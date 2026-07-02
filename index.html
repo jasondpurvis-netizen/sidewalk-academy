@@ -1014,11 +1014,11 @@ window.autoDraft=async function(){
     if(pr.maxShift && hrs > +pr.maxShift + 1e-9) return false;
     const cap=minorCapEnd(n,iso); if(cap!=null){ const se=parseClock(sl.end); if(se!=null && se>cap+1e-9) return false; const ag=ageOn(n,iso); if(ag!=null&&ag<16&&hrs>8+1e-9) return false; }
     if(minRest){ const le=lastEnd[n]; if(le){ const gap=Math.round((new Date(iso+'T00:00')-new Date(le.iso+'T00:00'))/86400000); const ss=parseClock(sl.start); if(ss!=null&&gap>=0){ if(((gap*24)-le.end)+ss < minRest-1e-9) return false; } } }
-    const mx=pr.maxHrs?+pr.maxHrs:otW; if((hoursBy[n]||0)+hrs > mx+1e-9) return false;
+    const mx=(pr.maxHrs&&+pr.maxHrs>0)?+pr.maxHrs:otW; if((hoursBy[n]||0)+hrs > mx+1e-9) return false;
     const maxD=pr.maxDays?+pr.maxDays:5; { const dset=daysBy[n]; if((!dset||!dset.has(iso)) && (dset?dset.size:0) >= maxD) return false; }
     return true; };
   const allNames=[]; Object.keys(roster).forEach(p=>roster[p].forEach(n=>allNames.push(n)));
-  const capOf=n=>{ const mx=(profileOf(n)||{}).maxHrs; return mx?+mx:otW; }; // ceiling: their max, else the OT line
+  const capOf=n=>{ const mx=(profileOf(n)||{}).maxHrs; return (mx&&+mx>0)?+mx:otW; }; // ceiling: their max (if valid), else the OT line
   const prio=n=>{ const p=+((profileOf(n)||{}).priority); if(p) return p; return posOf(n)==='Trainee'?5:3; }; // who gets hours first: 1=protect … 5=last (trainees fill last by default)
   // Coverage is generic: anyone qualified can cover any slot (rank only sets PRIORITY). Owners aren't auto-scheduled onto the floor.
   const canCover=(n)=>{ const pp=posOf(n); return pp!=='Owner'&&pp!=='Unassigned'; };
