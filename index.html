@@ -1107,7 +1107,7 @@ async function vOnboarding(v){
   const [rh,rs,rpf,rsh]=await Promise.all([
     sb.from('hires').select('*').order('start_date',{ascending:false}),
     sb.from('onboarding_steps').select('*').order('position'),
-    sb.from('profiles').select('name,role,email'),
+    sb.from('profiles').select('name,role'),
     sb.from('shifts').select('person_name')
   ]);
   await loadPositions(); await loadArchived();
@@ -1116,9 +1116,10 @@ async function vOnboarding(v){
   (rpf.data||[]).filter(p=>p.role!=='admin').forEach(p=>set.add(p.name));
   (rsh.data||[]).forEach(s=>{ if(s.person_name) set.add(s.person_name); });
   Object.keys(window._posMap||{}).forEach(n=>set.add(n));
+  [...(window._archived||[])].forEach(n=>set.add(n));
   const rosterAll=[...set].filter(Boolean);
   const roster=rosterAll.filter(n=>!isArchived(n));
-  const archivedList=rosterAll.filter(n=>isArchived(n)).sort();
+  const archivedList=[...(window._archived||[])].filter(Boolean).sort();
   const groups={}; roster.forEach(n=>{ const p=posOf(n); (groups[p]=groups[p]||[]).push(n); });
   const ordered=Object.keys(groups).sort((a,b)=>{const ia=POS_ORDER.indexOf(a),ib=POS_ORDER.indexOf(b);return (ia<0?99:ia)-(ib<0?99:ib)||a.localeCompare(b);});
 
