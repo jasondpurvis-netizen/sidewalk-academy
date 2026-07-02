@@ -1002,8 +1002,8 @@ window.autoDraft=async function(){
   const hhmm=h=>{ h=Math.round(h*4)/4; let hh=Math.floor(h+1e-9), mm=Math.round((h-hh)*60); if(mm>=60){hh++;mm-=60;} return String(hh).padStart(2,'0')+':'+String(mm).padStart(2,'0'); };
   const clampFloor=st=>(st&&st<OPEN_FLOOR)?OPEN_FLOOR:st;
   const covDays=cov.days||{}; const shiftLen=+(cov.shiftLen)||8; const mMin=+(cov.minLen)||4, mMax=+(cov.maxLen)||8; const floorH=parseClock(OPEN_FLOOR);
-  // Build a day's shifts FROM YOUR MATRIX: cover the headcount curve with staggered shifts — a shift begins when your headcount rises, ends when it falls; short dips are smoothed so nobody gets a 1-hour shift; shifts capped between min/max length
-  const genMatrix=dw=>{ const M=cov.matrix; if(!M||!M.blocks||!M.blocks.length) return null; const rows=M.blocks.map(b=>({s:parseClock(b.s),e:parseClock(b.e),need:+((b.n||[])[dw]||0)})).filter(b=>b.s!=null&&b.e!=null&&b.e>b.s).sort((a,b)=>a.s-b.s); if(!rows.length||!rows.some(r=>r.need>0)) return null; const dayStart=rows[0].s, dayEnd=rows[rows.length-1].e; let active=[]; const out=[]; for(let i=0;i<rows.length;i++){ const b=rows[i]; const horizon=b.s+mMin; let futMax=b.need; rows.forEach(r=>{ if(r.s<horizon-1e-9 && r.e>b.s+1e-9) futMax=Math.max(futMax,r.need); }); while(active.length<b.need) active.push({start:b.s}); active.sort((x,z)=>x.start-z.start); while(active.length>b.need && active.length>futMax){ const sh=active.shift(); out.push({start:sh.start,end:b.s}); } for(let k=active.length-1;k>=0;k--){ if(b.s-active[k].start>=mMax-1e-9){ out.push({start:active[k].start,end:b.s}); active.splice(k,1); active.push({start:b.s}); } } } active.forEach(sh=>out.push({start:sh.start,end:dayEnd})); return out.map(sh=>{ let s=sh.start,e=sh.end; if(e-s<mMin-1e-9) s=Math.max(dayStart,e-mMin); if(floorH!=null&&s<floorH) s=floorH; return {dow:dw,start:hhmm(s),end:hhmm(e),kind:'shift',station:''}; }).filter(x=>parseClock(x.end)>parseClock(x.start)); };
+  // Build a day's shifts FROM YOUR MATRIX by HORIZONTAL LAYERING: each demand level = one shift spanning the whole time it's needed, so the opener works a full shift (open→close) instead of a stub, and peak surges become short mid shifts. Splits any shift over max length; extends any under min length.
+  const genMatrix=dw=>{ const M=cov.matrix; if(!M||!M.blocks||!M.blocks.length) return null; const rows=M.blocks.map(b=>({s:parseClock(b.s),e:parseClock(b.e),need:+((b.n||[])[dw]||0)})).filter(b=>b.s!=null&&b.e!=null&&b.e>b.s).sort((a,b)=>a.s-b.s); if(!rows.length) return null; const peak=Math.max.apply(null,rows.map(r=>r.need)); if(peak<=0) return null; const dayStart=rows[0].s, dayEnd=rows[rows.length-1].e; const out=[]; for(let L=1;L<=peak;L++){ let segS=null,segE=null; rows.forEach(r=>{ if(r.need>=L){ if(segS==null)segS=r.s; segE=r.e; } }); if(segS==null) continue; let s=segS; if(floorH!=null&&s<floorH)s=floorH; const e=segE, span=e-s; if(span<=mMax+1+1e-9){ out.push({s,e}); } else { const pieces=Math.ceil(span/mMax), plen=span/pieces; for(let i=0;i<pieces;i++) out.push({s:s+i*plen, e:(i===pieces-1)?e:s+(i+1)*plen}); } } return out.map(sh=>{ let s=sh.s,e=sh.e; if(e-s<mMin-1e-9){ let ne=Math.min(dayEnd,s+mMin), ns=s; if(ne-ns<mMin-1e-9) ns=Math.max(dayStart,ne-mMin); s=ns; e=ne; if(floorH!=null&&s<floorH){ s=floorH; e=Math.min(dayEnd,s+mMin);} } return {dow:dw,start:hhmm(s),end:hhmm(e),kind:'shift',station:''}; }).filter(x=>parseClock(x.end)>parseClock(x.start)); };
   // Fallback (no matrix set): simple open/mid/close from the flat coverage rule
   const genDay=dw=>{ const c=covDays[dw]; if(!(c&&+c.people>0)) return null; const inH=parseClock(c.in||OPEN_FLOOR), outH=parseClock(c.out||'14:00'); if(inH==null||outH==null||outH-inH<2) return null; const N=+c.people, nO=Math.min(+(c.openers||1),N), nC=Math.min(+(c.closers||0), Math.max(0,N-nO)); const arr=[]; const mk=(s,e)=>({dow:dw,start:hhmm(Math.max(inH,s)),end:hhmm(Math.min(outH,e)),kind:'shift',station:''}); for(let i=0;i<nO;i++) arr.push(mk(inH, inH+shiftLen)); for(let i=0;i<nC;i++) arr.push(mk(outH-shiftLen, outH)); const mids=N-nO-nC, span=Math.max(0,(outH-shiftLen)-inH); for(let i=0;i<mids;i++){ const st=(mids===1)?inH+span/2:inH+span*(i/(mids-1)); arr.push(mk(st, st+shiftLen)); } return arr; };
   // Days with no matrix and no flat rule fall back to the template's shape (clamped to your opening floor)
@@ -1021,11 +1021,11 @@ window.autoDraft=async function(){
     if(pr.maxShift && hrs > +pr.maxShift + 1e-9) return false;
     const cap=minorCapEnd(n,iso); if(cap!=null){ const se=parseClock(sl.end); if(se!=null && se>cap+1e-9) return false; const ag=ageOn(n,iso); if(ag!=null&&ag<16&&hrs>8+1e-9) return false; }
     if(minRest){ const le=lastEnd[n]; if(le){ const gap=Math.round((new Date(iso+'T00:00')-new Date(le.iso+'T00:00'))/86400000); const ss=parseClock(sl.start); if(ss!=null&&gap>=0){ if(((gap*24)-le.end)+ss < minRest-1e-9) return false; } } }
-    const mx=(pr.maxHrs&&+pr.maxHrs>0)?+pr.maxHrs:otW; if((hoursBy[n]||0)+hrs > mx+1e-9) return false;
+    const _mx=+pr.maxHrs,_mn=+pr.minHrs; const mx=(_mx>0 && (!(_mn>0)||_mx>=_mn))?_mx:otW; if((hoursBy[n]||0)+hrs > mx+1e-9) return false;
     const maxD=pr.maxDays?+pr.maxDays:5; { const dset=daysBy[n]; if((!dset||!dset.has(iso)) && (dset?dset.size:0) >= maxD) return false; }
     return true; };
   const allNames=[]; Object.keys(roster).forEach(p=>roster[p].forEach(n=>allNames.push(n)));
-  const capOf=n=>{ const mx=(profileOf(n)||{}).maxHrs; return (mx&&+mx>0)?+mx:otW; }; // ceiling: their max (if valid), else the OT line
+  const capOf=n=>{ const pr=profileOf(n)||{}; const mx=+pr.maxHrs, mn=+pr.minHrs; return (mx>0 && (!(mn>0)||mx>=mn))?mx:otW; }; // ceiling: their max (ignored if invalid — ≤0 or below their own minimum), else the OT line
   const prio=n=>{ const p=+((profileOf(n)||{}).priority); if(p) return p; return posOf(n)==='Trainee'?5:3; }; // who gets hours first: 1=protect … 5=last (trainees fill last by default)
   // Coverage is generic: anyone qualified can cover any slot (rank only sets PRIORITY). Owners aren't auto-scheduled onto the floor.
   const canCover=(n)=>{ const pp=posOf(n); return pp!=='Owner'&&pp!=='Unassigned'; };
@@ -1034,22 +1034,18 @@ window.autoDraft=async function(){
   const hrsOf=sl=>shiftHours({start_time:sl.start,end_time:sl.end});
   const commit=(pick,sl,roleOverride)=>{ const iso=isoDays[sl.dow]; hoursBy[pick]=(hoursBy[pick]||0)+hrsOf(sl); (daysBy[pick]=daysBy[pick]||new Set()).add(iso); const e=parseClock(sl.end); lastEnd[pick]={iso,end:(e!=null?e:0)}; draft.push({person_name:pick,role:roleOverride||lblOf(sl)||posOf(pick),on_date:iso,start_time:sl.start,end_time:sl.end,kind:sl.kind,user_id:null}); sl._done=true; };
   const openSlot=(sl,role)=>{ const iso=isoDays[sl.dow]; unfilled.push({day:iso,station:role||lblOf(sl),start:sl.start,end:sl.end}); draft.push({person_name:'__OPEN__',role:role||lblOf(sl)||'Open',on_date:iso,start_time:sl.start,end_time:sl.end,kind:'shift',user_id:null}); sl._done=true; };
-  // ---- LEADERSHIP BACKBONE: every day gets a leader opening and a leader closing (a manager/supervisor runs each shift) ----
+  // ---- PRIORITY-DRIVEN FILL ----
+  // Your highest-priority people get the LONGEST shifts first (so full-timers hit their minimums). The opener & closer of each day must be a leader — and because openers are now full shifts, a leader lands there AND gets real hours. Lower tiers fill the blanks.
   const leaderGaps=[];
-  if(requireLeaderCoverage){
-    const daySlots={}; slots.forEach(s=>{ (daySlots[s.dow]=daySlots[s.dow]||[]).push(s); });
-    const pickLeaderFor=(sl)=>{ const iso=isoDays[sl.dow]; const hrs=hrsOf(sl); const pool=allNames.filter(n=>isLeader(n)&&canCover(n)&&eligible(n,sl,iso,hrs)); pool.sort((a,b)=>{ const da=(daysBy[a]?daysBy[a].size:0), db=(daysBy[b]?daysBy[b].size:0); if(da!==db) return da-db; const oa=((hoursBy[a]||0)+hrs>capOf(a)+1e-9)?1:0, ob=((hoursBy[b]||0)+hrs>capOf(b)+1e-9)?1:0; if(oa!==ob) return oa-ob; return (hoursBy[a]||0)-(hoursBy[b]||0) || POS_ORDER.indexOf(posOf(a))-POS_ORDER.indexOf(posOf(b)); }); return pool[0]||null; };
-    const dws=Object.keys(daySlots).map(Number);
-    // Pass 1 — a leader OPENS each day (spread leaders across all days first)
-    dws.forEach(dw=>{ const sl=daySlots[dw].filter(s=>!s._done).sort((a,b)=>(a.start||'').localeCompare(b.start||''))[0]; if(!sl)return; const L=pickLeaderFor(sl); if(L) commit(L,sl); else { openSlot(sl,'Opening lead'); leaderGaps.push({day:isoDays[dw],type:'opening'}); } });
-    // Pass 2 — a leader CLOSES each day
-    dws.forEach(dw=>{ const sl=daySlots[dw].filter(s=>!s._done).sort((a,b)=>(b.start||'').localeCompare(a.start||''))[0]; if(!sl)return; const L=pickLeaderFor(sl); if(L) commit(L,sl); else { openSlot(sl,'Closing lead'); leaderGaps.push({day:isoDays[dw],type:'closing'}); } });
-  }
-  // ---- GENERIC FILL for the rest, busiest days first, top-down ----
-  slots.filter(s=>!s._done).forEach(sl=>{ const iso=isoDays[sl.dow]; const hrs=hrsOf(sl);
-    const pool=allNames.filter(n=>canCover(n)&&eligible(n,sl,iso,hrs));
-    pool.sort((a,b)=>{ const oa=((hoursBy[a]||0)+hrs>capOf(a)+1e-9)?1:0, ob=((hoursBy[b]||0)+hrs>capOf(b)+1e-9)?1:0; if(oa!==ob) return oa-ob; const pa=prio(a), pb=prio(b); if(pa!==pb) return pa-pb; const ua=under(a)?0:1, ub=under(b)?0:1; if(ua!==ub) return ua-ub; return (hoursBy[a]||0)-(hoursBy[b]||0) || a.localeCompare(b); });
-    const pick=pool[0]||null; if(pick) commit(pick,sl); else openSlot(sl);
+  const daySlots={}; slots.forEach(s=>{ (daySlots[s.dow]=daySlots[s.dow]||[]).push(s); });
+  if(requireLeaderCoverage) Object.keys(daySlots).forEach(dw=>{ const arr=daySlots[dw].slice().sort((a,b)=>(a.start||'').localeCompare(b.start||'')); if(arr.length){ arr[0]._leadReq='opening'; const last=arr[arr.length-1]; if(!last._leadReq) last._leadReq='closing'; } });
+  // longest shifts first (so anchors + full shifts go to top priority), then busiest day
+  const orderSlots=slots.slice().sort((a,b)=> (hrsOf(b)-hrsOf(a)) || ((_dem[b.dow]||0)-(_dem[a.dow]||0)) || a.dow-b.dow || (a.start||'').localeCompare(b.start||''));
+  orderSlots.forEach(sl=>{ if(sl._done) return; const iso=isoDays[sl.dow]; const hrs=hrsOf(sl); const needLeader=!!sl._leadReq;
+    const pool=allNames.filter(n=>canCover(n)&&(!needLeader||isLeader(n))&&eligible(n,sl,iso,hrs));
+    pool.sort((a,b)=>{ const oa=((hoursBy[a]||0)+hrs>capOf(a)+1e-9)?1:0, ob=((hoursBy[b]||0)+hrs>capOf(b)+1e-9)?1:0; if(oa!==ob) return oa-ob; const ua=under(a)?0:1, ub=under(b)?0:1; if(ua!==ub) return ua-ub; const pa=prio(a), pb=prio(b); if(pa!==pb) return pa-pb; return (hoursBy[a]||0)-(hoursBy[b]||0) || a.localeCompare(b); });
+    const pick=pool[0]||null;
+    if(pick) commit(pick,sl); else if(needLeader){ openSlot(sl, sl._leadReq==='opening'?'Opening lead':'Closing lead'); leaderGaps.push({day:iso,type:sl._leadReq}); } else openSlot(sl);
   });
   if(draft.length) await sb.from('shifts').insert(draft);
   const flags=[];
