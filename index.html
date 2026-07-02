@@ -724,7 +724,7 @@ async function vToday(v){
   const items=ri.data||[], rots=rr.data||[], notes=rn.data||[], upcoming=ru.data||[];
   const dueRots=rots.filter(r=>{ if(!r.last_done) return true; const d=new Date(r.last_done); d.setDate(d.getDate()+(r.cadence_days||7)); return d.toISOString().slice(0,10)<=iso; });
   const ojrItem=items.find(i=>i.kind==='ojr');
-  const boardItems=items.filter(i=>!['ojr','mission','vision','pos'].includes(i.kind));
+  const boardItems=items.filter(i=>!['ojr','mission','vision','pos','pool'].includes(i.kind));
   const open=boardItems.filter(i=>!i.done);
   const parts=[];
   if(dueRots.length) parts.push(dueRots.length+' cleaning'+(dueRots.length>1?'s':'')+' due');
@@ -773,10 +773,10 @@ async function vSchedule(v){
   const stab=state.ctx.stab||'overview';
   setTitle('Operations','Scheduling, team & the daily log — one place');
   const _w=document.querySelector('.wrap'); if(_w) _w.style.maxWidth='1180px';
-  const tabs=[['overview','Overview'],['schedule','Schedule'],['team','Team'],['availability','Availability'],['timeoff','Time off'],['reports','Reports']];
+  const tabs=[['overview','Overview'],['schedule','Schedule'],['team','Team'],['availability','Availability'],['timeoff','Time off'],['pool','Shift pool'],['reports','Reports']];
   v.innerHTML=`<div class="schtabs">`+tabs.map(t=>`<button class="schtab${stab===t[0]?' on':''}" onclick="schGo('${t[0]}')">${t[1]}</button>`).join('')+`</div><div id="schbody"><div class="muted">Loading…</div></div>`;
   const body=document.getElementById('schbody');
-  ({overview:schOverview, schedule:schBoard, team:schTeam, availability:schAvail, timeoff:schTimeoff, logbook:schLogbook, reports:schReports}[stab]||schOverview)(body);
+  ({overview:schOverview, schedule:schBoard, team:schTeam, availability:schAvail, timeoff:schTimeoff, pool:schPool, logbook:schLogbook, reports:schReports}[stab]||schOverview)(body);
 }
 window.schGo=function(t){ state.ctx.stab=t; vSchedule(document.getElementById('view')); };
 /* ---------- Positions: single source of truth (stored as day_items kind='pos') ---------- */
@@ -992,6 +992,40 @@ async function _avUpsert(person,wd,fields){
 window.avMe=function(wd,can,btn){ const seg=btn.parentNode; seg.querySelectorAll('.avbtn').forEach(b=>b.classList.remove('on','off')); btn.classList.add(can?'on':'off'); _avUpsert(state.profile.name,wd,{can_work:can}); };
 window.avMeNote=function(wd,val){ _avUpsert(state.profile.name,wd,{note:val||null}); };
 window.avToggle=function(el){ const person=el.getAttribute('data-person'); const wd=+el.getAttribute('data-wd'); const nowOn=!el.classList.contains('on'); el.classList.toggle('on',nowOn); el.classList.toggle('off',!nowOn); const hadNote=el.querySelector('.avdot'); el.innerHTML=(nowOn?'✓':'✕')+(hadNote?'<i class="avdot"></i>':''); _avUpsert(person,wd,{can_work:nowOn}); };
+async function schPool(v){
+  const isAdmin=state.profile&&state.profile.role==='admin';
+  const me=state.profile.name;
+  v.innerHTML='<div class="muted">Loading…</div>';
+  const today=new Date(); const todayIso=isoDate(today); const end=new Date(); end.setDate(end.getDate()+21); const endIso=isoDate(end);
+  const [rsh,rpl,rpf]=await Promise.all([
+    sb.from('shifts').select('*').gte('on_date',todayIso).lte('on_date',endIso).order('on_date'),
+    sb.from('day_items').select('*').eq('kind','pool'),
+    sb.from('profiles').select('name,id')
+  ]);
+  await loadPositions();
+  const shifts=rsh.data||[]; window._poolShifts={}; shifts.forEach(s=>window._poolShifts[s.id]=s);
+  const profById={}; (rpf.data||[]).forEach(p=>profById[p.name]=p.id); window._poolProf=profById;
+  const pool=(rpl.data||[]).map(r=>{ let d={}; try{d=JSON.parse(r.detail||'{}');}catch(e){} return {id:r.id,on_date:r.on_date,d}; });
+  window._pool={}; pool.forEach(p=>window._pool[p.id]=p);
+  const fmtSlot=s=> fmtDay(_d(s.on_date))+' · '+(s.start_time?fmtClock(s.start_time):'shift')+(s.end_time?'–'+fmtClock(s.end_time):'');
+  let h=`<div class="faint" style="font-size:12.5px;margin-bottom:14px">Give up a shift you can't work, or pick up one a teammate dropped. ${isAdmin?'You approve every trade before it becomes real.':'Leadership approves every trade before it becomes real.'}</div>`;
+  const claimed=pool.filter(p=>p.d.status==='claimed');
+  if(isAdmin&&claimed.length){ h+=`<div class="sec">Needs your approval</div><div class="card" style="margin-bottom:18px">`+claimed.map(p=>{ const s=window._poolShifts[p.d.shift_id]; return `<div class="row" style="padding:12px 15px;border-bottom:1px solid var(--line)"><div style="flex:1;min-width:0"><div style="font-weight:600;font-size:14px">${esc(p.d.claimant)} → picks up ${esc(p.d.requester)}'s shift</div><div class="faint" style="font-size:12.5px">${s?esc(fmtSlot(s)):esc(fmtDay(_d(p.on_date)))} · ${esc(p.d.role||'')}</div></div><div class="row" style="gap:6px"><button class="btn pri" style="width:auto;padding:5px 10px" onclick="poolApprove(${p.id})">Approve</button><button class="btn" style="width:auto;padding:5px 10px" onclick="poolDeny(${p.id})">Deny</button></div></div>`; }).join('')+`</div>`; }
+  const grabbable=pool.filter(p=>p.d.status==='open'&&p.d.requester!==me);
+  h+=`<div class="sec">Up for grabs</div>`;
+  if(!grabbable.length) h+=`<div class="card" style="padding:20px;text-align:center;margin-bottom:18px"><div class="faint">Nothing open right now. When a teammate gives up a shift, it shows here to pick up.</div></div>`;
+  else h+=`<div class="card" style="margin-bottom:18px">`+grabbable.map(p=>{ const s=window._poolShifts[p.d.shift_id]; return `<div class="row" style="padding:12px 15px;border-bottom:1px solid var(--line)"><div style="flex:1;min-width:0"><div style="font-weight:600;font-size:14px">${s?esc(fmtSlot(s)):esc(fmtDay(_d(p.on_date)))}</div><div class="faint" style="font-size:12.5px">${esc(p.d.role||'')} · was ${esc(p.d.requester)}'s</div></div><button class="btn pri" style="width:auto;padding:6px 12px" onclick="poolPickup(${p.id})">Pick up</button></div>`; }).join('')+`</div>`;
+  const myShifts=shifts.filter(s=>s.person_name===me);
+  h+=`<div class="sec">My shifts</div>`;
+  if(!myShifts.length) h+=`<div class="card" style="padding:20px;text-align:center"><div class="faint">You have no upcoming shifts in the next 3 weeks.</div></div>`;
+  else h+=`<div class="card">`+myShifts.map(s=>{ const poolItem=pool.find(p=>p.d.shift_id===s.id&&p.d.requester===me); const st=poolItem?poolItem.d.status:null; return `<div class="row" style="padding:12px 15px;border-bottom:1px solid var(--line)"><div style="flex:1;min-width:0"><div style="font-weight:600;font-size:14px">${esc(fmtSlot(s))}</div><div class="faint" style="font-size:12.5px">${esc(posOf(me))}${st?' · <b style="color:var(--brand)">'+(st==='open'?'up for grabs':'picked up — pending approval')+'</b>':''}</div></div>${poolItem?`<button class="btn" style="width:auto;padding:6px 11px" onclick="poolCancel(${poolItem.id})">${st==='claimed'?'Withdraw':'Cancel'}</button>`:`<button class="btn" style="width:auto;padding:6px 11px" onclick="poolOffer(${s.id})">Give up</button>`}</div>`; }).join('')+`</div>`;
+  v.innerHTML=h;
+}
+window.poolOffer=async function(shiftId){ const s=(window._poolShifts||{})[shiftId]; if(!s)return; const d={shift_id:shiftId,requester:s.person_name,start:s.start_time,end:s.end_time,role:posOf(s.person_name),claimant:null,status:'open'}; await sb.from('day_items').insert({kind:'pool',on_date:s.on_date,title:s.person_name,detail:JSON.stringify(d),created_by:state.user.id}); schGo('pool'); };
+window.poolCancel=async function(id){ await sb.from('day_items').delete().eq('id',id); schGo('pool'); };
+window.poolPickup=async function(id){ const p=(window._pool||{})[id]; if(!p)return; const nd=Object.assign({},p.d,{claimant:state.profile.name,status:'claimed'}); await sb.from('day_items').update({detail:JSON.stringify(nd)}).eq('id',id); schGo('pool'); };
+window.poolApprove=async function(id){ const p=(window._pool||{})[id]; if(!p)return; const c=p.d.claimant; if(c){ await sb.from('shifts').update({person_name:c,role:posOf(c),user_id:(window._poolProf||{})[c]||null}).eq('id',p.d.shift_id); } await sb.from('day_items').delete().eq('id',id); schGo('pool'); };
+window.poolDeny=async function(id){ const p=(window._pool||{})[id]; if(!p)return; const nd=Object.assign({},p.d,{claimant:null,status:'open'}); await sb.from('day_items').update({detail:JSON.stringify(nd)}).eq('id',id); schGo('pool'); };
 async function schTimeoff(v){
   const isAdmin=state.profile&&state.profile.role==='admin';
   const r=await sb.from('time_off').select('*').order('start_date',{ascending:false});
@@ -1095,7 +1129,7 @@ async function vCalendar(v){
   let data;
   if(state.calCache && state.calCache.ym===ym){ data=state.calCache.data; }
   else { v.innerHTML='<div class="muted">Loading…</div>'; const r=await sb.from('day_items').select('*').gte('on_date',first).lte('on_date',last).order('created_at'); data=r.data||[]; state.calCache={ym,data}; }
-  const CAL_HIDE=new Set(['pos','ojr','mission','vision']);
+  const CAL_HIDE=new Set(['pos','ojr','mission','vision','pool']);
   const byd={}; (data||[]).forEach(it=>{ if(CAL_HIDE.has(it.kind))return; (byd[it.on_date]=byd[it.on_date]||[]).push(it); });
   const hol={}; usHolidays(y).forEach(x=>hol[x.date]=x);
   const todayIso=isoDate(new Date()); const sel=state.ctx.day||(ym===todayIso.slice(0,7)?todayIso:first);
