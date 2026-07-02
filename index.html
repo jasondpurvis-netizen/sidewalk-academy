@@ -1038,7 +1038,7 @@ window.autoDraft=async function(){
   // Your highest-priority people get the LONGEST shifts first (so full-timers hit their minimums). The opener & closer of each day must be a leader — and because openers are now full shifts, a leader lands there AND gets real hours. Lower tiers fill the blanks.
   const leaderGaps=[];
   const daySlots={}; slots.forEach(s=>{ (daySlots[s.dow]=daySlots[s.dow]||[]).push(s); });
-  if(requireLeaderCoverage) Object.keys(daySlots).forEach(dw=>{ const arr=daySlots[dw].slice().sort((a,b)=>(a.start||'').localeCompare(b.start||'')); if(arr.length){ arr[0]._leadReq='opening'; const last=arr[arr.length-1]; if(!last._leadReq) last._leadReq='closing'; } });
+  if(requireLeaderCoverage) Object.keys(daySlots).forEach(dw=>{ const arr=daySlots[dw]; if(!arr.length) return; let opener=arr[0], closer=arr[0]; arr.forEach(sl=>{ if((sl.start||'')<(opener.start||'')) opener=sl; if((sl.end||'')>(closer.end||'')) closer=sl; }); opener._leadReq='opening'; if(!closer._leadReq) closer._leadReq='closing'; }); // opener = earliest start, closer = latest END (the shift that actually closes)
   // longest shifts first (so anchors + full shifts go to top priority), then busiest day
   const orderSlots=slots.slice().sort((a,b)=> (hrsOf(b)-hrsOf(a)) || ((_dem[b.dow]||0)-(_dem[a.dow]||0)) || a.dow-b.dow || (a.start||'').localeCompare(b.start||''));
   orderSlots.forEach(sl=>{ if(sl._done) return; const iso=isoDays[sl.dow]; const hrs=hrsOf(sl); const needLeader=!!sl._leadReq;
