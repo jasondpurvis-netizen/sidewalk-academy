@@ -710,18 +710,22 @@ async function vToday(v){
   ]);
   const items=ri.data||[], rots=rr.data||[], notes=rn.data||[], upcoming=ru.data||[];
   const dueRots=rots.filter(r=>{ if(!r.last_done) return true; const d=new Date(r.last_done); d.setDate(d.getDate()+(r.cadence_days||7)); return d.toISOString().slice(0,10)<=iso; });
-  const open=items.filter(i=>!i.done);
+  const ojrItem=items.find(i=>i.kind==='ojr');
+  const boardItems=items.filter(i=>!['ojr','mission','vision','pos'].includes(i.kind));
+  const open=boardItems.filter(i=>!i.done);
   const parts=[];
   if(dueRots.length) parts.push(dueRots.length+' cleaning'+(dueRots.length>1?'s':'')+' due');
   const orders=open.filter(i=>i.kind==='order'); if(orders.length) parts.push(orders.length+' pickup order'+(orders.length>1?'s':''));
   const ppl=open.filter(i=>i.kind==='people'||i.kind==='training'); if(ppl.length) parts.push(ppl.length+' people note'+(ppl.length>1?'s':''));
   const other=open.filter(i=>['task'].includes(i.kind)); if(other.length) parts.push(other.length+' task'+(other.length>1?'s':''));
-  let h=`<div class="card" style="padding:16px 18px;margin-bottom:18px;background:var(--brand-soft);border-color:var(--brand-line)"><div style="font-weight:700;margin-bottom:4px">Here's today</div><div style="font-size:14px;color:#333">${parts.length?esc(parts.join(' · ')):'Nothing logged yet. Add what the day holds below.'}</div></div>`;
+  let h='';
+  if(ojrItem&&ojrItem.detail) h+=`<div class="card" style="padding:13px 16px;margin-bottom:14px;background:#FEECEC;border-color:#F4C7C7"><b style="color:#DC2626"><i class="ti ti-user-star"></i> Today's OJR: ${esc(ojrItem.detail)}</b> <span class="muted" style="font-size:13px">— in charge of the shift today.</span></div>`;
+  h+=`<div class="card" style="padding:16px 18px;margin-bottom:18px;background:var(--brand-soft);border-color:var(--brand-line)"><div style="font-weight:700;margin-bottom:4px">Here's today</div><div style="font-size:14px;color:#333">${parts.length?esc(parts.join(' · ')):'Nothing logged yet. Add what the day holds below.'}</div></div>`;
   const hToday=usHolidays(new Date().getFullYear()).find(x=>x.date===iso);
   if(hToday) h+=`<div class="card" style="padding:13px 16px;margin-bottom:16px;background:var(--amber-soft);border-color:var(--amber)"><b style="color:var(--amber)">🎉 ${esc(hToday.name)} today</b> <span class="muted" style="font-size:13px">${hToday.closed?"— we're closed. End of day: any perishable prepped today is waste after close. Don't over-prep.":"— banks and government closed, so expect it busier. Bump prep and add staff."}</span></div>`;
   if(dueRots.length){ h+=`<div class="sec">Cleaning / rotation due</div><div class="card">`+dueRots.map(r=>`<div class="lesson-row"><div style="font-size:16px">🧽</div><div style="flex:1;min-width:0"><div style="font-weight:500">${esc(r.title)}</div><div class="faint" style="font-size:12px">${r.area?esc(r.area)+' · ':''}every ${r.cadence_days||7} days${r.last_done?' · last done '+r.last_done:' · never logged'}</div></div><button class="btn" style="width:auto" onclick="doneRotation(${r.id})">Mark done</button></div>`).join('')+`</div>`; }
   h+=`<div class="sec">On the board today</div><div class="card">`;
-  h+=items.length? items.map(i=>`<div class="lesson-row"><div style="font-size:16px">${i.kind==='order'?'🛍️':i.kind==='training'?'🎓':i.kind==='people'?'👋':i.kind==='note'?'📝':'📌'}</div><div style="flex:1;min-width:0"><div style="font-weight:500;${i.done?'text-decoration:line-through;color:#999':''}">${esc(i.title)}</div>${i.detail?`<div class="faint" style="font-size:12px">${esc(i.detail)}</div>`:''}</div><button class="btn" style="width:auto" onclick="toggleDayItem(${i.id},${i.done?'false':'true'})">${i.done?'Undo':'Done'}</button></div>`).join(''):`<div style="padding:22px;text-align:center" class="faint">Nothing on the board yet.</div>`;
+  h+=boardItems.length? boardItems.map(i=>`<div class="lesson-row"><div style="font-size:16px">${i.kind==='order'?'🛍️':i.kind==='training'?'🎓':i.kind==='people'?'👋':i.kind==='note'?'📝':'📌'}</div><div style="flex:1;min-width:0"><div style="font-weight:500;${i.done?'text-decoration:line-through;color:#999':''}">${esc(i.title)}</div>${i.detail?`<div class="faint" style="font-size:12px">${esc(i.detail)}</div>`:''}</div><button class="btn" style="width:auto" onclick="toggleDayItem(${i.id},${i.done?'false':'true'})">${i.done?'Undo':'Done'}</button></div>`).join(''):`<div style="padding:22px;text-align:center" class="faint">Nothing on the board yet.</div>`;
   h+=`</div>`;
   if(upcoming.length){ const byd={}; upcoming.forEach(u=>{ (byd[u.on_date]=byd[u.on_date]||[]).push(u); }); h+=`<div class="sec">Coming up</div><div class="card">`+Object.keys(byd).sort().map(d=>{ const dd=new Date(d+'T00:00:00'); const lbl=dd.toLocaleDateString(undefined,{weekday:'long',month:'short',day:'numeric'}); return `<div style="padding:10px 14px;border-bottom:1px solid var(--line)"><div style="font-weight:600;font-size:13px;margin-bottom:4px">${lbl}</div>`+byd[d].map(u=>`<div class="row" style="gap:8px;padding:3px 0"><span style="font-size:14px">${u.kind==='order'?'🛍️':u.kind==='note'?'📝':u.kind==='people'?'👋':u.kind==='training'?'🎓':'📌'}</span><span style="flex:1;font-size:13px">${esc(u.title)}${u.detail?' <span class="faint">— '+esc(u.detail)+'</span>':''}</span>${isAdmin?`<span style="cursor:pointer;color:var(--faint)" onclick="delDayItem(${u.id})">✕</span>`:''}</div>`).join('')+`</div>`; }).join('')+`</div>`; }
   h+=`<div class="card" style="padding:14px;margin-top:10px"><div class="row" style="gap:8px;flex-wrap:wrap"><select id="ditype" style="padding:9px;border:1px solid var(--line2);border-radius:8px;background:var(--card);color:var(--ink);font-family:inherit"><option value="task">Task</option><option value="order">Pickup order</option><option value="note">Note</option><option value="training">Training</option><option value="people">People (first day…)</option></select><input id="dititle" placeholder="What's happening?" onkeydown="if(event.key==='Enter')addDayItem()" style="flex:1;min-width:150px;padding:9px 11px;border:1px solid var(--line2);border-radius:8px;background:var(--card);color:var(--ink);font-family:inherit"/><input id="didate" type="date" value="${iso}" title="Show on this day" style="padding:9px;border:1px solid var(--line2);border-radius:8px;background:var(--card);color:var(--ink);font-family:inherit"/></div><div class="row" style="gap:8px;margin-top:8px"><input id="didetail" placeholder="Details (optional) — e.g. 6 salt bagels, pickup 8am" onkeydown="if(event.key==='Enter')addDayItem()" style="flex:1;padding:9px 11px;border:1px solid var(--line2);border-radius:8px;background:var(--card);color:var(--ink);font-family:inherit"/><button class="btn pri" style="width:auto" onclick="addDayItem()">Add</button></div><div class="faint" style="font-size:12px;margin-top:7px">Set a future date to schedule something for that day's report — like a heads-up for Friday.</div></div>`;
@@ -777,14 +781,16 @@ async function schBoard(v){
   const base = state.ctx.wk ? wkDate(state.ctx.wk) : weekStart(new Date());
   const start=weekStart(base); const days=[...Array(7)].map((_,i)=>{ const d=new Date(start); d.setDate(d.getDate()+i); return d; });
   const isoDays=days.map(isoDate); const wkStart=isoDays[0];
-  const [rsh,rpf,rpay,rsal,rpub] = await Promise.all([
+  const [rsh,rpf,rpay,rsal,rpub,rojr] = await Promise.all([
     sb.from('shifts').select('*').gte('on_date',isoDays[0]).lte('on_date',isoDays[6]),
     sb.from('profiles').select('*'),
     sb.from('pay_rates').select('*'),
     sb.from('day_sales').select('*').gte('on_date',isoDays[0]).lte('on_date',isoDays[6]),
     sb.from('published_weeks').select('*').eq('week_start',wkStart).maybeSingle(),
+    sb.from('day_items').select('on_date,detail').eq('kind','ojr').gte('on_date',isoDays[0]).lte('on_date',isoDays[6]),
     loadPositions()
   ]);
+  const ojrByDay={}; (rojr.data||[]).forEach(o=>{ if(o.on_date) ojrByDay[o.on_date]=o.detail; });
   const shifts=rsh.data||[]; window._shifts={}; shifts.forEach(s=>window._shifts[s.id]=s); const team=(rpf.data||[]).filter(p=>p.role!=='admin'); window._team=team;
   const wage={}; (rpay.data||[]).forEach(p=>wage[p.person_name]=Number(p.wage)||0);
   const sales={}; (rsal.data||[]).forEach(d=>sales[d.on_date]=Number(d.sales)||0);
@@ -811,8 +817,8 @@ async function schBoard(v){
     h+=`<div class="band" style="background:${_bc}14;color:${_bc};border-left:4px solid ${_bc}">${esc(role)}</div>`;
     roles[role].forEach(p=>{
       let wHrs=0,wCost=0;
-      const cells=isoDays.map((iso,di)=>{ const list=byPD[p.name+'|'+iso]||[]; let cell='';
-        list.forEach(s=>{ const hrs=shiftHours(s); wHrs+=hrs; const c=hrs*(wage[p.name]||0); wCost+=c; dayHrs[di]+=hrs; dayCost[di]+=c; const tr=s.kind==='training'; cell+=`<div class="scard${tr?' train':''}"${isAdmin?` onclick="editShift(${s.id})" style="cursor:pointer"`:''}>${s.start_time?fmtClock(s.start_time):'shift'}${s.end_time?'–'+fmtClock(s.end_time):''}${tr?' · train':''}${isAdmin?`<span class="x" onclick="event.stopPropagation();delShift(${s.id})">×</span>`:''}</div>`; });
+      const cells=isoDays.map((iso,di)=>{ const list=byPD[p.name+'|'+iso]||[]; let cell=''; const isOjr=ojrByDay[iso]===p.name;
+        list.forEach(s=>{ const hrs=shiftHours(s); wHrs+=hrs; const c=hrs*(wage[p.name]||0); wCost+=c; dayHrs[di]+=hrs; dayCost[di]+=c; const tr=s.kind==='training'; const oj=isOjr?';border-color:#F4C7C7;background:#FEECEC':''; const styleAttr=isAdmin?` style="cursor:pointer${oj}"`:(isOjr?` style="border-color:#F4C7C7;background:#FEECEC"`:''); cell+=`<div class="scard${tr?' train':''}"${isAdmin?` onclick="editShift(${s.id})"`:''}${styleAttr}>${isOjr?'<span style="display:inline-block;background:#DC2626;color:#fff;font-size:9px;font-weight:800;letter-spacing:.03em;padding:1px 4px;border-radius:4px;margin-right:4px;vertical-align:middle">OJR</span>':''}${s.start_time?fmtClock(s.start_time):'shift'}${s.end_time?'–'+fmtClock(s.end_time):''}${tr?' · train':''}${isAdmin?`<span class="x" onclick="event.stopPropagation();delShift(${s.id})">×</span>`:''}</div>`; });
         return `<div class="daycell${iso===todayIso?' today':''}">${cell}</div>`;
       }).join('');
       const inits=(p.name||'?').split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
