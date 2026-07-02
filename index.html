@@ -477,12 +477,12 @@ async function vSummary(v){
   v.innerHTML=`<div class="muted">Loading…</div>`;
   const { data:profiles } = await sb.from("profiles").select("*");
   const { data:prog } = await sb.from("progress").select("user_id,lesson_id,at");
-  await loadArchived();
+  await loadPositions(); await loadArchived();
   const total = state.tracks.reduce((a,t)=>a+trackLessons(t.id).length,0);
   const byUser={}, lastAt={};
   (prog||[]).forEach(p=>{ byUser[p.user_id]=(byUser[p.user_id]||0)+1; if(p.at&&(!lastAt[p.user_id]||p.at>lastAt[p.user_id]))lastAt[p.user_id]=p.at; });
   const weekAgo=Date.now()-7*86400000; const weekDone=(prog||[]).filter(p=>p.at&&new Date(p.at).getTime()>=weekAgo).length;
-  const learners=(profiles||[]).filter(p=>p.role!=="admin"&&!isArchived(p.name)).map(p=>{
+  const learners=(profiles||[]).filter(p=>p.role!=="admin"&&!isArchived(p.name)&&(window._posMap&&window._posMap[p.name]&&window._posMap[p.name]!=='Owner')).map(p=>{
     const dn=byUser[p.id]||0, pct=total?Math.round(dn/total*100):0;
     let status= pct>=100?'certified': dn>0?'training':'notstarted';
     const days = lastAt[p.id]? Math.floor((Date.now()-new Date(lastAt[p.id]))/86400000) : null;
@@ -811,6 +811,7 @@ function lawRules(){ const j=(state.settings&&state.settings.law_jurisdiction)||
 window.POSCOL=v=>POS_COL[v]||'#94A3B8';
 async function loadPositions(){ const r=await sb.from('day_items').select('title,detail').eq('kind','pos'); const m={}; (r.data||[]).forEach(x=>{ if(x.title) m[x.title]=x.detail||'Unassigned'; }); window._posMap=m; return m; }
 function posOf(name){ return (window._posMap&&window._posMap[name])||'Unassigned'; }
+function rosterNames(){ return Object.keys(window._posMap||{}).filter(n=>n&&posOf(n)!=='Owner'&&!isArchived(n)); } // owner-added team only — people who merely log in never auto-appear on the roster
 async function loadArchived(){ const r=await sb.from('day_items').select('title').eq('kind','archived'); const s=new Set(); (r.data||[]).forEach(x=>{ if(x.title) s.add(x.title); }); window._archived=s; return s; }
 function isArchived(name){ return !!(window._archived&&window._archived.has(name)); }
 async function loadDates(){ const r=await sb.from('day_items').select('title,detail').eq('kind','profile'); const m={}; (r.data||[]).forEach(x=>{ if(x.title){ try{m[x.title]=JSON.parse(x.detail||'{}');}catch(e){m[x.title]={};} } }); window._profiles=m; const pd={}; Object.keys(m).forEach(n=>{ pd[n]={bday:m[n].bday||'',hired:m[n].hired||''}; }); window._pdates=pd; return pd; }
@@ -873,7 +874,7 @@ async function schBoard(v){
   let covRules={requireLeader:true,shiftLen:8,days:{}}; try{ const rc=await sb.from('day_items').select('detail').eq('kind','covrules').maybeSingle(); const cd=JSON.parse((rc.data&&rc.data.detail)||'{}'); covRules={requireLeader:cd.requireLeader!==false, shiftLen:+(cd.shiftLen)||8, days:cd.days||{}}; }catch(e){}
   const covTarget=di=>{ const c=covRules.days[di]; return c&&c.people?+c.people:null; };
   const offMap={}; (rto.data||[]).forEach(t=>{ isoDays.forEach(iso=>{ if(iso>=t.start_date && iso<=(t.end_date||t.start_date)){ (offMap[t.person_name]=offMap[t.person_name]||{})[iso]=t.reason||'Time off'; } }); });
-  const shifts=rsh.data||[]; window._shifts={}; shifts.forEach(s=>window._shifts[s.id]=s); const team=(rpf.data||[]).filter(p=>p.role!=='admin'&&!isArchived(p.name)); window._team=team;
+  const shifts=rsh.data||[]; window._shifts={}; shifts.forEach(s=>window._shifts[s.id]=s); const _pm={}; (rpf.data||[]).forEach(p=>_pm[p.name]=p); const team=rosterNames().map(n=>({name:n,id:(_pm[n]||{}).id||null})); window._team=team;
   const wage={}; (rpay.data||[]).forEach(p=>wage[p.person_name]=Number(p.wage)||0);
   const sales={}; (rsal.data||[]).forEach(d=>sales[d.on_date]=Number(d.sales)||0);
   const pub=rpub.data; const todayIso=isoDate(new Date());
@@ -948,7 +949,7 @@ window.fillShift=async function(id){
   const wd=(new Date(s.on_date+'T00:00').getDay()+6)%7;
   const [rav,rto,rpf,rsh]=await Promise.all([ sb.from('availability').select('person_name,weekday,can_work,note'), sb.from('time_off').select('*').eq('status','approved'), sb.from('profiles').select('name,role'), sb.from('shifts').select('person_name,on_date') ]);
   await loadPositions(); await loadArchived();
-  const set=new Set(); (rpf.data||[]).filter(p=>p.role!=='admin').forEach(p=>set.add(p.name)); Object.keys(window._posMap||{}).forEach(n=>set.add(n)); (rsh.data||[]).forEach(x=>{ if(x.person_name&&x.person_name!=='__OPEN__')set.add(x.person_name); });
+  const set=new Set(); rosterNames().forEach(n=>set.add(n)); (rsh.data||[]).forEach(x=>{ if(x.person_name&&x.person_name!=='__OPEN__')set.add(x.person_name); });
   const people=[...set].filter(n=>n&&!isArchived(n));
   const avMap={}; (rav.data||[]).forEach(a=>{ (avMap[a.person_name]=avMap[a.person_name]||{})[a.weekday]={can_work:a.can_work,note:a.note}; });
   const onLeave=n=> (rto.data||[]).some(t=>t.person_name===n && s.on_date>=t.start_date && s.on_date<=(t.end_date||t.start_date));
@@ -1090,7 +1091,7 @@ async function schTeam(v){
   const tv=state.ctx.tv||'roster';
   const todayIso=isoDate(new Date());
   const [rpf,rsh,rpay,rtoday]=await Promise.all([ sb.from('profiles').select('*'), sb.from('shifts').select('person_name,role'), sb.from('pay_rates').select('*'), sb.from('shifts').select('*').eq('on_date',todayIso), loadPositions(), loadArchived() ]);
-  const team=(rpf.data||[]).filter(p=>p.role!=='admin'&&!isArchived(p.name)).map(p=>({name:p.name,title:posOf(p.name),email:p.email,member:true}));
+  const _pm={}; (rpf.data||[]).forEach(p=>_pm[p.name]=p); const team=rosterNames().map(n=>({name:n,title:posOf(n),email:(_pm[n]||{}).email,member:!!_pm[n]}));
   const known=new Set(team.map(p=>p.name));
   (rsh.data||[]).forEach(s=>{ if(s.person_name&&!known.has(s.person_name)&&!isArchived(s.person_name)){ known.add(s.person_name); team.push({name:s.person_name,title:posOf(s.person_name),member:false}); } });
   const wage={}; (rpay.data||[]).forEach(p=>wage[p.person_name]=Number(p.wage)||0);
@@ -1129,7 +1130,7 @@ async function schAvail(v){
   h+=`<div class="card" style="padding:4px 2px;margin-bottom:26px">`+AV_DOW.map((d,i)=>{ const row=(byPerson[me]||{})[i]; const can=row?row.can_work!==false:true; const note=row?(row.note||''):''; const win=parseWin(note); const status=!can?'off':((win||note==='limited')?'limited':'avail');
     return `<div style="padding:9px 12px;${i<6?'border-bottom:1px solid var(--line)':''}"><div class="row" style="gap:9px"><div style="width:38px;font-weight:600;font-size:14px">${d}</div><div class="avseg"><button class="avbtn${status==='avail'?' on':''}" onclick="avMe(${i},'avail',this)">Available</button><button class="avbtn${status==='limited'?' lim':''}" onclick="avMe(${i},'limited',this)">Limited</button><button class="avbtn${status==='off'?' off':''}" onclick="avMe(${i},'off',this)">Off</button></div></div><div class="avwin" data-wd="${i}" style="display:${status==='limited'?'flex':'none'};gap:7px;align-items:center;margin:9px 0 2px 47px;flex-wrap:wrap"><span class="faint" style="font-size:12px">Can work</span><input type="time" class="avfrom" value="${win?win[0]:''}" onchange="avWin(${i})" style="padding:7px;border:1px solid var(--line2);border-radius:8px;background:var(--card);color:var(--ink);font-family:inherit;font-size:13px"/><span class="faint" style="font-size:12px">to</span><input type="time" class="avto" value="${win?win[1]:''}" onchange="avWin(${i})" style="padding:7px;border:1px solid var(--line2);border-radius:8px;background:var(--card);color:var(--ink);font-family:inherit;font-size:13px"/></div></div>`; }).join('')+`</div>`;
   if(isAdmin){
-    const set=new Set(); (rpf.data||[]).filter(p=>p.role!=='admin').forEach(p=>set.add(p.name)); (rsh.data||[]).forEach(s=>{ if(s.person_name)set.add(s.person_name); }); Object.keys(window._posMap||{}).forEach(n=>set.add(n)); set.delete(me);
+    const set=new Set(); rosterNames().forEach(n=>set.add(n)); (rsh.data||[]).forEach(s=>{ if(s.person_name)set.add(s.person_name); }); set.delete(me);
     const people=[...set].filter(n=>n&&!isArchived(n)).sort((a,b)=>{const pa=POS_ORDER.indexOf(posOf(a)),pb=POS_ORDER.indexOf(posOf(b));return (pa<0?99:pa)-(pb<0?99:pb)||a.localeCompare(b);});
     h+=`<div class="sec">Team availability</div><div class="faint" style="font-size:12.5px;margin:-4px 0 11px">Green ✓ = available, amber <b style="color:#B7791F">L</b> = limited hours (hover for the window), red ✕ = off. Tap a cell to flip available/off. People set their own limited hours in My availability. This is what the auto-draft reads.</div>`;
     if(!people.length) h+=`<div class="card" style="padding:20px;text-align:center"><div class="faint">No team yet.</div></div>`;
@@ -1259,7 +1260,7 @@ async function teamRoster(v){
   v.innerHTML='<div class="muted">Loading…</div>';
   const [rpf,rsh]=await Promise.all([ sb.from('profiles').select('name,role'), sb.from('shifts').select('person_name') ]);
   await loadPositions(); await loadProfiles(); await loadArchived();
-  const set=new Set(); (rpf.data||[]).filter(p=>p.role!=='admin').forEach(p=>set.add(p.name)); (rsh.data||[]).forEach(s=>{ if(s.person_name)set.add(s.person_name); }); Object.keys(window._posMap||{}).forEach(n=>set.add(n));
+  const set=new Set(); rosterNames().forEach(n=>set.add(n)); (rsh.data||[]).forEach(s=>{ if(s.person_name)set.add(s.person_name); });
   const roster=[...set].filter(n=>n&&!isArchived(n));
   const groups={}; roster.forEach(n=>{ (groups[posOf(n)]=groups[posOf(n)]||[]).push(n); });
   const ordered=Object.keys(groups).sort((a,b)=>{const ia=POS_ORDER.indexOf(a),ib=POS_ORDER.indexOf(b);return (ia<0?99:ia)-(ib<0?99:ib)||a.localeCompare(b);});
