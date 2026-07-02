@@ -347,7 +347,7 @@ async function submitAuth(){
 function renderApp(){
   const isAdmin = state.profile && state.profile.role==="admin";
   const nav = isAdmin
-    ? [["",[["whiteboard","Whiteboard","ti-layout-dashboard"]]],["Academy",[["home","Academy","ti-school"],["summary","Team progress","ti-chart-bar"],["ask","Ask","ti-bulb"],["build","Build","ti-tools"]]],["Operations",[["onboarding","Onboarding","ti-user-plus"],["today","Daily Report","ti-clipboard-list"],["schedule","Schedule","ti-calendar-week"],["calendar","Calendar","ti-calendar-month"]]],["Shared",[["community","Community","ti-messages"],["resources","Resources","ti-files"],["downloads","Downloads","ti-download"]]],["",[["settings","Settings","ti-settings"]]]]
+    ? [["",[["whiteboard","Whiteboard","ti-layout-dashboard"]]],["Academy",[["home","Academy","ti-school"],["ask","Ask","ti-bulb"],["build","Build","ti-tools"]]],["Operations",[["team","Team","ti-users"],["onboarding","Onboarding","ti-user-plus"],["today","Daily Report","ti-clipboard-list"],["schedule","Schedule","ti-calendar-week"],["calendar","Calendar","ti-calendar-month"]]],["Shared",[["community","Community","ti-messages"],["resources","Resources","ti-files"],["downloads","Downloads","ti-download"]]],["",[["settings","Settings","ti-settings"]]]]
     : [["",[["whiteboard","Whiteboard","ti-layout-dashboard"],["home","Home","ti-home"],["ask","Ask","ti-bulb"],["journal","Journal","ti-notebook"]]],["Operations",[["today","Daily Report","ti-clipboard-list"],["schedule","Schedule","ti-calendar-week"],["calendar","Calendar","ti-calendar-month"]]],["Shared",[["community","Community","ti-messages"],["resources","Resources","ti-files"],["downloads","Downloads","ti-download"]]]];
   root.innerHTML = `<div class="app">
     <aside class="side">
@@ -360,10 +360,10 @@ function renderApp(){
   </div>`;
   document.getElementById("nav").innerHTML = nav.map(([g,items])=>{ const gl=g?`<div class="navgroup">${esc(g)}</div>`:''; return gl+items.map(([p,l,i])=>`<a style="${p==='settings'?'margin-top:auto':''}" class="${state.page===p||(state.page==='lesson'||state.page==='track')&&p==='home'?'active':''}" onclick="go('${p}');toggleNav(false)"><i class="ti ${i}" aria-hidden="true"></i>${l}</a>`).join(''); }).join("");
   document.getElementById("out").onclick=signOut;
-  const PI={whiteboard:'ti-layout-dashboard',home:'ti-school',summary:'ti-chart-bar',onboarding:'ti-user-plus',ask:'ti-bulb',build:'ti-tools',today:'ti-clipboard-list',schedule:'ti-calendar-week',calendar:'ti-calendar-month',community:'ti-messages',resources:'ti-files',downloads:'ti-download',settings:'ti-settings',journal:'ti-notebook',track:'ti-book-2',lesson:'ti-book-2',feedback:'ti-message-2'};
+  const PI={whiteboard:'ti-layout-dashboard',home:'ti-school',summary:'ti-chart-bar',team:'ti-users',onboarding:'ti-user-plus',ask:'ti-bulb',build:'ti-tools',today:'ti-clipboard-list',schedule:'ti-calendar-week',calendar:'ti-calendar-month',community:'ti-messages',resources:'ti-files',downloads:'ti-download',settings:'ti-settings',journal:'ti-notebook',track:'ti-book-2',lesson:'ti-book-2',feedback:'ti-message-2'};
   const _ti=document.getElementById('topicon'); if(_ti)_ti.innerHTML='<i class="ti '+(PI[state.page]||'ti-point')+'"></i>';
   const v=document.getElementById("view");
-  ({whiteboard:vWhiteboard, home:vHome, track:vTrack, lesson:vLesson, summary:vSummary, journal:vJournal, community:vCommunity, feedback:vFeedback, downloads:vDownloads, settings:vSettings, resources:vResources, ask:vAsk, build:vBuild, today:vToday, schedule:vSchedule, onboarding:vOnboarding, calendar:vCalendar}[state.page]||vHome)(v);
+  ({whiteboard:vWhiteboard, home:vHome, track:vTrack, lesson:vLesson, summary:vSummary, team:vTeam, journal:vJournal, community:vCommunity, feedback:vFeedback, downloads:vDownloads, settings:vSettings, resources:vResources, ask:vAsk, build:vBuild, today:vToday, schedule:vSchedule, onboarding:vOnboarding, calendar:vCalendar}[state.page]||vHome)(v);
 }
 function setTitle(t,s){ document.getElementById("ttl").textContent=t; document.getElementById("tsub").textContent=s||""; }
 window.toggleNav=function(open){ const s=document.querySelector('.side'); const sc=document.getElementById('scrim'); if(!s)return; s.classList.toggle('open',open); if(sc)sc.classList.toggle('open',open); };
@@ -739,7 +739,7 @@ async function vToday(v){
   const items=ri.data||[], rots=rr.data||[], notes=rn.data||[], upcoming=ru.data||[];
   const dueRots=rots.filter(r=>{ if(!r.last_done) return true; const d=new Date(r.last_done); d.setDate(d.getDate()+(r.cadence_days||7)); return d.toISOString().slice(0,10)<=iso; });
   const ojrItem=items.find(i=>i.kind==='ojr');
-  const boardItems=items.filter(i=>!['ojr','mission','vision','pos','pool','archived','pdates'].includes(i.kind));
+  const boardItems=items.filter(i=>!['ojr','mission','vision','pos','pool','archived','pdates','profile'].includes(i.kind));
   const open=boardItems.filter(i=>!i.done);
   const parts=[];
   if(dueRots.length) parts.push(dueRots.length+' cleaning'+(dueRots.length>1?'s':'')+' due');
@@ -808,7 +808,9 @@ async function loadPositions(){ const r=await sb.from('day_items').select('title
 function posOf(name){ return (window._posMap&&window._posMap[name])||'Unassigned'; }
 async function loadArchived(){ const r=await sb.from('day_items').select('title').eq('kind','archived'); const s=new Set(); (r.data||[]).forEach(x=>{ if(x.title) s.add(x.title); }); window._archived=s; return s; }
 function isArchived(name){ return !!(window._archived&&window._archived.has(name)); }
-async function loadDates(){ const r=await sb.from('day_items').select('title,detail').eq('kind','pdates'); const m={}; (r.data||[]).forEach(x=>{ if(x.title){ try{m[x.title]=JSON.parse(x.detail||'{}');}catch(e){m[x.title]={};} } }); window._pdates=m; return m; }
+async function loadDates(){ const r=await sb.from('day_items').select('title,detail').eq('kind','profile'); const m={}; (r.data||[]).forEach(x=>{ if(x.title){ try{m[x.title]=JSON.parse(x.detail||'{}');}catch(e){m[x.title]={};} } }); window._profiles=m; const pd={}; Object.keys(m).forEach(n=>{ pd[n]={bday:m[n].bday||'',hired:m[n].hired||''}; }); window._pdates=pd; return pd; }
+async function loadProfiles(){ return loadDates(); }
+function profileOf(name){ return (window._profiles&&window._profiles[name])||{}; }
 function _nextOccur(mm,dd){ const t=new Date(); t.setHours(0,0,0,0); const y=t.getFullYear(); let d=new Date(y,mm-1,dd); d.setHours(0,0,0,0); if(d<t) d=new Date(y+1,mm-1,dd); return d; }
 function _daysUntil(d){ const t=new Date(); t.setHours(0,0,0,0); return Math.round((d-t)/86400000); }
 function upcomingCelebrations(within){ within=within||7; const m=window._pdates||{}; const out=[];
@@ -828,16 +830,18 @@ window.openArchive=function(name,editId){
   m.innerHTML=`<div style="background:var(--card);width:100%;max-width:460px;border-radius:16px 16px 0 0;padding:20px 20px 28px;box-shadow:0 -8px 40px rgba(0,0,0,.22)"><div style="font-weight:700;font-size:16px">${cur?'Edit record':'No longer employed'}</div><div class="faint" style="font-size:12.5px;margin-bottom:15px">${esc(name)} · drops off active views — history stays on record</div><label style="font-size:12px;color:var(--muted)">Reason for leaving</label><select id="arReason" style="width:100%;padding:11px;margin:4px 0 12px;border:1px solid var(--line2);border-radius:9px;background:var(--card);color:var(--ink);font-family:inherit">${reasons.map(r=>`<option${d.reason===r?' selected':''}>${r}</option>`).join('')}</select><label style="font-size:12px;color:var(--muted)">Rehire status</label><select id="arRehire" style="width:100%;padding:11px;margin:4px 0 12px;border:1px solid var(--line2);border-radius:9px;background:var(--card);color:var(--ink);font-family:inherit">${rehires.map(o=>`<option value="${o[0]}"${d.rehire===o[0]?' selected':''}>${o[1]}</option>`).join('')}</select><label style="font-size:12px;color:var(--muted)">Notes — why they left, anything a future you should know</label><textarea id="arNotes" placeholder="e.g. Great closer, left for school. Would take back in a heartbeat." style="width:100%;min-height:84px;padding:11px;margin:4px 0 2px;border:1px solid var(--line2);border-radius:9px;background:var(--card);color:var(--ink);font-family:inherit;font-size:14px;line-height:1.5">${esc(d.notes||'')}</textarea><div class="row" style="gap:8px;margin-top:14px"><button class="btn" style="width:auto;margin-left:auto" onclick="document.getElementById('archm').remove()">Cancel</button><button class="btn pri" style="width:auto" onclick='doArchive(${JSON.stringify(name)},${editId!=null?editId:'null'})'>${cur?'Save':'Archive'}</button></div></div>`;
   document.body.appendChild(m); m.addEventListener('click',e=>{if(e.target===m)m.remove();});
 };
-window.doArchive=async function(name,editId){ const reason=(document.getElementById('arReason')||{}).value||''; const rehire=(document.getElementById('arRehire')||{}).value||'Eligible'; const notes=((document.getElementById('arNotes')||{}).value||'').trim(); const detail=JSON.stringify({reason,rehire,notes,date:isoDate(new Date())}); if(editId!=null){ await sb.from('day_items').update({detail}).eq('id',editId); } else { await sb.from('day_items').insert({kind:'archived',title:name,on_date:null,detail,created_by:state.user.id}); if(window._archived)window._archived.add(name); } const m=document.getElementById('archm'); if(m)m.remove(); state.ctx.obtab='former'; vOnboarding(document.getElementById('view')); };
-window.restorePerson=async function(name){ await sb.from('day_items').delete().eq('kind','archived').eq('title',name); if(window._archived)window._archived.delete(name); vOnboarding(document.getElementById('view')); };
-window.openDates=function(name){
-  const p=(window._pdates&&window._pdates[name])||{};
-  let m=document.getElementById('pdm'); if(m)m.remove();
-  m=document.createElement('div'); m.id='pdm'; m.style.cssText='position:fixed;inset:0;background:rgba(16,24,40,.45);z-index:9999;display:flex;align-items:flex-end;justify-content:center';
-  m.innerHTML=`<div style="background:var(--card);width:100%;max-width:440px;border-radius:16px 16px 0 0;padding:20px 20px 28px;box-shadow:0 -8px 40px rgba(0,0,0,.22)"><div style="font-weight:700;font-size:16px">Dates for ${esc(name)}</div><div class="faint" style="font-size:12.5px;margin-bottom:15px">For birthday &amp; work-anniversary reminders — you'll get a heads-up a week out, a few days out, and day-of.</div><label style="font-size:12px;color:var(--muted)">Birthday</label><input type="date" id="pdBday" value="${p.bday?('2000-'+p.bday):''}" style="width:100%;padding:11px;margin:4px 0 12px;border:1px solid var(--line2);border-radius:9px;background:var(--card);color:var(--ink);font-family:inherit"/><label style="font-size:12px;color:var(--muted)">Hire date (for work anniversary)</label><input type="date" id="pdHired" value="${p.hired||''}" style="width:100%;padding:11px;margin:4px 0 2px;border:1px solid var(--line2);border-radius:9px;background:var(--card);color:var(--ink);font-family:inherit"/><div class="row" style="gap:8px;margin-top:16px"><button class="btn" style="width:auto;margin-left:auto" onclick="document.getElementById('pdm').remove()">Cancel</button><button class="btn pri" style="width:auto" onclick='doDates(${JSON.stringify(name)})'>Save</button></div></div>`;
+window.doArchive=async function(name,editId){ const reason=(document.getElementById('arReason')||{}).value||''; const rehire=(document.getElementById('arRehire')||{}).value||'Eligible'; const notes=((document.getElementById('arNotes')||{}).value||'').trim(); const detail=JSON.stringify({reason,rehire,notes,date:isoDate(new Date())}); if(editId!=null){ await sb.from('day_items').update({detail}).eq('id',editId); } else { await sb.from('day_items').insert({kind:'archived',title:name,on_date:null,detail,created_by:state.user.id}); if(window._archived)window._archived.add(name); } const m=document.getElementById('archm'); if(m)m.remove(); state.ctx.obtab='former'; state.ctx.ttab='former'; _reRenderPeople(); };
+window.restorePerson=async function(name){ await sb.from('day_items').delete().eq('kind','archived').eq('title',name); if(window._archived)window._archived.delete(name); _reRenderPeople(); };
+function _reRenderPeople(){ if(state.page==='team') vTeam(document.getElementById('view')); else vOnboarding(document.getElementById('view')); }
+window.openProfile=function(name){
+  const p=profileOf(name); const pos=posOf(name);
+  const F=(id,lbl,type,val,ph)=>`<div style="flex:1;min-width:120px"><label style="font-size:11px;color:var(--muted)">${lbl}</label><input id="${id}" type="${type||'text'}" value="${val?esc(String(val)):''}" placeholder="${ph||''}" style="width:100%;padding:9px 10px;margin-top:3px;border:1px solid var(--line2);border-radius:8px;background:var(--card);color:var(--ink);font-family:inherit;font-size:14px"/></div>`;
+  let m=document.getElementById('prm'); if(m)m.remove();
+  m=document.createElement('div'); m.id='prm'; m.style.cssText='position:fixed;inset:0;background:rgba(16,24,40,.45);z-index:9999;display:flex;align-items:flex-end;justify-content:center';
+  m.innerHTML=`<div style="background:var(--card);width:100%;max-width:520px;border-radius:16px 16px 0 0;padding:20px 20px 26px;box-shadow:0 -8px 40px rgba(0,0,0,.22);max-height:88vh;overflow:auto"><div style="font-weight:700;font-size:17px">${esc(name)}</div><div class="faint" style="font-size:12.5px;margin-bottom:14px">Profile — kept on record</div><label style="font-size:11px;color:var(--muted)">Position</label><select id="prPos" style="width:100%;padding:10px;margin:3px 0 6px;border:1px solid var(--line2);border-radius:8px;background:var(--card);color:var(--ink);font-family:inherit">${POS_PICK.map(o=>`<option${o===pos?' selected':''}>${o}</option>`).join('')}</select><div class="sec" style="margin-top:6px">Dates</div><div class="row" style="gap:10px;flex-wrap:wrap">${F('prBday','Birthday','date',p.bday?('2000-'+p.bday):'')}${F('prHired','Hire date','date',p.hired||'')}</div><div class="sec">Contact</div><div class="row" style="gap:10px;flex-wrap:wrap">${F('prMobile','Mobile phone','tel',p.mobile,'(555) 555-5555')}${F('prHome','Home phone','tel',p.home)}</div><div class="row" style="gap:10px;flex-wrap:wrap;margin-top:8px">${F('prAddr','Address','text',p.address)}</div><div class="row" style="gap:10px;flex-wrap:wrap;margin-top:8px">${F('prCity','City','text',p.city)}${F('prState','State','text',p.state)}${F('prZip','Zip','text',p.zip)}</div><div class="sec">Emergency contact</div><div class="row" style="gap:10px;flex-wrap:wrap">${F('prEcName','Name','text',p.ec_name)}${F('prEcPhone','Phone','tel',p.ec_phone)}</div><div class="sec">Pay</div><div class="row" style="gap:10px;flex-wrap:wrap">${F('prWage','Hourly wage ($)','number',p.wage,'0.00')}</div><div class="row" style="gap:8px;margin-top:18px;flex-wrap:wrap"><button class="btn" style="width:auto;color:#A32D2D;border-color:#F0C9C9" onclick="document.getElementById('prm').remove();openArchive(${JSON.stringify(name)})">No longer employed</button><button class="btn" style="width:auto;margin-left:auto" onclick="document.getElementById('prm').remove()">Cancel</button><button class="btn pri" style="width:auto" onclick='doProfile(${JSON.stringify(name)})'>Save</button></div></div>`;
   document.body.appendChild(m); m.addEventListener('click',e=>{if(e.target===m)m.remove();});
 };
-window.doDates=async function(name){ const b=(document.getElementById('pdBday')||{}).value||''; const hr=(document.getElementById('pdHired')||{}).value||''; const bday=b?b.slice(5):''; await sb.from('day_items').delete().eq('kind','pdates').eq('title',name); if(bday||hr) await sb.from('day_items').insert({kind:'pdates',title:name,on_date:null,detail:JSON.stringify({bday,hired:hr}),created_by:state.user.id}); if(window._pdates)window._pdates[name]={bday,hired:hr}; const m=document.getElementById('pdm'); if(m)m.remove(); vOnboarding(document.getElementById('view')); };
+window.doProfile=async function(name){ const g=id=>((document.getElementById(id)||{}).value||'').trim(); const b=g('prBday'); const detail=JSON.stringify({bday:b?b.slice(5):'',hired:g('prHired'),mobile:g('prMobile'),home:g('prHome'),address:g('prAddr'),city:g('prCity'),state:g('prState'),zip:g('prZip'),ec_name:g('prEcName'),ec_phone:g('prEcPhone'),wage:g('prWage')}); await sb.from('day_items').delete().eq('kind','profile').eq('title',name); await sb.from('day_items').insert({kind:'profile',title:name,on_date:null,detail,created_by:state.user.id}); const posv=(document.getElementById('prPos')||{}).value; if(posv) await setPos(name,posv); const w=g('prWage'); if(w) await sb.from('pay_rates').upsert({person_name:name,wage:Number(w)||0,updated_at:new Date().toISOString()}); await loadProfiles(); const m=document.getElementById('prm'); if(m)m.remove(); _reRenderPeople(); };
 window.setPos=async function(name,pos){ await sb.from('day_items').delete().eq('kind','pos').eq('title',name); if(pos){ await sb.from('day_items').insert({kind:'pos',title:name,detail:pos,on_date:null,created_by:state.user.id}); } if(window._posMap) window._posMap[name]=pos; };
 function posSelect(name,cur){ return `<select onchange="setPos('${esc(name).replace(/'/g,"\\'")}',this.value);var d=this.parentNode.querySelector('.posdot');if(d)d.style.background=window.POSCOL(this.value)" style="padding:7px 9px;border:1px solid var(--line2);border-radius:8px;background:var(--card);color:var(--ink);font-family:inherit;font-size:13px">${POS_PICK.map(o=>`<option value="${o}"${o===cur?' selected':''}>${o}</option>`).join('')}</select>`; }
 async function schBoard(v){
@@ -1153,57 +1157,54 @@ async function schReports(v){
 }
 window.repWeek=function(n){ if(n===0){ state.ctx.wk=isoDate(weekStart(new Date())); } else { const base=state.ctx.wk?wkDate(state.ctx.wk):weekStart(new Date()); base.setDate(base.getDate()+n*7); state.ctx.wk=isoDate(base); } schGo('reports'); };
 
+async function vTeam(v){
+  if(!(state.profile&&state.profile.role==='admin')){ go('home'); return; }
+  const tab=state.ctx.ttab||'roster';
+  setTitle('Team','Your people — profiles, progress & former team');
+  const seg=(k,l)=>`<button onclick="state.ctx.ttab='${k}';vTeam(document.getElementById('view'))" style="padding:7px 15px;font-size:13px;font-weight:600;border:none;cursor:pointer;font-family:inherit;background:${tab===k?'var(--brand)':'var(--card)'};color:${tab===k?'#fff':'var(--muted)'}">${l}</button>`;
+  v.innerHTML=`<div style="display:inline-flex;border:1px solid var(--line2);border-radius:9px;overflow:hidden;margin-bottom:18px;flex-wrap:wrap">${seg('roster','Roster')}${seg('progress','Academy progress')}${seg('former','Former team')}</div><div id="teambody"><div class="muted">Loading…</div></div>`;
+  const body=document.getElementById('teambody');
+  if(tab==='progress'){ vSummary(body); return; }
+  if(tab==='former'){ teamFormer(body); return; }
+  teamRoster(body);
+}
+async function teamRoster(v){
+  v.innerHTML='<div class="muted">Loading…</div>';
+  const [rpf,rsh]=await Promise.all([ sb.from('profiles').select('name,role'), sb.from('shifts').select('person_name') ]);
+  await loadPositions(); await loadProfiles(); await loadArchived();
+  const set=new Set(); (rpf.data||[]).filter(p=>p.role!=='admin').forEach(p=>set.add(p.name)); (rsh.data||[]).forEach(s=>{ if(s.person_name)set.add(s.person_name); }); Object.keys(window._posMap||{}).forEach(n=>set.add(n));
+  const roster=[...set].filter(n=>n&&!isArchived(n));
+  const groups={}; roster.forEach(n=>{ (groups[posOf(n)]=groups[posOf(n)]||[]).push(n); });
+  const ordered=Object.keys(groups).sort((a,b)=>{const ia=POS_ORDER.indexOf(a),ib=POS_ORDER.indexOf(b);return (ia<0?99:ia)-(ib<0?99:ib)||a.localeCompare(b);});
+  let h=`<div class="faint" style="font-size:12.5px;margin-bottom:12px">Tap anyone to open their profile — position, birthday, hire date, contact, emergency contact and pay. Positions here flow to the schedule automatically.</div>`;
+  if(!roster.length) h+=`<div class="card" style="padding:24px;text-align:center"><div class="faint">No team yet. Add people in Onboarding.</div></div>`;
+  ordered.forEach(pos=>{ const c=POS_COL[pos]||'#94A3B8'; h+=`<div class="band" style="background:${c}14;color:${c};border-left:4px solid ${c};margin:14px 0 0">${esc(pos)} <span style="opacity:.7;font-weight:500">· ${groups[pos].length}</span></div><div class="card" style="margin-top:0">`+groups[pos].slice().sort().map(n=>{ const p=profileOf(n); const inits=(n||'?').split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase(); const bits=[]; if(p.mobile)bits.push(p.mobile); if(p.bday)bits.push('🎂 '+p.bday); return `<div class="row" style="padding:11px 15px;border-bottom:1px solid var(--line);cursor:pointer" onclick='openProfile(${JSON.stringify(n)})'><span class="av">${esc(inits)}</span><div style="flex:1;min-width:0"><div style="font-weight:600;font-size:14px">${esc(n)}</div><div class="faint" style="font-size:12px">${bits.length?esc(bits.join(' · ')):'Tap to add details'}</div></div><i class="ti ti-chevron-right" style="color:var(--faint)"></i></div>`; }).join('')+`</div>`; });
+  v.innerHTML=h;
+}
+async function teamFormer(v){
+  v.innerHTML='<div class="muted">Loading…</div>';
+  await loadPositions();
+  const r=await sb.from('day_items').select('*').eq('kind','archived');
+  const archRows=(r.data||[]).map(x=>{ let d={}; try{d=JSON.parse(x.detail||'{}');}catch(e){} return {id:x.id,name:x.title,d}; }).sort((a,b)=>a.name.localeCompare(b.name));
+  window._archMap={}; archRows.forEach(a=>window._archMap[a.id]=a); window._archived=new Set(archRows.map(a=>a.name));
+  let h=`<div class="faint" style="font-size:12.5px;margin-bottom:12px">People who've left. History kept for your records. Open a card for why they left and rehire eligibility.</div>`;
+  if(!archRows.length) h+=`<div class="card" style="padding:26px;text-align:center"><div class="faint">No former team members.</div></div>`;
+  const rehireMeta={Eligible:['Eligible for rehire','#1B7B3F','#E7F5EC'],Conditional:['Conditional','#B7791F','#FBF0DA'],No:['Do not rehire','#A32D2D','#FCEBEB']};
+  h+=archRows.map(a=>{ const rm=rehireMeta[a.d.rehire]||rehireMeta.Eligible; const inits=(a.name||'?').split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase(); return `<div class="card" style="padding:14px 16px;margin-bottom:10px"><div class="row" style="gap:10px"><span class="av">${esc(inits)}</span><div style="flex:1;min-width:0"><div style="font-weight:600;font-size:14px">${esc(a.name)}</div><div class="faint" style="font-size:12px">${esc(posOf(a.name))}${a.d.date?' · left '+esc(a.d.date):''}${a.d.reason?' · '+esc(a.d.reason):''}</div></div><span class="pill" style="background:${rm[2]};color:${rm[1]};font-size:11px;font-weight:700;white-space:nowrap">${rm[0]}</span></div>${a.d.notes?`<div style="margin-top:9px;font-size:13px;line-height:1.55;color:#444;background:var(--brand-soft);border-radius:8px;padding:9px 11px;white-space:pre-wrap">${esc(a.d.notes)}</div>`:''}<div class="row" style="gap:8px;margin-top:11px"><button class="btn" style="width:auto;padding:6px 11px" onclick='openArchive(${JSON.stringify(a.name)},${a.id})'>Edit</button><button class="btn pri" style="width:auto;padding:6px 11px" onclick='restorePerson(${JSON.stringify(a.name)})'>Restore &amp; rehire</button></div></div>`; }).join('');
+  v.innerHTML=h;
+}
 const ONBOARD_STEPS=['I-9 employment eligibility verified','E-Verify submitted','W-4 tax form signed','State tax form signed','Direct deposit set up','Employee handbook acknowledged','Food handler card on file','Allergen & safety briefing','Uniform & name tag issued','POS login created','Building tour & emergency exits','Shadow a full shift','Join the academy (sign in with the code)','Start the first training track'];
 async function vOnboarding(v){
   if(!(state.profile&&state.profile.role==='admin')){ go('home'); return; }
-  setTitle('Onboarding',"Set each person's position, then nothing gets missed");
+  setTitle('Onboarding','Bring a new hire up to speed — add them, run the checklist');
   v.innerHTML='<div class="muted">Loading…</div>';
-  const obtab=state.ctx.obtab||'team';
-  const [rh,rs,rpf,rsh,rarch]=await Promise.all([
+  const [rh,rs]=await Promise.all([
     sb.from('hires').select('*').order('start_date',{ascending:false}),
-    sb.from('onboarding_steps').select('*').order('position'),
-    sb.from('profiles').select('name,role'),
-    sb.from('shifts').select('person_name'),
-    sb.from('day_items').select('*').eq('kind','archived')
+    sb.from('onboarding_steps').select('*').order('position')
   ]);
-  await loadPositions(); await loadDates();
-  const archRows=(rarch.data||[]).map(r=>{ let d={}; try{d=JSON.parse(r.detail||'{}');}catch(e){} return {id:r.id,name:r.title,d}; }).sort((a,b)=>a.name.localeCompare(b.name));
-  window._archived=new Set(archRows.map(a=>a.name)); window._archMap={}; archRows.forEach(a=>window._archMap[a.id]=a);
+  await loadPositions();
   const byHire={}; (rs.data||[]).forEach(s=>{ (byHire[s.hire_id]=byHire[s.hire_id]||[]).push(s); });
-  const set=new Set();
-  (rpf.data||[]).filter(p=>p.role!=='admin').forEach(p=>set.add(p.name));
-  (rsh.data||[]).forEach(s=>{ if(s.person_name) set.add(s.person_name); });
-  Object.keys(window._posMap||{}).forEach(n=>set.add(n));
-  const roster=[...set].filter(n=>n&&!isArchived(n));
-  const groups={}; roster.forEach(n=>{ const p=posOf(n); (groups[p]=groups[p]||[]).push(n); });
-  const ordered=Object.keys(groups).sort((a,b)=>{const ia=POS_ORDER.indexOf(a),ib=POS_ORDER.indexOf(b);return (ia<0?99:ia)-(ib<0?99:ib)||a.localeCompare(b);});
-
-  const seg=(k,l,badge)=>`<button onclick="state.ctx.obtab='${k}';vOnboarding(document.getElementById('view'))" style="padding:7px 15px;font-size:13px;font-weight:600;border:none;cursor:pointer;font-family:inherit;background:${obtab===k?'var(--brand)':'var(--card)'};color:${obtab===k?'#fff':'var(--muted)'}">${l}${badge?' · '+badge:''}</button>`;
-  let h=`<div style="display:inline-flex;border:1px solid var(--line2);border-radius:9px;overflow:hidden;margin-bottom:18px">${seg('team','Active team')}${seg('former','Former team',archRows.length||'')}</div>`;
-
-  if(obtab==='former'){
-    h+=`<div class="faint" style="font-size:12.5px;margin-bottom:12px">People who've left. Their history is kept for your records. Open a card to see why they left and whether you'd rehire — handy when someone reapplies a year later.</div>`;
-    if(!archRows.length) h+=`<div class="card" style="padding:26px;text-align:center"><div class="faint">No former team members. When someone leaves, use the ⊘ button on their name in Active team.</div></div>`;
-    const rehireMeta={Eligible:['Eligible for rehire','#1B7B3F','#E7F5EC'],Conditional:['Conditional','#B7791F','#FBF0DA'],No:['Do not rehire','#A32D2D','#FCEBEB']};
-    h+=archRows.map(a=>{ const rm=rehireMeta[a.d.rehire]||rehireMeta.Eligible; const inits=(a.name||'?').split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
-      return `<div class="card" style="padding:14px 16px;margin-bottom:10px"><div class="row" style="gap:10px"><span class="av">${esc(inits)}</span><div style="flex:1;min-width:0"><div style="font-weight:600;font-size:14px">${esc(a.name)}</div><div class="faint" style="font-size:12px">${esc(posOf(a.name))}${a.d.date?' · left '+esc(a.d.date):''}${a.d.reason?' · '+esc(a.d.reason):''}</div></div><span class="pill" style="background:${rm[2]};color:${rm[1]};font-size:11px;font-weight:700;white-space:nowrap">${rm[0]}</span></div>${a.d.notes?`<div style="margin-top:9px;font-size:13px;line-height:1.55;color:#444;background:var(--brand-soft);border-radius:8px;padding:9px 11px;white-space:pre-wrap">${esc(a.d.notes)}</div>`:''}<div class="row" style="gap:8px;margin-top:11px"><button class="btn" style="width:auto;padding:6px 11px" onclick='openArchive(${JSON.stringify(a.name)},${a.id})'>Edit</button><button class="btn pri" style="width:auto;padding:6px 11px" onclick='restorePerson(${JSON.stringify(a.name)})'>Restore &amp; rehire</button></div></div>`;
-    }).join('');
-    v.innerHTML=h; return;
-  }
-
-  h+=`<div class="card" style="padding:16px;margin-bottom:18px"><div style="font-weight:700;margin-bottom:4px">Add a new hire</div><div class="faint" style="font-size:12.5px;margin-bottom:11px">Pick their position now — it follows them onto every schedule automatically.</div><div class="row" style="gap:8px;flex-wrap:wrap"><input id="hname" placeholder="Full name" style="flex:1;min-width:150px;padding:10px 12px;border:1px solid var(--line2);border-radius:9px;background:var(--card);color:var(--ink);font-family:inherit"/><select id="hpos" style="padding:10px;border:1px solid var(--line2);border-radius:9px;background:var(--card);color:var(--ink);font-family:inherit">${POS_PICK.map(o=>`<option value="${o}"${o==='Team Member'?' selected':''}>${o}</option>`).join('')}</select><input id="hdate" type="date" value="${isoDate(new Date())}" style="padding:10px;border:1px solid var(--line2);border-radius:9px;background:var(--card);color:var(--ink);font-family:inherit"/><button class="btn pri" style="width:auto" onclick="addHire()">Add hire</button></div><div class="faint" style="font-size:12px;margin-top:9px">They get a starter checklist below. Share your join code so they sign in and start training.</div></div>`;
-
-  h+=`<div class="sec">Team &amp; positions</div><div class="faint" style="font-size:12.5px;margin:-4px 0 10px">Change a position here once — it updates everywhere: schedule, team, and daily report. The ⊘ button marks someone no longer employed.</div>`;
-  h+=`<div class="card" style="padding:6px 0;margin-bottom:20px">`;
-  if(!roster.length) h+=`<div class="faint" style="padding:20px;text-align:center">No team yet. Add a hire above, or share your join code.</div>`;
-  ordered.forEach(pos=>{ const c=POS_COL[pos]||'#94A3B8';
-    h+=`<div class="band" style="background:${c}14;color:${c};border-left:4px solid ${c};margin:8px 12px 4px">${esc(pos)} <span style="opacity:.7;font-weight:500">· ${groups[pos].length}</span></div>`;
-    groups[pos].slice().sort().forEach(n=>{ const inits=(n||'?').split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
-      const _pd=(window._pdates&&window._pdates[n])||{}; const _hasD=_pd.bday||_pd.hired;
-      h+=`<div class="row" style="padding:9px 15px;gap:8px"><span class="av">${esc(inits)}</span><div style="flex:1;min-width:0"><div style="font-weight:600;font-size:14px">${esc(n)}</div></div><span class="posdot" style="width:9px;height:9px;border-radius:50%;background:${c};flex-shrink:0"></span>${posSelect(n,pos)}<button class="btn" style="width:auto;padding:6px 9px${_hasD?';color:var(--brand);border-color:var(--brand-line)':''}" title="Birthday & hire date" onclick='openDates(${JSON.stringify(n)})'><i class="ti ti-cake"></i></button><button class="btn" style="width:auto;padding:6px 9px;color:#A32D2D;border-color:#F0C9C9" title="Mark no longer employed" onclick='openArchive(${JSON.stringify(n)})'><i class="ti ti-user-off"></i></button></div>`;
-    });
-  });
-  h+=`</div>`;
+  let h=`<div class="card" style="padding:16px;margin-bottom:18px"><div style="font-weight:700;margin-bottom:4px">Add a new hire</div><div class="faint" style="font-size:12.5px;margin-bottom:11px">Name + position puts them on the schedule and starts their checklist. Their full profile (birthday, contact, pay, etc.) lives in <b style="color:var(--brand);cursor:pointer" onclick="state.ctx.ttab='roster';go('team')">Team</b>.</div><div class="row" style="gap:8px;flex-wrap:wrap"><input id="hname" placeholder="Full name" style="flex:1;min-width:150px;padding:10px 12px;border:1px solid var(--line2);border-radius:9px;background:var(--card);color:var(--ink);font-family:inherit"/><select id="hpos" style="padding:10px;border:1px solid var(--line2);border-radius:9px;background:var(--card);color:var(--ink);font-family:inherit">${POS_PICK.map(o=>`<option value="${o}"${o==='Team Member'?' selected':''}>${o}</option>`).join('')}</select><input id="hdate" type="date" value="${isoDate(new Date())}" style="padding:10px;border:1px solid var(--line2);border-radius:9px;background:var(--card);color:var(--ink);font-family:inherit"/><button class="btn pri" style="width:auto" onclick="addHire()">Add hire</button></div><div class="faint" style="font-size:12px;margin-top:9px">They get the starter checklist below. Share your join code so they sign in and start training.</div></div>`;
 
   h+=`<div class="sec">Onboarding in progress</div>`;
   if(!(rh.data||[]).length) h+=`<div class="card" style="padding:26px;text-align:center"><div class="faint">No one onboarding right now. Add a hire above to start a checklist.</div></div>`;
@@ -1232,7 +1233,7 @@ async function vCalendar(v){
   let data;
   if(state.calCache && state.calCache.ym===ym){ data=state.calCache.data; }
   else { v.innerHTML='<div class="muted">Loading…</div>'; const r=await sb.from('day_items').select('*').gte('on_date',first).lte('on_date',last).order('created_at'); data=r.data||[]; state.calCache={ym,data}; }
-  const CAL_HIDE=new Set(['pos','ojr','mission','vision','pool','archived','pdates']);
+  const CAL_HIDE=new Set(['pos','ojr','mission','vision','pool','archived','pdates','profile']);
   const byd={}; (data||[]).forEach(it=>{ if(CAL_HIDE.has(it.kind))return; (byd[it.on_date]=byd[it.on_date]||[]).push(it); });
   const hol={}; usHolidays(y).forEach(x=>hol[x.date]=x);
   const todayIso=isoDate(new Date()); const sel=state.ctx.day||(ym===todayIso.slice(0,7)?todayIso:first);
