@@ -953,14 +953,30 @@ async function schOverview(v){
 }
 async function schTeam(v){
   const isAdmin=state.profile&&state.profile.role==='admin';
-  const [rpf,rsh,rpay]=await Promise.all([ sb.from('profiles').select('*'), sb.from('shifts').select('person_name,role'), sb.from('pay_rates').select('*'), loadPositions() ]);
+  const tv=state.ctx.tv||'roster';
+  const todayIso=isoDate(new Date());
+  const [rpf,rsh,rpay,rtoday]=await Promise.all([ sb.from('profiles').select('*'), sb.from('shifts').select('person_name,role'), sb.from('pay_rates').select('*'), sb.from('shifts').select('*').eq('on_date',todayIso), loadPositions() ]);
   const team=(rpf.data||[]).filter(p=>p.role!=='admin').map(p=>({name:p.name,title:posOf(p.name),email:p.email,member:true}));
   const known=new Set(team.map(p=>p.name));
   (rsh.data||[]).forEach(s=>{ if(s.person_name&&!known.has(s.person_name)){ known.add(s.person_name); team.push({name:s.person_name,title:posOf(s.person_name),member:false}); } });
   const wage={}; (rpay.data||[]).forEach(p=>wage[p.person_name]=Number(p.wage)||0);
+  const seg=(k,l)=>`<button onclick="state.ctx.tv='${k}';schTeam(document.getElementById('schbody'))" style="padding:7px 14px;font-size:13px;font-weight:600;border:none;cursor:pointer;font-family:inherit;background:${tv===k?'var(--brand)':'var(--card)'};color:${tv===k?'#fff':'var(--muted)'}">${l}</button>`;
+  let h=`<div style="display:inline-flex;border:1px solid var(--line2);border-radius:9px;overflow:hidden;margin-bottom:16px">${seg('roster','Roster')}${seg('now','On the clock now')}</div>`;
+  if(tv==='now'){
+    const now=new Date(); const nowH=now.getHours()+now.getMinutes()/60;
+    const todays=(rtoday.data||[]).slice().sort((a,b)=>(a.start_time||'').localeCompare(b.start_time||''));
+    const onNow=todays.filter(s=>{ const a=parseClock(s.start_time),b=parseClock(s.end_time); if(a==null||b==null)return false; let end=b; if(end<a)end+=24; return nowH>=a && nowH<end; });
+    const later=todays.filter(s=>{ const a=parseClock(s.start_time); return a!=null && a>nowH; });
+    const rowOf=(s,tag,col)=>{ const inits=(s.person_name||'?').split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase(); const pos=posOf(s.person_name); const pc=POS_COL[pos]||'#94A3B8'; return `<div class="row" style="padding:11px 15px;border-bottom:1px solid var(--line)"><span class="av" style="background:${pc}22;color:${pc}">${esc(inits)}</span><div style="flex:1;min-width:0"><div style="font-weight:600;font-size:14px">${esc(s.person_name||'—')}</div><div class="faint" style="font-size:12px">${esc(pos)}${s.kind==='training'?' · training':''}</div></div><div style="text-align:right"><div style="font-size:13px;font-weight:600;color:${col}">${s.start_time?fmtClock(s.start_time):''}${s.end_time?'–'+fmtClock(s.end_time):''}</div>${tag?`<div class="faint" style="font-size:11px">${tag}</div>`:''}</div></div>`; };
+    h+=`<div class="faint" style="font-size:12.5px;margin-bottom:12px">${now.toLocaleDateString(undefined,{weekday:'long',month:'short',day:'numeric'})} · as of ${now.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'})}</div>`;
+    h+=`<div class="sec">On the clock now · ${onNow.length}</div>`;
+    h+= onNow.length? `<div class="card">`+onNow.map(s=>rowOf(s,'on shift','var(--green)')).join('')+`</div>` : `<div class="card" style="padding:22px;text-align:center"><div class="faint">No one is on a shift right now.</div></div>`;
+    if(later.length){ h+=`<div class="sec">Coming up today</div><div class="card">`+later.map(s=>rowOf(s,'starts '+fmtClock(s.start_time),'var(--brand)')).join('')+`</div>`; }
+    v.innerHTML=h; return;
+  }
   const roles={}; team.forEach(p=>{ (roles[p.title]=roles[p.title]||[]).push(p); });
-  let h=`<div class="faint" style="font-size:13px;margin-bottom:14px">${team.length} people${isAdmin?' · positions are set in Onboarding':''}</div>`;
-  if(!team.length) h=`<div class="card" style="padding:24px;text-align:center"><div class="faint">No team yet. Add shifts in the Schedule tab, or share your join code so they sign in.</div></div>`;
+  h+=`<div class="faint" style="font-size:13px;margin-bottom:14px">${team.length} people${isAdmin?' · positions are set in Onboarding':''}</div>`;
+  if(!team.length) h+=`<div class="card" style="padding:24px;text-align:center"><div class="faint">No team yet. Add shifts in the Schedule tab, or share your join code so they sign in.</div></div>`;
   else Object.keys(roles).sort((a,b)=>{const ia=POS_ORDER.indexOf(a),ib=POS_ORDER.indexOf(b);return (ia<0?99:ia)-(ib<0?99:ib)||a.localeCompare(b);}).forEach(role=>{
     const _bc=POS_COL[role]||'#94A3B8';
     h+=`<div class="band" style="background:${_bc}14;color:${_bc};border-left:4px solid ${_bc};margin:16px 0 0">${esc(role)} <span style="opacity:.7;font-weight:500">· ${roles[role].length}</span></div><div class="card" style="margin-top:0">`+roles[role].map(p=>{ const inits=(p.name||'?').split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase(); return `<div class="row" style="padding:11px 15px;border-bottom:1px solid var(--line)"><span class="av">${esc(inits)}</span><div style="flex:1;min-width:0"><div style="font-weight:600;font-size:14px">${esc(p.name)}</div><div class="faint" style="font-size:12px">${p.member?(p.email?esc(p.email):'On the academy'):'Not on the academy yet'}</div></div>${isAdmin&&wage[p.name]?`<div class="faint" style="font-size:12.5px">${money(wage[p.name])}/hr</div>`:''}</div>`; }).join('')+`</div>`;
