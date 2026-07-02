@@ -983,11 +983,13 @@ window.autoDraft=async function(){
     if(pr.maxDays){ const dset=daysBy[n]; if((!dset||!dset.has(iso)) && (dset?dset.size:0) >= +pr.maxDays) return false; }
     return true; };
   const allNames=[]; Object.keys(roster).forEach(p=>roster[p].forEach(n=>allNames.push(n)));
+  const capOf=n=>{ const mx=(profileOf(n)||{}).maxHrs; return mx?+mx:otW; }; // ceiling: their max, else the OT line
   slots.forEach(sl=>{ const iso=isoDays[sl.dow]; const hrs=shiftHours({start_time:sl.start,end_time:sl.end}); const sr=POS_ORDER.indexOf(sl.pos);
     const canCover=(n)=>{ const pp=posOf(n); if(pp===sl.pos) return true; if(pp==='Owner'||pp==='Unassigned') return false; const pr=POS_ORDER.indexOf(pp); return pr>=0&&sr>=0&&pr<sr; };
-    let pick=null;
-    if(eligible(sl.orig,sl,iso,hrs)) pick=sl.orig;
-    else { const pool=allNames.filter(n=>canCover(n)&&eligible(n,sl,iso,hrs)); pool.sort((a,b)=>{ const da=sr-POS_ORDER.indexOf(posOf(a)), db=sr-POS_ORDER.indexOf(posOf(b)); if(da!==db) return da-db; const ua=under(a)?0:1, ub=under(b)?0:1; if(ua!==ub) return ua-ub; const oa=(hoursBy[a]||0)+((hoursBy[a]||0)+hrs>otW?1000:0), ob=(hoursBy[b]||0)+((hoursBy[b]||0)+hrs>otW?1000:0); return oa-ob || a.localeCompare(b); }); pick=pool[0]||null; }
+    // TOP-DOWN: best people filled to their max first, then build down
+    const pool=allNames.filter(n=>canCover(n)&&eligible(n,sl,iso,hrs));
+    pool.sort((a,b)=>{ const oa=((hoursBy[a]||0)+hrs>capOf(a)+1e-9)?1:0, ob=((hoursBy[b]||0)+hrs>capOf(b)+1e-9)?1:0; if(oa!==ob) return oa-ob; const ra=POS_ORDER.indexOf(posOf(a)), rb=POS_ORDER.indexOf(posOf(b)); if(ra!==rb) return ra-rb; const ua=under(a)?0:1, ub=under(b)?0:1; if(ua!==ub) return ua-ub; return (hoursBy[a]||0)-(hoursBy[b]||0) || a.localeCompare(b); });
+    const pick=pool[0]||null;
     if(pick){ hoursBy[pick]=(hoursBy[pick]||0)+hrs; (daysBy[pick]=daysBy[pick]||new Set()).add(iso); const e=parseClock(sl.end); lastEnd[pick]={iso,end:(e!=null?e:0)}; draft.push({person_name:pick,role:sl.pos,on_date:iso,start_time:sl.start,end_time:sl.end,kind:sl.kind,user_id:null}); }
     else { unfilled.push({day:iso,pos:sl.pos,start:sl.start,end:sl.end}); draft.push({person_name:'__OPEN__',role:sl.pos,on_date:iso,start_time:sl.start,end_time:sl.end,kind:'shift',user_id:null}); }
   });
