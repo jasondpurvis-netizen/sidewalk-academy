@@ -797,16 +797,18 @@ async function schBoard(v){
   const base = state.ctx.wk ? wkDate(state.ctx.wk) : weekStart(new Date());
   const start=weekStart(base); const days=[...Array(7)].map((_,i)=>{ const d=new Date(start); d.setDate(d.getDate()+i); return d; });
   const isoDays=days.map(isoDate); const wkStart=isoDays[0];
-  const [rsh,rpf,rpay,rsal,rpub,rojr] = await Promise.all([
+  const [rsh,rpf,rpay,rsal,rpub,rojr,rto] = await Promise.all([
     sb.from('shifts').select('*').gte('on_date',isoDays[0]).lte('on_date',isoDays[6]),
     sb.from('profiles').select('*'),
     sb.from('pay_rates').select('*'),
     sb.from('day_sales').select('*').gte('on_date',isoDays[0]).lte('on_date',isoDays[6]),
     sb.from('published_weeks').select('*').eq('week_start',wkStart).maybeSingle(),
     sb.from('day_items').select('on_date,detail').eq('kind','ojr').gte('on_date',isoDays[0]).lte('on_date',isoDays[6]),
+    sb.from('time_off').select('*').eq('status','approved'),
     loadPositions()
   ]);
   const ojrByDay={}; (rojr.data||[]).forEach(o=>{ if(o.on_date) ojrByDay[o.on_date]=o.detail; });
+  const offMap={}; (rto.data||[]).forEach(t=>{ isoDays.forEach(iso=>{ if(iso>=t.start_date && iso<=(t.end_date||t.start_date)){ (offMap[t.person_name]=offMap[t.person_name]||{})[iso]=t.reason||'Time off'; } }); });
   const shifts=rsh.data||[]; window._shifts={}; shifts.forEach(s=>window._shifts[s.id]=s); const team=(rpf.data||[]).filter(p=>p.role!=='admin'); window._team=team;
   const wage={}; (rpay.data||[]).forEach(p=>wage[p.person_name]=Number(p.wage)||0);
   const sales={}; (rsal.data||[]).forEach(d=>sales[d.on_date]=Number(d.sales)||0);
@@ -824,6 +826,7 @@ async function schBoard(v){
   const totSales=isoDays.reduce((a,iso)=>a+(sales[iso]||0),0); const labpctO=(isAdmin&&totSales&&allCost)?Math.round(allCost/totSales*100):null;
   const metric=(ic,vv,ll,col)=>`<div class="metric"><div class="ml"><i class="ti ${ic}"></i>${ll}</div><div class="mv"${col?` style="color:${col}"`:''}>${vv}</div></div>`;
   h+=`<div class="metrics">${metric('ti-clock',allHrs?allHrs.toFixed(1):'0','Hours')}${metric('ti-currency-dollar',isAdmin&&allCost?money(allCost):'—','Labor')}${metric('ti-users',ppl,'Scheduled')}${metric('ti-percentage',labpctO!=null?labpctO+'%':'—','Labor %',labpctO!=null?(labpctO>30?'var(--amber)':'var(--green)'):'')}</div>`;
+  if(isAdmin){ const R=lawRules(); const warns=[]; const hoursByP={}; shifts.forEach(s=>{ hoursByP[s.person_name]=(hoursByP[s.person_name]||0)+shiftHours(s); }); const seen=new Set(); shifts.forEach(s=>{ if(offMap[s.person_name]&&offMap[s.person_name][s.on_date]){ const k=s.person_name+'|'+s.on_date; if(!seen.has(k)){ seen.add(k); warns.push('🌴 '+s.person_name+' is scheduled '+fmtDay(_d(s.on_date))+' but has approved time off'); } } }); const otW=R.ot_weekly_hrs||40; Object.keys(hoursByP).forEach(n=>{ if(hoursByP[n]>otW) warns.push('⏰ '+n+' is over '+otW+'h this week ('+hoursByP[n].toFixed(1)+'h)'); }); if(warns.length) h+=`<div class="card" style="padding:12px 15px;margin-bottom:14px;background:var(--amber-soft);border-color:var(--amber)"><div style="font-weight:700;color:var(--amber);margin-bottom:5px">${warns.length} thing${warns.length>1?'s':''} to check before publishing</div><div style="font-size:13px;line-height:1.8">${warns.map(w=>esc(w)).join('<br>')}</div></div>`; }
   if(window._draftSummary){ const ds=window._draftSummary; window._draftSummary=null; h+=`<div class="card" style="padding:14px 16px;margin-bottom:14px;background:var(--brand-soft);border-color:var(--brand-line)"><div style="font-weight:700;margin-bottom:3px">✨ Auto-draft ready — ${ds.made} shift${ds.made!==1?'s':''} placed${ds.unfilled?', '+ds.unfilled+' still open':''}</div><div class="faint" style="font-size:12.5px">Review below, tweak anything, then Publish. Nothing reaches the team until you publish.</div>${ds.flags.length?`<div style="margin-top:9px;font-size:13px;line-height:1.7;border-top:1px solid var(--brand-line);padding-top:8px">${ds.flags.map(f=>`<div style="white-space:pre-line;margin-bottom:5px">${esc(f)}</div>`).join('')}</div>`:''}</div>`; }
   if(!shifts.length) h+=`<div class="card" style="padding:30px 22px;text-align:center;margin-bottom:14px"><div style="font-size:30px;color:var(--brand);margin-bottom:8px"><i class="ti ti-calendar-plus"></i></div><div style="font-weight:600;margin-bottom:3px">No shifts this week</div><div class="faint" style="font-size:13px">${isAdmin?'Add one below, tap Copy week, or ✨ Auto-draft to build it from a past week.':'Your shifts show here once leadership posts the schedule.'}</div></div>`;
   h+=`<div class="board"><div class="board-grid"><div class="bh bh-team">Team</div>`+days.map(d=>`<div class="bh ${isoDate(d)===todayIso?'bh-today':''}">${d.toLocaleDateString(undefined,{weekday:'short'})}<span>${d.getDate()}</span></div>`).join('');
@@ -834,8 +837,9 @@ async function schBoard(v){
     h+=`<div class="band" style="background:${_bc}14;color:${_bc};border-left:4px solid ${_bc}">${esc(role)}</div>`;
     roles[role].forEach(p=>{
       let wHrs=0,wCost=0;
-      const cells=isoDays.map((iso,di)=>{ const list=byPD[p.name+'|'+iso]||[]; let cell=''; const isOjr=ojrByDay[iso]===p.name;
+      const cells=isoDays.map((iso,di)=>{ const list=byPD[p.name+'|'+iso]||[]; let cell=''; const isOjr=ojrByDay[iso]===p.name; const offRec=offMap[p.name]&&offMap[p.name][iso];
         list.forEach(s=>{ const hrs=shiftHours(s); wHrs+=hrs; const c=hrs*(wage[p.name]||0); wCost+=c; dayHrs[di]+=hrs; dayCost[di]+=c; const tr=s.kind==='training'; const oj=isOjr?';border-color:#F4C7C7;background:#FEECEC':''; const styleAttr=isAdmin?` style="cursor:pointer${oj}"`:(isOjr?` style="border-color:#F4C7C7;background:#FEECEC"`:''); cell+=`<div class="scard${tr?' train':''}"${isAdmin?` onclick="editShift(${s.id})"`:''}${styleAttr}>${isOjr?'<span style="display:inline-block;background:#DC2626;color:#fff;font-size:9px;font-weight:800;letter-spacing:.03em;padding:1px 4px;border-radius:4px;margin-right:4px;vertical-align:middle">OJR</span>':''}${s.start_time?fmtClock(s.start_time):'shift'}${s.end_time?'–'+fmtClock(s.end_time):''}${tr?' · train':''}${isAdmin?`<span class="x" onclick="event.stopPropagation();delShift(${s.id})">×</span>`:''}</div>`; });
+        if(offRec) cell=`<div class="scard" style="background:#F1F0EE;color:#8A8A8A;border-color:#E2E0DD;font-weight:600;cursor:default" title="${esc(offRec)}"><i class="ti ti-plane" style="font-size:11px"></i> Time off</div>`+cell;
         return `<div class="daycell${iso===todayIso?' today':''}">${cell}</div>`;
       }).join('');
       const inits=(p.name||'?').split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
