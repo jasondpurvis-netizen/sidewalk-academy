@@ -937,33 +937,36 @@ window.autoDraft=async function(){
   const cur=await sb.from('shifts').select('id').gte('on_date',isoDays[0]).lte('on_date',isoDays[6]);
   if((cur.data||[]).length){ if(!confirm('This week already has '+cur.data.length+' shifts. Replace them with a fresh auto-draft?')) return; await sb.from('shifts').delete().gte('on_date',isoDays[0]).lte('on_date',isoDays[6]); }
   // inputs
-  const [rav,rto]=await Promise.all([ sb.from('availability').select('person_name,weekday,can_work'), sb.from('time_off').select('*').eq('status','approved') ]);
-  await loadPositions();
-  const offDay={}; (rav.data||[]).forEach(a=>{ if(a.can_work===false){ (offDay[a.person_name]=offDay[a.person_name]||{})[a.weekday]=true; } });
-  const isOff=(person,wd)=>!!(offDay[person]&&offDay[person][wd]);
-  const onLeave=(person,iso)=>{ return (rto.data||[]).some(t=>t.person_name===person && iso>=t.start_date && iso<=(t.end_date||t.start_date)); };
-  // roster by position
-  await loadArchived();
-  const roster={}; Object.keys(window._posMap||{}).forEach(n=>{ if(isArchived(n))return; const p=window._posMap[n]; (roster[p]=roster[p]||[]).push(n); });
-  const twStartD=wkDate(twStart);
-  const hoursBy={}; const closeByPersonDate={}; // for clopening
+  const [rav,rto]=await Promise.all([ sb.from('availability').select('person_name,weekday,can_work,note'), sb.from('time_off').select('*').eq('status','approved') ]);
+  await loadPositions(); await loadProfiles(); await loadArchived();
+  const R=lawRules(); const otW=R.ot_weekly_hrs||40; const minRest=R.min_rest_between_shifts_hrs;
+  const avMap={}; (rav.data||[]).forEach(a=>{ (avMap[a.person_name]=avMap[a.person_name]||{})[a.weekday]={can_work:a.can_work,note:a.note}; });
+  const onLeave=(person,iso)=> (rto.data||[]).some(t=>t.person_name===person && iso>=t.start_date && iso<=(t.end_date||t.start_date));
+  const fitsAvail=(person,wd,sStart,sEnd)=>{ const a=avMap[person]&&avMap[person][wd]; if(!a) return true; if(a.can_work===false) return false; const win=parseWin(a.note); if(win){ const ws=parseClock(win[0]),we=parseClock(win[1]),ss=parseClock(sStart),se=parseClock(sEnd); if(ws==null||we==null||ss==null||se==null) return true; return ss>=ws-1e-9 && se<=we+1e-9; } return true; };
+  const ageOn=(person,iso)=>{ const dob=(profileOf(person)||{}).dob; if(!dob||dob.length<10) return null; const b=new Date(dob+'T00:00'),d=new Date(iso+'T00:00'); let a=d.getFullYear()-b.getFullYear(); const m=d.getMonth()-b.getMonth(); if(m<0||(m===0&&d.getDate()<b.getDate())) a--; return a; };
+  const minorCapEnd=(person,iso)=>{ const a=ageOn(person,iso); if(a==null||a>=16) return null; const mo=+iso.slice(5,7); return (mo>=6&&mo<=8)?21:19; };
+  const roster={}; Object.keys(window._posMap||{}).forEach(n=>{ if(isArchived(n))return; (roster[posOf(n)]=roster[posOf(n)]||[]).push(n); });
+  const hoursBy={}; const lastEnd={};
   const draft=[]; let unfilled=[];
-  // build slots from template, sorted by date+start
   const slots=tmpl.map(s=>{ const dow=(new Date(s.on_date+'T00:00').getDay()+6)%7; return {dow,start:s.start_time,end:s.end_time,kind:s.kind,pos:posOf(s.person_name),orig:s.person_name}; }).sort((a,b)=> a.dow-b.dow || (a.start||'').localeCompare(b.start||''));
+  const eligible=(n,sl,iso,hrs)=>{ if(!n) return false; if(onLeave(n,iso)) return false; if(draft.some(d=>d.person_name===n && d.on_date===iso)) return false; if(!fitsAvail(n,sl.dow,sl.start,sl.end)) return false;
+    const cap=minorCapEnd(n,iso); if(cap!=null){ const se=parseClock(sl.end); if(se!=null && se>cap+1e-9) return false; const ag=ageOn(n,iso); if(ag!=null&&ag<16&&hrs>8+1e-9) return false; }
+    if(minRest){ const le=lastEnd[n]; if(le){ const gap=Math.round((new Date(iso+'T00:00')-new Date(le.iso+'T00:00'))/86400000); const ss=parseClock(sl.start); if(ss!=null&&gap>=0){ if(((gap*24)-le.end)+ss < minRest-1e-9) return false; } } }
+    return true; };
   slots.forEach(sl=>{ const iso=isoDays[sl.dow]; const hrs=shiftHours({start_time:sl.start,end_time:sl.end});
-    const eligible=(n)=> n && !isOff(n,sl.dow) && !onLeave(n,iso) && !(draft.some(d=>d.person_name===n && d.on_date===iso));
     let pick=null;
-    if(eligible(sl.orig)) pick=sl.orig;
-    else { const pool=(roster[sl.pos]||[]).filter(eligible); pool.sort((a,b)=>(hoursBy[a]||0)-(hoursBy[b]||0)); pick=pool[0]||null; }
-    if(pick){ hoursBy[pick]=(hoursBy[pick]||0)+hrs; draft.push({person_name:pick,role:sl.pos,on_date:iso,start_time:sl.start,end_time:sl.end,kind:sl.kind,user_id:null}); }
-    else unfilled.push({day:isoDays[sl.dow],pos:sl.pos,start:sl.start,end:sl.end});
+    if(eligible(sl.orig,sl,iso,hrs)) pick=sl.orig;
+    else { const pool=(roster[sl.pos]||[]).filter(n=>eligible(n,sl,iso,hrs)); pool.sort((a,b)=>{ const sa=(hoursBy[a]||0)+((hoursBy[a]||0)+hrs>otW?1000:0), s2=(hoursBy[b]||0)+((hoursBy[b]||0)+hrs>otW?1000:0); return sa-s2 || a.localeCompare(b); }); pick=pool[0]||null; }
+    if(pick){ hoursBy[pick]=(hoursBy[pick]||0)+hrs; const e=parseClock(sl.end); lastEnd[pick]={iso,end:(e!=null?e:0)}; draft.push({person_name:pick,role:sl.pos,on_date:iso,start_time:sl.start,end_time:sl.end,kind:sl.kind,user_id:null}); }
+    else unfilled.push({day:iso,pos:sl.pos,start:sl.start,end:sl.end});
   });
   if(draft.length) await sb.from('shifts').insert(draft);
-  // flags
-  const R=lawRules(); const flags=[];
-  if(unfilled.length){ const lines=unfilled.slice().sort((a,b)=>(a.day+ (a.start||'')).localeCompare(b.day+(b.start||''))).map(u=>'   • '+u.pos+' · '+fmtDay(_d(u.day))+(u.start?' · '+fmtClock(u.start)+(u.end?'–'+fmtClock(u.end):''):'')); flags.push('⚠ '+unfilled.length+' shift'+(unfilled.length>1?'s':'')+" couldn't be filled — no one available:\n"+lines.join('\n')); }
-  const otW=R.ot_weekly_hrs||40; const overs=Object.keys(hoursBy).filter(n=>hoursBy[n]>otW); if(overs.length) flags.push('⏰ Over '+otW+'h (overtime): '+overs.map(n=>n+' '+hoursBy[n].toFixed(1)+'h').join(', '));
-  if(R.meal_after_hrs){ const longs=draft.filter(d=>shiftHours(d)>R.meal_after_hrs); if(longs.length) flags.push('🍽 '+longs.length+' shift'+(longs.length>1?'s':'')+' over '+R.meal_after_hrs+'h — meal break required.'); }
+  const flags=[];
+  if(unfilled.length){ const lines=unfilled.slice().sort((a,b)=>(a.day+(a.start||'')).localeCompare(b.day+(b.start||''))).map(u=>'   • '+u.pos+' · '+fmtDay(_d(u.day))+(u.start?' · '+fmtClock(u.start)+(u.end?'–'+fmtClock(u.end):''):'')); flags.push('⚠ '+unfilled.length+' shift'+(unfilled.length>1?'s':'')+" couldn't be filled within everyone's rules:\n"+lines.join('\n')); }
+  const overs=Object.keys(hoursBy).filter(n=>hoursBy[n]>otW); if(overs.length) flags.push('⏰ Over '+otW+'h (overtime): '+overs.map(n=>n+' '+hoursBy[n].toFixed(1)+'h').join(', '));
+  if(R.meal_after_hrs){ const longs=draft.filter(d=>shiftHours(d)>R.meal_after_hrs); if(longs.length) flags.push('🍽 '+longs.length+' shift'+(longs.length>1?'s':'')+' over '+R.meal_after_hrs+'h — schedule a meal break.'); }
+  const minorsUsed=[...new Set(draft.map(d=>d.person_name).filter(n=>{const a=ageOn(n,isoDays[0]); return a!=null&&a<18;}))]; if(minorsUsed.length) flags.push('✅ Minor limits respected for '+minorsUsed.join(', ')+' (curfew + hours).');
+  const limUsed=Object.keys(avMap).some(n=>Object.values(avMap[n]).some(x=>parseWin(x.note))); if(limUsed) flags.push('✅ Only scheduled people inside their available hours.');
   window._draftSummary={made:draft.length, unfilled:unfilled.length, flags};
   vSchedule(document.getElementById('view'));
 };
