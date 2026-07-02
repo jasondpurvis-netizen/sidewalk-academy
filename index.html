@@ -467,11 +467,12 @@ async function vSummary(v){
   v.innerHTML=`<div class="muted">Loading…</div>`;
   const { data:profiles } = await sb.from("profiles").select("*");
   const { data:prog } = await sb.from("progress").select("user_id,lesson_id,at");
+  await loadArchived();
   const total = state.tracks.reduce((a,t)=>a+trackLessons(t.id).length,0);
   const byUser={}, lastAt={};
   (prog||[]).forEach(p=>{ byUser[p.user_id]=(byUser[p.user_id]||0)+1; if(p.at&&(!lastAt[p.user_id]||p.at>lastAt[p.user_id]))lastAt[p.user_id]=p.at; });
   const weekAgo=Date.now()-7*86400000; const weekDone=(prog||[]).filter(p=>p.at&&new Date(p.at).getTime()>=weekAgo).length;
-  const learners=(profiles||[]).filter(p=>p.role!=="admin").map(p=>{
+  const learners=(profiles||[]).filter(p=>p.role!=="admin"&&!isArchived(p.name)).map(p=>{
     const dn=byUser[p.id]||0, pct=total?Math.round(dn/total*100):0;
     let status= pct>=100?'certified': dn>0?'training':'notstarted';
     const days = lastAt[p.id]? Math.floor((Date.now()-new Date(lastAt[p.id]))/86400000) : null;
@@ -732,7 +733,7 @@ async function vToday(v){
   const items=ri.data||[], rots=rr.data||[], notes=rn.data||[], upcoming=ru.data||[];
   const dueRots=rots.filter(r=>{ if(!r.last_done) return true; const d=new Date(r.last_done); d.setDate(d.getDate()+(r.cadence_days||7)); return d.toISOString().slice(0,10)<=iso; });
   const ojrItem=items.find(i=>i.kind==='ojr');
-  const boardItems=items.filter(i=>!['ojr','mission','vision','pos','pool'].includes(i.kind));
+  const boardItems=items.filter(i=>!['ojr','mission','vision','pos','pool','archived'].includes(i.kind));
   const open=boardItems.filter(i=>!i.done);
   const parts=[];
   if(dueRots.length) parts.push(dueRots.length+' cleaning'+(dueRots.length>1?'s':'')+' due');
@@ -797,6 +798,10 @@ function lawRules(){ const j=(state.settings&&state.settings.law_jurisdiction)||
 window.POSCOL=v=>POS_COL[v]||'#94A3B8';
 async function loadPositions(){ const r=await sb.from('day_items').select('title,detail').eq('kind','pos'); const m={}; (r.data||[]).forEach(x=>{ if(x.title) m[x.title]=x.detail||'Unassigned'; }); window._posMap=m; return m; }
 function posOf(name){ return (window._posMap&&window._posMap[name])||'Unassigned'; }
+async function loadArchived(){ const r=await sb.from('day_items').select('title').eq('kind','archived'); const s=new Set(); (r.data||[]).forEach(x=>{ if(x.title) s.add(x.title); }); window._archived=s; return s; }
+function isArchived(name){ return !!(window._archived&&window._archived.has(name)); }
+window.archivePerson=async function(name){ if(!confirm('Mark '+name+' as no longer employed?\n\nThey drop off the active schedule, roster, availability and Team progress. Their history (past shifts, hours, training) is kept on record.')) return; await sb.from('day_items').insert({kind:'archived',title:name,on_date:null,created_by:state.user.id}); if(window._archived)window._archived.add(name); vOnboarding(document.getElementById('view')); };
+window.restorePerson=async function(name){ await sb.from('day_items').delete().eq('kind','archived').eq('title',name); if(window._archived)window._archived.delete(name); vOnboarding(document.getElementById('view')); };
 window.setPos=async function(name,pos){ await sb.from('day_items').delete().eq('kind','pos').eq('title',name); if(pos){ await sb.from('day_items').insert({kind:'pos',title:name,detail:pos,on_date:null,created_by:state.user.id}); } if(window._posMap) window._posMap[name]=pos; };
 function posSelect(name,cur){ return `<select onchange="setPos('${esc(name).replace(/'/g,"\\'")}',this.value);var d=this.parentNode.querySelector('.posdot');if(d)d.style.background=window.POSCOL(this.value)" style="padding:7px 9px;border:1px solid var(--line2);border-radius:8px;background:var(--card);color:var(--ink);font-family:inherit;font-size:13px">${POS_PICK.map(o=>`<option value="${o}"${o===cur?' selected':''}>${o}</option>`).join('')}</select>`; }
 async function schBoard(v){
@@ -813,18 +818,19 @@ async function schBoard(v){
     sb.from('published_weeks').select('*').eq('week_start',wkStart).maybeSingle(),
     sb.from('day_items').select('on_date,detail').eq('kind','ojr').gte('on_date',isoDays[0]).lte('on_date',isoDays[6]),
     sb.from('time_off').select('*').eq('status','approved'),
-    loadPositions()
+    loadPositions(),
+    loadArchived()
   ]);
   const ojrByDay={}; (rojr.data||[]).forEach(o=>{ if(o.on_date) ojrByDay[o.on_date]=o.detail; });
   const offMap={}; (rto.data||[]).forEach(t=>{ isoDays.forEach(iso=>{ if(iso>=t.start_date && iso<=(t.end_date||t.start_date)){ (offMap[t.person_name]=offMap[t.person_name]||{})[iso]=t.reason||'Time off'; } }); });
-  const shifts=rsh.data||[]; window._shifts={}; shifts.forEach(s=>window._shifts[s.id]=s); const team=(rpf.data||[]).filter(p=>p.role!=='admin'); window._team=team;
+  const shifts=rsh.data||[]; window._shifts={}; shifts.forEach(s=>window._shifts[s.id]=s); const team=(rpf.data||[]).filter(p=>p.role!=='admin'&&!isArchived(p.name)); window._team=team;
   const wage={}; (rpay.data||[]).forEach(p=>wage[p.person_name]=Number(p.wage)||0);
   const sales={}; (rsal.data||[]).forEach(d=>sales[d.on_date]=Number(d.sales)||0);
   const pub=rpub.data; const todayIso=isoDate(new Date());
   const byPD={}; shifts.forEach(s=>{ const k=(s.person_name||'')+'|'+s.on_date; (byPD[k]=byPD[k]||[]).push(s); });
   const roles={}; team.forEach(p=>{ const r=posOf(p.name); (roles[r]=roles[r]||[]).push(p); });
   const known=new Set(team.map(p=>p.name));
-  shifts.forEach(s=>{ if(s.person_name && !known.has(s.person_name)){ known.add(s.person_name); const r=posOf(s.person_name); (roles[r]=roles[r]||[]).push({name:s.person_name,title:r}); } });
+  shifts.forEach(s=>{ if(s.person_name && !known.has(s.person_name) && !isArchived(s.person_name)){ known.add(s.person_name); const r=posOf(s.person_name); (roles[r]=roles[r]||[]).push({name:s.person_name,title:r}); } });
   const fmtH=d=>{ const x=new Date(d); return x.toLocaleDateString(undefined,{weekday:'short'})+' '+(x.getMonth()+1)+'/'+x.getDate(); };
   const daysAhead = pub ? Math.round((start - new Date(pub.published_at))/86400000) : null;
   let h=`<div class="sched-bar"><div class="sched-nav"><button class="iconbtn" aria-label="Previous week" onclick="weekShift(-1)"><i class="ti ti-chevron-left"></i></button><button class="iconbtn" aria-label="Next week" onclick="weekShift(1)"><i class="ti ti-chevron-right"></i></button><button class="btn" style="width:auto" onclick="weekShift(0)">Today</button></div><div style="min-width:0"><div style="font-size:18px;font-weight:600;line-height:1.2">${fmtDay(days[0])} – ${fmtDay(days[6])}</div><div class="faint" style="font-size:12px;margin-top:2px">${pub?`<span style="color:var(--green)">●</span> Published${daysAhead>=0?' · posted '+daysAhead+' days ahead':''}`:'Draft — not published yet'}</div></div>`;
@@ -897,7 +903,8 @@ window.autoDraft=async function(){
   const isOff=(person,wd)=>!!(offDay[person]&&offDay[person][wd]);
   const onLeave=(person,iso)=>{ return (rto.data||[]).some(t=>t.person_name===person && iso>=t.start_date && iso<=(t.end_date||t.start_date)); };
   // roster by position
-  const roster={}; Object.keys(window._posMap||{}).forEach(n=>{ const p=window._posMap[n]; (roster[p]=roster[p]||[]).push(n); });
+  await loadArchived();
+  const roster={}; Object.keys(window._posMap||{}).forEach(n=>{ if(isArchived(n))return; const p=window._posMap[n]; (roster[p]=roster[p]||[]).push(n); });
   const twStartD=wkDate(twStart);
   const hoursBy={}; const closeByPersonDate={}; // for clopening
   const draft=[]; let unfilled=[];
@@ -955,16 +962,16 @@ async function schTeam(v){
   const isAdmin=state.profile&&state.profile.role==='admin';
   const tv=state.ctx.tv||'roster';
   const todayIso=isoDate(new Date());
-  const [rpf,rsh,rpay,rtoday]=await Promise.all([ sb.from('profiles').select('*'), sb.from('shifts').select('person_name,role'), sb.from('pay_rates').select('*'), sb.from('shifts').select('*').eq('on_date',todayIso), loadPositions() ]);
-  const team=(rpf.data||[]).filter(p=>p.role!=='admin').map(p=>({name:p.name,title:posOf(p.name),email:p.email,member:true}));
+  const [rpf,rsh,rpay,rtoday]=await Promise.all([ sb.from('profiles').select('*'), sb.from('shifts').select('person_name,role'), sb.from('pay_rates').select('*'), sb.from('shifts').select('*').eq('on_date',todayIso), loadPositions(), loadArchived() ]);
+  const team=(rpf.data||[]).filter(p=>p.role!=='admin'&&!isArchived(p.name)).map(p=>({name:p.name,title:posOf(p.name),email:p.email,member:true}));
   const known=new Set(team.map(p=>p.name));
-  (rsh.data||[]).forEach(s=>{ if(s.person_name&&!known.has(s.person_name)){ known.add(s.person_name); team.push({name:s.person_name,title:posOf(s.person_name),member:false}); } });
+  (rsh.data||[]).forEach(s=>{ if(s.person_name&&!known.has(s.person_name)&&!isArchived(s.person_name)){ known.add(s.person_name); team.push({name:s.person_name,title:posOf(s.person_name),member:false}); } });
   const wage={}; (rpay.data||[]).forEach(p=>wage[p.person_name]=Number(p.wage)||0);
   const seg=(k,l)=>`<button onclick="state.ctx.tv='${k}';schTeam(document.getElementById('schbody'))" style="padding:7px 14px;font-size:13px;font-weight:600;border:none;cursor:pointer;font-family:inherit;background:${tv===k?'var(--brand)':'var(--card)'};color:${tv===k?'#fff':'var(--muted)'}">${l}</button>`;
   let h=`<div style="display:inline-flex;border:1px solid var(--line2);border-radius:9px;overflow:hidden;margin-bottom:16px">${seg('roster','Roster')}${seg('now','On the clock now')}</div>`;
   if(tv==='now'){
     const now=new Date(); const nowH=now.getHours()+now.getMinutes()/60;
-    const todays=(rtoday.data||[]).slice().sort((a,b)=>(a.start_time||'').localeCompare(b.start_time||''));
+    const todays=(rtoday.data||[]).filter(s=>!isArchived(s.person_name)).slice().sort((a,b)=>(a.start_time||'').localeCompare(b.start_time||''));
     const onNow=todays.filter(s=>{ const a=parseClock(s.start_time),b=parseClock(s.end_time); if(a==null||b==null)return false; let end=b; if(end<a)end+=24; return nowH>=a && nowH<end; });
     const later=todays.filter(s=>{ const a=parseClock(s.start_time); return a!=null && a>nowH; });
     const rowOf=(s,tag,col)=>{ const inits=(s.person_name||'?').split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase(); const pos=posOf(s.person_name); const pc=POS_COL[pos]||'#94A3B8'; return `<div class="row" style="padding:11px 15px;border-bottom:1px solid var(--line)"><span class="av" style="background:${pc}22;color:${pc}">${esc(inits)}</span><div style="flex:1;min-width:0"><div style="font-weight:600;font-size:14px">${esc(s.person_name||'—')}</div><div class="faint" style="font-size:12px">${esc(pos)}${s.kind==='training'?' · training':''}</div></div><div style="text-align:right"><div style="font-size:13px;font-weight:600;color:${col}">${s.start_time?fmtClock(s.start_time):''}${s.end_time?'–'+fmtClock(s.end_time):''}</div>${tag?`<div class="faint" style="font-size:11px">${tag}</div>`:''}</div></div>`; };
@@ -988,7 +995,7 @@ async function schAvail(v){
   const isAdmin=state.profile&&state.profile.role==='admin';
   const me=state.profile.name;
   v.innerHTML='<div class="muted">Loading…</div>';
-  const [ra,rpf,rsh]=await Promise.all([ sb.from('availability').select('*'), sb.from('profiles').select('name,role'), sb.from('shifts').select('person_name'), loadPositions() ]);
+  const [ra,rpf,rsh]=await Promise.all([ sb.from('availability').select('*'), sb.from('profiles').select('name,role'), sb.from('shifts').select('person_name'), loadPositions(), loadArchived() ]);
   const byPerson={}; (ra.data||[]).forEach(r=>{ const p=byPerson[r.person_name]=byPerson[r.person_name]||{}; p[r.weekday]=r; });
   window._avail=byPerson;
   let h=`<div class="sec">My availability</div><div class="faint" style="font-size:12.5px;margin:-4px 0 11px">Tap a day to switch between <b style="color:#1B7B3F">Available</b> and <b style="color:#A32D2D">Off</b>. Add a note for limits like "after 3pm". Leadership uses this to build the schedule — you're not requesting a specific shift, just telling us when you can work.</div>`;
@@ -996,7 +1003,7 @@ async function schAvail(v){
     return `<div class="row" style="gap:9px;padding:8px 12px;${i<6?'border-bottom:1px solid var(--line)':''}"><div style="width:40px;font-weight:600;font-size:14px">${d}</div><div class="avseg"><button class="avbtn${can?' on':''}" onclick="avMe(${i},true,this)">Available</button><button class="avbtn${!can?' off':''}" onclick="avMe(${i},false,this)">Off</button></div><input value="${esc(note)}" placeholder="Note (optional)" onchange="avMeNote(${i},this.value)" style="flex:1;min-width:70px;padding:7px 9px;border:1px solid var(--line2);border-radius:8px;background:var(--card);color:var(--ink);font-family:inherit;font-size:13px"/></div>`; }).join('')+`</div>`;
   if(isAdmin){
     const set=new Set(); (rpf.data||[]).filter(p=>p.role!=='admin').forEach(p=>set.add(p.name)); (rsh.data||[]).forEach(s=>{ if(s.person_name)set.add(s.person_name); }); Object.keys(window._posMap||{}).forEach(n=>set.add(n)); set.delete(me);
-    const people=[...set].filter(Boolean).sort((a,b)=>{const pa=POS_ORDER.indexOf(posOf(a)),pb=POS_ORDER.indexOf(posOf(b));return (pa<0?99:pa)-(pb<0?99:pb)||a.localeCompare(b);});
+    const people=[...set].filter(n=>n&&!isArchived(n)).sort((a,b)=>{const pa=POS_ORDER.indexOf(posOf(a)),pb=POS_ORDER.indexOf(posOf(b));return (pa<0?99:pa)-(pb<0?99:pb)||a.localeCompare(b);});
     h+=`<div class="sec">Team availability</div><div class="faint" style="font-size:12.5px;margin:-4px 0 11px">Tap any cell to flip a person between available and off. Green ✓ = can work that day. This is what the auto-draft schedule will read.</div>`;
     if(!people.length) h+=`<div class="card" style="padding:20px;text-align:center"><div class="faint">No team yet.</div></div>`;
     else { h+=`<div class="avgrid-wrap"><div class="avgrid"><div class="avgh avgh-name">Team</div>`+AV_DOW.map(d=>`<div class="avgh">${d}</div>`).join('');
@@ -1103,13 +1110,15 @@ async function vOnboarding(v){
     sb.from('profiles').select('name,role,email'),
     sb.from('shifts').select('person_name')
   ]);
-  await loadPositions();
+  await loadPositions(); await loadArchived();
   const byHire={}; (rs.data||[]).forEach(s=>{ (byHire[s.hire_id]=byHire[s.hire_id]||[]).push(s); });
   const set=new Set();
   (rpf.data||[]).filter(p=>p.role!=='admin').forEach(p=>set.add(p.name));
   (rsh.data||[]).forEach(s=>{ if(s.person_name) set.add(s.person_name); });
   Object.keys(window._posMap||{}).forEach(n=>set.add(n));
-  const roster=[...set].filter(Boolean);
+  const rosterAll=[...set].filter(Boolean);
+  const roster=rosterAll.filter(n=>!isArchived(n));
+  const archivedList=rosterAll.filter(n=>isArchived(n)).sort();
   const groups={}; roster.forEach(n=>{ const p=posOf(n); (groups[p]=groups[p]||[]).push(n); });
   const ordered=Object.keys(groups).sort((a,b)=>{const ia=POS_ORDER.indexOf(a),ib=POS_ORDER.indexOf(b);return (ia<0?99:ia)-(ib<0?99:ib)||a.localeCompare(b);});
 
@@ -1121,10 +1130,11 @@ async function vOnboarding(v){
   ordered.forEach(pos=>{ const c=POS_COL[pos]||'#94A3B8';
     h+=`<div class="band" style="background:${c}14;color:${c};border-left:4px solid ${c};margin:8px 12px 4px">${esc(pos)} <span style="opacity:.7;font-weight:500">· ${groups[pos].length}</span></div>`;
     groups[pos].slice().sort().forEach(n=>{ const inits=(n||'?').split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
-      h+=`<div class="row" style="padding:9px 15px;gap:10px"><span class="av">${esc(inits)}</span><div style="flex:1;min-width:0"><div style="font-weight:600;font-size:14px">${esc(n)}</div></div><span class="posdot" style="width:9px;height:9px;border-radius:50%;background:${c};flex-shrink:0"></span>${posSelect(n,pos)}</div>`;
+      h+=`<div class="row" style="padding:9px 15px;gap:10px"><span class="av">${esc(inits)}</span><div style="flex:1;min-width:0"><div style="font-weight:600;font-size:14px">${esc(n)}</div></div><span class="posdot" style="width:9px;height:9px;border-radius:50%;background:${c};flex-shrink:0"></span>${posSelect(n,pos)}<button class="btn" style="width:auto;padding:6px 9px;color:#A32D2D;border-color:#F0C9C9" title="Mark no longer employed" onclick="archivePerson('${esc(n).replace(/'/g,"\\'")}')"><i class="ti ti-user-off"></i></button></div>`;
     });
   });
   h+=`</div>`;
+  if(archivedList.length){ h+=`<div class="sec">No longer employed</div><div class="faint" style="font-size:12.5px;margin:-4px 0 10px">Off the active schedule &amp; rosters — history kept on record. Restore anytime.</div><div class="card" style="padding:2px 0;margin-bottom:20px">`+archivedList.map(n=>{ const inits=(n||'?').split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase(); return `<div class="row" style="padding:10px 15px;gap:10px;opacity:.72"><span class="av">${esc(inits)}</span><div style="flex:1;min-width:0"><div style="font-weight:600;font-size:14px">${esc(n)}</div><div class="faint" style="font-size:12px">Archived · ${esc(posOf(n))}</div></div><button class="btn" style="width:auto;padding:6px 11px" onclick="restorePerson('${esc(n).replace(/'/g,"\\'")}')">Restore</button></div>`; }).join('')+`</div>`; }
 
   h+=`<div class="sec">Onboarding in progress</div>`;
   if(!(rh.data||[]).length) h+=`<div class="card" style="padding:26px;text-align:center"><div class="faint">No one onboarding right now. Add a hire above to start a checklist.</div></div>`;
@@ -1153,7 +1163,7 @@ async function vCalendar(v){
   let data;
   if(state.calCache && state.calCache.ym===ym){ data=state.calCache.data; }
   else { v.innerHTML='<div class="muted">Loading…</div>'; const r=await sb.from('day_items').select('*').gte('on_date',first).lte('on_date',last).order('created_at'); data=r.data||[]; state.calCache={ym,data}; }
-  const CAL_HIDE=new Set(['pos','ojr','mission','vision','pool']);
+  const CAL_HIDE=new Set(['pos','ojr','mission','vision','pool','archived']);
   const byd={}; (data||[]).forEach(it=>{ if(CAL_HIDE.has(it.kind))return; (byd[it.on_date]=byd[it.on_date]||[]).push(it); });
   const hol={}; usHolidays(y).forEach(x=>hol[x.date]=x);
   const todayIso=isoDate(new Date()); const sel=state.ctx.day||(ym===todayIso.slice(0,7)?todayIso:first);
