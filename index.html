@@ -463,7 +463,7 @@ async function vCommunity(v){
   const tag = (state.ctx.tag||'').toLowerCase();
   setTitle("Community", tag?('Posts tagged '+tag):"Talk it through together");
   const visible = CHANNELS.filter(c=> c[0]!=='leadership' || isAdmin);
-  if(!state.community){ v.innerHTML=`<div class="muted">Loading…</div>`; const [p,c,m,rx,rd]=await Promise.all([ sb.from('posts').select('*').order('created_at',{ascending:false}), sb.from('comments').select('*').order('created_at'), sb.from('channel_modes').select('*'), sb.from('reactions').select('*'), sb.from('channel_reads').select('*').eq('user_id',state.user.id) ]); state.community={posts:p.data||[],comments:c.data||[],modes:m.data||[],reactions:rx.data||[],reads:rd.data||[]}; }
+  if(!state.community){ v.innerHTML=`<div class="muted">Loading…</div>`; const [p,c,m,rx,rd]=await Promise.all([ sb.from('posts').select('*').order('created_at',{ascending:false}), sb.from('comments').select('*').order('created_at'), sb.from('channel_modes').select('*'), sb.from('reactions').select('*'), sb.from('channel_reads').select('*').eq('user_id',state.user.id), sb.from('profiles').select('id,name') ]); state.community={posts:p.data||[],comments:c.data||[],modes:m.data||[],reactions:rx.data||[],reads:rd.data||[],profiles:pf.data||[]}; }
   let posts = tag ? state.community.posts.filter(p=>(p.body||'').toLowerCase().includes(tag) && (p.channel!=='leadership'||isAdmin)) : state.community.posts.filter(p=>p.channel===ch);
   const cBy={}; state.community.comments.forEach(c=>{ (cBy[c.post_id]=cBy[c.post_id]||[]).push(c); });
   const cur = CHANNELS.find(c=>c[0]===ch)||CHANNELS[0];
@@ -513,8 +513,10 @@ const REACT_EMOJIS=['❤️','👍','🎉','😂','👏','🔥'];
 function reactionBar(p){
   const rs=(state.community.reactions||[]).filter(r=>r.post_id===p.id);
   const by={}; rs.forEach(r=>{ (by[r.emoji]=by[r.emoji]||[]).push(r.user_id); });
-  const mine=state.user.id;
-  return `<div class="row" style="margin-top:11px;gap:6px;flex-wrap:wrap">`+REACT_EMOJIS.map(e=>{ const u=by[e]||[]; const on=u.includes(mine); const n=u.length; return `<button onclick="react(${p.id},'${e}')" style="border:1px solid ${on?'var(--brand)':'var(--line2)'};background:${on?'var(--brand-soft)':'var(--card)'};border-radius:999px;padding:3px 10px;font-size:14px;cursor:pointer;line-height:1.2;display:inline-flex;align-items:center;gap:5px;transition:transform .08s ease">${e}${n?`<span style="font-size:12px;font-weight:700;color:${on?'var(--brand)':'var(--muted)'}">${n}</span>`:''}</button>`; }).join('')+`</div>`;
+  const mine=state.user.id; const nm={}; (state.community.profiles||[]).forEach(pr=>nm[pr.id]=pr.name);
+  const bar=REACT_EMOJIS.map(e=>{ const u=by[e]||[]; const on=u.includes(mine); const n=u.length; return `<button onclick="react(${p.id},'${e}')" style="border:1px solid ${on?'var(--brand)':'var(--line2)'};background:${on?'var(--brand-soft)':'var(--card)'};border-radius:999px;padding:3px 10px;font-size:14px;cursor:pointer;line-height:1.2;display:inline-flex;align-items:center;gap:5px;transition:transform .08s ease">${e}${n?`<span style="font-size:12px;font-weight:700;color:${on?'var(--brand)':'var(--muted)'}">${n}</span>`:''}</button>`; }).join('');
+  const who=Object.keys(by).map(e=>`${e} ${by[e].map(id=>id===mine?'You':(nm[id]||'Someone')).join(', ')}`).join('    ');
+  return `<div style="margin-top:11px"><div class="row" style="gap:6px;flex-wrap:wrap">`+bar+`</div>`+(who?`<div class="faint" style="font-size:11.5px;margin-top:6px;line-height:1.5">${esc(who)}</div>`:'')+`</div>`;
 }
 window.react=async function(pid,emoji){ const mine=state.user.id; const arr=state.community.reactions||(state.community.reactions=[]); const idx=arr.findIndex(r=>r.post_id===pid&&r.user_id===mine&&r.emoji===emoji); if(idx>=0){ arr.splice(idx,1); sb.from('reactions').delete().eq('post_id',pid).eq('user_id',mine).eq('emoji',emoji).then(()=>{}); } else { arr.push({post_id:pid,user_id:mine,emoji}); sb.from('reactions').insert({post_id:pid,user_id:mine,emoji}).then(()=>{}); } vCommunity(document.getElementById('view')); };
 window._npmedia=null;
