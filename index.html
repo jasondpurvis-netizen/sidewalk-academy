@@ -739,7 +739,7 @@ async function vToday(v){
   const items=ri.data||[], rots=rr.data||[], notes=rn.data||[], upcoming=ru.data||[];
   const dueRots=rots.filter(r=>{ if(!r.last_done) return true; const d=new Date(r.last_done); d.setDate(d.getDate()+(r.cadence_days||7)); return d.toISOString().slice(0,10)<=iso; });
   const ojrItem=items.find(i=>i.kind==='ojr');
-  const boardItems=items.filter(i=>!['ojr','mission','vision','pos','pool','archived','pdates','profile'].includes(i.kind));
+  const boardItems=items.filter(i=>!['ojr','mission','vision','pos','pool','archived','pdates','profile','covrules'].includes(i.kind));
   const open=boardItems.filter(i=>!i.done);
   const parts=[];
   if(dueRots.length) parts.push(dueRots.length+' cleaning'+(dueRots.length>1?'s':'')+' due');
@@ -865,6 +865,8 @@ async function schBoard(v){
     loadArchived()
   ]);
   const ojrByDay={}; (rojr.data||[]).forEach(o=>{ if(o.on_date) ojrByDay[o.on_date]=o.detail; });
+  let covRules={requireLeader:true,days:{}}; try{ const rc=await sb.from('day_items').select('detail').eq('kind','covrules').maybeSingle(); const cd=JSON.parse((rc.data&&rc.data.detail)||'{}'); covRules={requireLeader:cd.requireLeader!==false, days:cd.days||{}}; }catch(e){}
+  const covTarget=di=>{ const c=covRules.days[di]; return c&&c.people?+c.people:null; };
   const offMap={}; (rto.data||[]).forEach(t=>{ isoDays.forEach(iso=>{ if(iso>=t.start_date && iso<=(t.end_date||t.start_date)){ (offMap[t.person_name]=offMap[t.person_name]||{})[iso]=t.reason||'Time off'; } }); });
   const shifts=rsh.data||[]; window._shifts={}; shifts.forEach(s=>window._shifts[s.id]=s); const team=(rpf.data||[]).filter(p=>p.role!=='admin'&&!isArchived(p.name)); window._team=team;
   const wage={}; (rpay.data||[]).forEach(p=>wage[p.person_name]=Number(p.wage)||0);
@@ -910,14 +912,21 @@ async function schBoard(v){
     h+=`<div class="pcell"><span class="av" style="background:#FEECEC;color:#DC2626"><i class="ti ti-alert-triangle"></i></span><span style="min-width:0"><span class="nm">Open shifts</span><span class="mt">${openShifts.length} to fill</span></span></div>${ocells}`;
   }
   const totHrs=dayHrs.reduce((a,b)=>a+b,0), totCost=dayCost.reduce((a,b)=>a+b,0);
+  const dayPpl=isoDays.map(iso=> new Set(shifts.filter(s=>s.on_date===iso&&s.person_name&&s.person_name!=='__OPEN__').map(s=>s.person_name)).size );
+  const totPpl=new Set(shifts.filter(s=>s.person_name&&s.person_name!=='__OPEN__').map(s=>s.person_name)).size;
+  h+=`<div class="bt bt-team" style="font-weight:600">On the floor</div>`+isoDays.map((iso,di)=>{ const t=covTarget(di); const short=t!=null&&dayPpl[di]<t; return `<div class="bt" style="font-weight:600">${dayPpl[di]||'—'}${t!=null?`<span class="faint" style="font-weight:400"> / ${t}</span>`:''}${short?`<div style="font-size:10px;font-weight:600;color:var(--amber)">short ${t-dayPpl[di]}</div>`:''}</div>`; }).join('');
   h+=`<div class="bt bt-team">Daily total</div>`+isoDays.map((iso,di)=>{ const sl=sales[iso]||0; const pct=(isAdmin&&sl&&dayCost[di])?Math.round(dayCost[di]/sl*100):null; return `<div class="bt">${dayHrs[di]?dayHrs[di].toFixed(1)+'h':'—'}${isAdmin&&dayCost[di]?`<div class="faint" style="font-weight:400;font-size:11px">${money(dayCost[di])}</div>`:''}${pct!=null?`<div style="font-size:11px;font-weight:600;color:${pct>30?'var(--amber)':'var(--green)'}">${pct}%</div>`:''}</div>`; }).join('')+`</div></div>`;
   if(isAdmin){
     h+=`<div class="sec">Add a shift or training</div><div class="card" style="padding:14px"><div class="row" style="gap:8px;flex-wrap:wrap"><input id="shname" list="teamlist" placeholder="Who…" style="flex:1;min-width:130px;padding:9px 11px;border:1px solid var(--line2);border-radius:8px;background:var(--card);color:var(--ink);font-family:inherit"/><datalist id="teamlist">${team.map(p=>`<option value="${esc(p.name)}">`).join('')}</datalist><input id="shrole" placeholder="Role" style="width:120px;padding:9px 11px;border:1px solid var(--line2);border-radius:8px;background:var(--card);color:var(--ink);font-family:inherit"/><input id="shdate" type="date" value="${todayIso}" style="padding:9px;border:1px solid var(--line2);border-radius:8px;background:var(--card);color:var(--ink);font-family:inherit"/></div><div class="row" style="gap:8px;margin-top:8px;flex-wrap:wrap"><input id="shstart" type="time" style="padding:9px;border:1px solid var(--line2);border-radius:8px;background:var(--card);color:var(--ink);font-family:inherit"/><input id="shend" type="time" style="padding:9px;border:1px solid var(--line2);border-radius:8px;background:var(--card);color:var(--ink);font-family:inherit"/><select id="shkind" style="padding:9px;border:1px solid var(--line2);border-radius:8px;background:var(--card);color:var(--ink);font-family:inherit"><option value="shift">Shift</option><option value="training">Training</option></select><button class="btn pri" style="width:auto" onclick="addShift()">Add</button></div></div>`;
     h+=`<div class="sec">Pay rates (for labor cost)</div><div class="card" style="padding:14px"><div class="faint" style="font-size:12px;margin-bottom:8px">Set hourly wages — used to compute labor cost. Only leadership sees these.</div>${team.map(p=>`<div class="row" style="gap:8px;padding:4px 0"><div style="flex:1;font-size:13px">${esc(p.name)}</div><span class="faint">$</span><input type="number" min="0" step="0.25" value="${wage[p.name]||''}" placeholder="0.00" onchange="setWage('${esc(p.name).replace(/'/g,'')}',this.value)" style="width:90px;padding:7px 9px;border:1px solid var(--line2);border-radius:8px;background:var(--card);color:var(--ink)"/><span class="faint" style="font-size:12px">/hr</span></div>`).join('')||'<div class="faint" style="font-size:13px">No team members yet.</div>'}</div>`;
     h+=`<div class="sec">Projected sales (for labor %)</div><div class="card" style="padding:14px"><div class="faint" style="font-size:12px;margin-bottom:8px">Optional — enter a day's expected sales to see labor as a % of sales.</div><div class="row" style="gap:10px;flex-wrap:wrap">${isoDays.map((iso,di)=>`<div style="text-align:center"><div class="faint" style="font-size:11px;margin-bottom:3px">${days[di].toLocaleDateString(undefined,{weekday:'short'})}</div><div class="row" style="gap:2px"><span class="faint" style="align-self:center">$</span><input type="number" min="0" value="${sales[iso]||''}" placeholder="0" onchange="setSales('${iso}',this.value)" style="width:72px;padding:6px;border:1px solid var(--line2);border-radius:8px;background:var(--card);color:var(--ink)"/></div></div>`).join('')}</div></div>`;
   }
+  if(isAdmin){ const dn=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+    h+=`<div class="sec">Coverage rules — how the week should be staffed</div><div class="card" style="padding:14px"><div class="faint" style="font-size:12px;margin-bottom:10px">The auto-draft builds to these. Adjust them as your business grows and the seasons change.</div><label style="display:flex;align-items:center;gap:9px;font-size:14px;cursor:pointer;margin-bottom:12px"><input type="checkbox" id="covLeader" ${covRules.requireLeader?'checked':''}/> <span>Require a <b>leader</b> (manager or supervisor) to open and close every day</span></label><div class="faint" style="font-size:12px;margin-bottom:6px">Target people on the floor each day — the board flags any day that comes up short:</div><div class="row" style="gap:8px;flex-wrap:wrap">${dn.map((d,i)=>`<div style="text-align:center"><div class="faint" style="font-size:11px;margin-bottom:3px">${d}</div><input type="number" min="0" id="covP${i}" value="${(covRules.days[i]&&covRules.days[i].people)||''}" placeholder="—" style="width:54px;padding:7px;border:1px solid var(--line2);border-radius:8px;background:var(--card);color:var(--ink);text-align:center;font-family:inherit"/></div>`).join('')}</div><div class="row" style="margin-top:14px"><button class="btn pri" style="width:auto" onclick="saveCovRules()">Save coverage rules</button><span id="covmsg" class="muted" style="font-size:13px;margin-left:10px;align-self:center"></span></div></div>`;
+  }
   v.innerHTML=h;
 }
+window.saveCovRules=async function(){ const days={}; for(let i=0;i<7;i++){ const v=(document.getElementById('covP'+i)||{}).value; if(v&&+v>0) days[i]={people:+v}; } const requireLeader=!!((document.getElementById('covLeader')||{}).checked); const detail=JSON.stringify({requireLeader,days}); await sb.from('day_items').delete().eq('kind','covrules'); await sb.from('day_items').insert({kind:'covrules',title:'coverage',on_date:null,detail,created_by:state.user.id}); const m=document.getElementById('covmsg'); if(m)m.textContent='Saved ✓ — runs on your next auto-draft'; };
 window.weekShift=function(n){ if(n===0){ state.ctx.wk=isoDate(weekStart(new Date())); } else { const base=state.ctx.wk?wkDate(state.ctx.wk):weekStart(new Date()); base.setDate(base.getDate()+n*7); state.ctx.wk=isoDate(base); } vSchedule(document.getElementById('view')); };
 window.addShift=async function(){ const nm=val('shname'); const on=document.getElementById('shdate').value; if(!nm||!on){ alert('Pick a person and a date.'); return; } const prof=(window._team||[]).find(p=>p.name===nm); await sb.from('shifts').insert({person_name:nm,role:val('shrole')||(prof&&prof.title)||'',on_date:on,start_time:document.getElementById('shstart').value,end_time:document.getElementById('shend').value,kind:document.getElementById('shkind').value,user_id:prof?prof.id:null}); state.ctx.wk=isoDate(weekStart(wkDate(on))); vSchedule(document.getElementById('view')); };
 window.delShift=async function(id){ await sb.from('shifts').delete().eq('id',id); vSchedule(document.getElementById('view')); };
@@ -967,6 +976,8 @@ window.autoDraft=async function(){
   // inputs
   const [rav,rto]=await Promise.all([ sb.from('availability').select('person_name,weekday,can_work,note'), sb.from('time_off').select('*').eq('status','approved') ]);
   await loadPositions(); await loadProfiles(); await loadArchived();
+  const rcov=await sb.from('day_items').select('detail').eq('kind','covrules').maybeSingle();
+  let cov={}; let requireLeaderCoverage=true; try{ const cd=JSON.parse((rcov.data&&rcov.data.detail)||'{}'); cov=cd.days||{}; if(cd.requireLeader===false) requireLeaderCoverage=false; }catch(e){}
   const R=lawRules(); const otW=R.ot_weekly_hrs||40; const minRest=R.min_rest_between_shifts_hrs;
   const avMap={}; (rav.data||[]).forEach(a=>{ (avMap[a.person_name]=avMap[a.person_name]||{})[a.weekday]={can_work:a.can_work,note:a.note}; });
   const onLeave=(person,iso)=> (rto.data||[]).some(t=>t.person_name===person && iso>=t.start_date && iso<=(t.end_date||t.start_date));
@@ -996,16 +1007,29 @@ window.autoDraft=async function(){
     return true; };
   const allNames=[]; Object.keys(roster).forEach(p=>roster[p].forEach(n=>allNames.push(n)));
   const capOf=n=>{ const mx=(profileOf(n)||{}).maxHrs; return mx?+mx:otW; }; // ceiling: their max, else the OT line
-  slots.forEach(sl=>{ const iso=isoDays[sl.dow]; const hrs=shiftHours({start_time:sl.start,end_time:sl.end});
-    // Coverage is generic: anyone qualified can cover any slot (rank only sets PRIORITY, not eligibility). Owners aren't auto-scheduled onto the floor.
-    const canCover=(n)=>{ const pp=posOf(n); return pp!=='Owner'&&pp!=='Unassigned'; };
-    // TOP-DOWN: best people filled to their max first, then build down
+  // Coverage is generic: anyone qualified can cover any slot (rank only sets PRIORITY). Owners aren't auto-scheduled onto the floor.
+  const canCover=(n)=>{ const pp=posOf(n); return pp!=='Owner'&&pp!=='Unassigned'; };
+  const LEADER=new Set(['Owner','Manager','Supervisor']); const isLeader=n=>LEADER.has(posOf(n));
+  const lblOf=sl=>(sl.station&&!isRankLabel(sl.station))?sl.station:'';
+  const hrsOf=sl=>shiftHours({start_time:sl.start,end_time:sl.end});
+  const commit=(pick,sl,roleOverride)=>{ const iso=isoDays[sl.dow]; hoursBy[pick]=(hoursBy[pick]||0)+hrsOf(sl); (daysBy[pick]=daysBy[pick]||new Set()).add(iso); const e=parseClock(sl.end); lastEnd[pick]={iso,end:(e!=null?e:0)}; draft.push({person_name:pick,role:roleOverride||lblOf(sl)||posOf(pick),on_date:iso,start_time:sl.start,end_time:sl.end,kind:sl.kind,user_id:null}); sl._done=true; };
+  const openSlot=(sl,role)=>{ const iso=isoDays[sl.dow]; unfilled.push({day:iso,station:role||lblOf(sl),start:sl.start,end:sl.end}); draft.push({person_name:'__OPEN__',role:role||lblOf(sl)||'Open',on_date:iso,start_time:sl.start,end_time:sl.end,kind:'shift',user_id:null}); sl._done=true; };
+  // ---- LEADERSHIP BACKBONE: every day gets a leader opening and a leader closing (a manager/supervisor runs each shift) ----
+  const leaderGaps=[];
+  if(requireLeaderCoverage){
+    const daySlots={}; slots.forEach(s=>{ (daySlots[s.dow]=daySlots[s.dow]||[]).push(s); });
+    const pickLeaderFor=(sl)=>{ const iso=isoDays[sl.dow]; const hrs=hrsOf(sl); const pool=allNames.filter(n=>isLeader(n)&&canCover(n)&&eligible(n,sl,iso,hrs)); pool.sort((a,b)=>{ const da=(daysBy[a]?daysBy[a].size:0), db=(daysBy[b]?daysBy[b].size:0); if(da!==db) return da-db; const oa=((hoursBy[a]||0)+hrs>capOf(a)+1e-9)?1:0, ob=((hoursBy[b]||0)+hrs>capOf(b)+1e-9)?1:0; if(oa!==ob) return oa-ob; return (hoursBy[a]||0)-(hoursBy[b]||0) || POS_ORDER.indexOf(posOf(a))-POS_ORDER.indexOf(posOf(b)); }); return pool[0]||null; };
+    const dws=Object.keys(daySlots).map(Number);
+    // Pass 1 — a leader OPENS each day (spread leaders across all days first)
+    dws.forEach(dw=>{ const sl=daySlots[dw].filter(s=>!s._done).sort((a,b)=>(a.start||'').localeCompare(b.start||''))[0]; if(!sl)return; const L=pickLeaderFor(sl); if(L) commit(L,sl); else { openSlot(sl,'Opening lead'); leaderGaps.push({day:isoDays[dw],type:'opening'}); } });
+    // Pass 2 — a leader CLOSES each day
+    dws.forEach(dw=>{ const sl=daySlots[dw].filter(s=>!s._done).sort((a,b)=>(b.start||'').localeCompare(a.start||''))[0]; if(!sl)return; const L=pickLeaderFor(sl); if(L) commit(L,sl); else { openSlot(sl,'Closing lead'); leaderGaps.push({day:isoDays[dw],type:'closing'}); } });
+  }
+  // ---- GENERIC FILL for the rest, busiest days first, top-down ----
+  slots.filter(s=>!s._done).forEach(sl=>{ const iso=isoDays[sl.dow]; const hrs=hrsOf(sl);
     const pool=allNames.filter(n=>canCover(n)&&eligible(n,sl,iso,hrs));
     pool.sort((a,b)=>{ const oa=((hoursBy[a]||0)+hrs>capOf(a)+1e-9)?1:0, ob=((hoursBy[b]||0)+hrs>capOf(b)+1e-9)?1:0; if(oa!==ob) return oa-ob; const ra=POS_ORDER.indexOf(posOf(a)), rb=POS_ORDER.indexOf(posOf(b)); if(ra!==rb) return ra-rb; const ua=under(a)?0:1, ub=under(b)?0:1; if(ua!==ub) return ua-ub; return (hoursBy[a]||0)-(hoursBy[b]||0) || a.localeCompare(b); });
-    const pick=pool[0]||null;
-    const lbl=(sl.station&&!isRankLabel(sl.station))?sl.station:'';
-    if(pick){ hoursBy[pick]=(hoursBy[pick]||0)+hrs; (daysBy[pick]=daysBy[pick]||new Set()).add(iso); const e=parseClock(sl.end); lastEnd[pick]={iso,end:(e!=null?e:0)}; draft.push({person_name:pick,role:lbl||posOf(pick),on_date:iso,start_time:sl.start,end_time:sl.end,kind:sl.kind,user_id:null}); }
-    else { unfilled.push({day:iso,station:lbl,start:sl.start,end:sl.end}); draft.push({person_name:'__OPEN__',role:lbl||'Open',on_date:iso,start_time:sl.start,end_time:sl.end,kind:'shift',user_id:null}); }
+    const pick=pool[0]||null; if(pick) commit(pick,sl); else openSlot(sl);
   });
   if(draft.length) await sb.from('shifts').insert(draft);
   const flags=[];
@@ -1013,6 +1037,7 @@ window.autoDraft=async function(){
   const overs=Object.keys(hoursBy).filter(n=>hoursBy[n]>otW); if(overs.length) flags.push('⏰ Over '+otW+'h (overtime): '+overs.map(n=>n+' '+hoursBy[n].toFixed(1)+'h').join(', '));
   if(R.meal_after_hrs){ const longs=draft.filter(d=>shiftHours(d)>R.meal_after_hrs); if(longs.length) flags.push('🍽 '+longs.length+' shift'+(longs.length>1?'s':'')+' over '+R.meal_after_hrs+'h — schedule a meal break.'); }
   const belowMin=allNames.filter(n=>{ const mn=+((profileOf(n)||{}).minHrs||0); return mn>0 && (hoursBy[n]||0) < mn-1e-9; }); if(belowMin.length) flags.push('📉 Below their weekly minimum: '+belowMin.map(n=>n+' '+(hoursBy[n]||0).toFixed(1)+'/'+(profileOf(n).minHrs)+'h').join(', ')+' — add hours or adjust their rule.');
+  if(leaderGaps.length){ flags.unshift('👤 '+leaderGaps.length+' shift'+(leaderGaps.length>1?'s':'')+' need a leader (no manager/supervisor free): '+leaderGaps.map(x=>fmtDay(_d(x.day))+' '+x.type).join(', ')+' — assign a leader or develop someone to run it.'); }
   window._draftSummary={made:draft.length, unfilled:unfilled.length, flags};
   vSchedule(document.getElementById('view'));
 };
@@ -1283,7 +1308,7 @@ async function vCalendar(v){
   let data;
   if(state.calCache && state.calCache.ym===ym){ data=state.calCache.data; }
   else { v.innerHTML='<div class="muted">Loading…</div>'; const r=await sb.from('day_items').select('*').gte('on_date',first).lte('on_date',last).order('created_at'); data=r.data||[]; state.calCache={ym,data}; }
-  const CAL_HIDE=new Set(['pos','ojr','mission','vision','pool','archived','pdates','profile']);
+  const CAL_HIDE=new Set(['pos','ojr','mission','vision','pool','archived','pdates','profile','covrules']);
   const byd={}; (data||[]).forEach(it=>{ if(CAL_HIDE.has(it.kind))return; (byd[it.on_date]=byd[it.on_date]||[]).push(it); });
   const hol={}; usHolidays(y).forEach(x=>hol[x.date]=x);
   const todayIso=isoDate(new Date()); const sel=state.ctx.day||(ym===todayIso.slice(0,7)?todayIso:first);
