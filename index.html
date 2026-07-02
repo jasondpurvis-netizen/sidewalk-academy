@@ -144,6 +144,19 @@
   .schtab.on{color:var(--brand);border-bottom-color:var(--brand)}
   .wbframe{border:11px solid #CDD4DA;border-radius:18px;background:#fff;padding:22px 20px 26px;box-shadow:0 12px 34px rgba(16,24,40,.13),inset 0 0 0 1px #E7EBEE;position:relative}
   .wbframe::after{content:"";position:absolute;left:50%;bottom:-9px;transform:translateX(-50%);width:120px;height:9px;background:#B9C1C8;border-radius:0 0 8px 8px}
+  .avseg{display:inline-flex;border:1px solid var(--line2);border-radius:9px;overflow:hidden;flex-shrink:0}
+  .avbtn{padding:6px 12px;font-size:12.5px;font-weight:600;background:var(--card);color:var(--muted);border:none;cursor:pointer;font-family:inherit}
+  .avbtn.on{background:#E7F5EC;color:#1B7B3F}
+  .avbtn.off{background:#FCEBEB;color:#A32D2D}
+  .avgrid-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--line);border-radius:12px}
+  .avgrid{display:grid;grid-template-columns:150px repeat(7,minmax(46px,1fr));min-width:520px}
+  .avgh{padding:8px 6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--faint);text-align:center;border-bottom:1px solid var(--line);background:#FAFAFA}
+  .avgh.avgh-name{text-align:left;padding-left:12px;position:sticky;left:0;z-index:2;background:#FAFAFA}
+  .avgn{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line);position:sticky;left:0;background:var(--card);z-index:1}
+  .avg{display:flex;align-items:center;justify-content:center;border-bottom:1px solid var(--line);border-left:1px solid var(--line);font-weight:700;font-size:14px;cursor:pointer;position:relative;min-height:40px}
+  .avg.on{background:#E7F5EC;color:#1B7B3F}
+  .avg.off{background:#FBECEC;color:#C05252}
+  .avdot{position:absolute;top:5px;right:5px;width:5px;height:5px;border-radius:50%;background:var(--brand)}
   @media(max-width:720px){.wbframe{border-width:8px;border-radius:14px;padding:16px 13px 20px}}
   .otile{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:15px 17px}
   .otile .ol{font-size:12.5px;color:var(--muted);display:flex;align-items:center;gap:6px}
@@ -760,10 +773,10 @@ async function vSchedule(v){
   const stab=state.ctx.stab||'overview';
   setTitle('Operations','Scheduling, team & the daily log — one place');
   const _w=document.querySelector('.wrap'); if(_w) _w.style.maxWidth='1180px';
-  const tabs=[['overview','Overview'],['schedule','Schedule'],['team','Team'],['timeoff','Time off'],['reports','Reports']];
+  const tabs=[['overview','Overview'],['schedule','Schedule'],['team','Team'],['availability','Availability'],['timeoff','Time off'],['reports','Reports']];
   v.innerHTML=`<div class="schtabs">`+tabs.map(t=>`<button class="schtab${stab===t[0]?' on':''}" onclick="schGo('${t[0]}')">${t[1]}</button>`).join('')+`</div><div id="schbody"><div class="muted">Loading…</div></div>`;
   const body=document.getElementById('schbody');
-  ({overview:schOverview, schedule:schBoard, team:schTeam, timeoff:schTimeoff, logbook:schLogbook, reports:schReports}[stab]||schOverview)(body);
+  ({overview:schOverview, schedule:schBoard, team:schTeam, availability:schAvail, timeoff:schTimeoff, logbook:schLogbook, reports:schReports}[stab]||schOverview)(body);
 }
 window.schGo=function(t){ state.ctx.stab=t; vSchedule(document.getElementById('view')); };
 /* ---------- Positions: single source of truth (stored as day_items kind='pos') ---------- */
@@ -898,6 +911,39 @@ async function schTeam(v){
   });
   v.innerHTML=h;
 }
+const AV_DOW=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+async function schAvail(v){
+  const isAdmin=state.profile&&state.profile.role==='admin';
+  const me=state.profile.name;
+  v.innerHTML='<div class="muted">Loading…</div>';
+  const [ra,rpf,rsh]=await Promise.all([ sb.from('availability').select('*'), sb.from('profiles').select('name,role'), sb.from('shifts').select('person_name'), loadPositions() ]);
+  const byPerson={}; (ra.data||[]).forEach(r=>{ const p=byPerson[r.person_name]=byPerson[r.person_name]||{}; p[r.weekday]=r; });
+  window._avail=byPerson;
+  let h=`<div class="sec">My availability</div><div class="faint" style="font-size:12.5px;margin:-4px 0 11px">Tap a day to switch between <b style="color:#1B7B3F">Available</b> and <b style="color:#A32D2D">Off</b>. Add a note for limits like "after 3pm". Leadership uses this to build the schedule — you're not requesting a specific shift, just telling us when you can work.</div>`;
+  h+=`<div class="card" style="padding:4px 2px;margin-bottom:26px">`+AV_DOW.map((d,i)=>{ const row=(byPerson[me]||{})[i]; const can=row?row.can_work!==false:true; const note=row?(row.note||''):'';
+    return `<div class="row" style="gap:9px;padding:8px 12px;${i<6?'border-bottom:1px solid var(--line)':''}"><div style="width:40px;font-weight:600;font-size:14px">${d}</div><div class="avseg"><button class="avbtn${can?' on':''}" onclick="avMe(${i},true,this)">Available</button><button class="avbtn${!can?' off':''}" onclick="avMe(${i},false,this)">Off</button></div><input value="${esc(note)}" placeholder="Note (optional)" onchange="avMeNote(${i},this.value)" style="flex:1;min-width:70px;padding:7px 9px;border:1px solid var(--line2);border-radius:8px;background:var(--card);color:var(--ink);font-family:inherit;font-size:13px"/></div>`; }).join('')+`</div>`;
+  if(isAdmin){
+    const set=new Set(); (rpf.data||[]).filter(p=>p.role!=='admin').forEach(p=>set.add(p.name)); (rsh.data||[]).forEach(s=>{ if(s.person_name)set.add(s.person_name); }); Object.keys(window._posMap||{}).forEach(n=>set.add(n)); set.delete(me);
+    const people=[...set].filter(Boolean).sort((a,b)=>{const pa=POS_ORDER.indexOf(posOf(a)),pb=POS_ORDER.indexOf(posOf(b));return (pa<0?99:pa)-(pb<0?99:pb)||a.localeCompare(b);});
+    h+=`<div class="sec">Team availability</div><div class="faint" style="font-size:12.5px;margin:-4px 0 11px">Tap any cell to flip a person between available and off. Green ✓ = can work that day. This is what the auto-draft schedule will read.</div>`;
+    if(!people.length) h+=`<div class="card" style="padding:20px;text-align:center"><div class="faint">No team yet.</div></div>`;
+    else { h+=`<div class="avgrid-wrap"><div class="avgrid"><div class="avgh avgh-name">Team</div>`+AV_DOW.map(d=>`<div class="avgh">${d}</div>`).join('');
+      people.forEach(person=>{ const pos=posOf(person); const c=POS_COL[pos]||'#94A3B8'; const inits=(person||'?').split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
+        h+=`<div class="avgn"><span class="av" style="background:${c}22;color:${c}">${esc(inits)}</span><span class="nm" style="font-size:13px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(person)}</span></div>`+AV_DOW.map((d,i)=>{ const row=(byPerson[person]||{})[i]; const can=row?row.can_work!==false:true; const note=row?(row.note||''):''; return `<div class="avg${can?' on':' off'}" data-person="${esc(person)}" data-wd="${i}" onclick="avToggle(this)" title="${note?esc(note):''}">${can?'✓':'✕'}${note?'<i class="avdot"></i>':''}</div>`; }).join('');
+      });
+      h+=`</div></div>`;
+    }
+  }
+  v.innerHTML=h;
+}
+async function _avUpsert(person,wd,fields){
+  const cur=(window._avail&&window._avail[person]&&window._avail[person][wd])||null;
+  if(cur){ Object.assign(cur,fields); await sb.from('availability').update({...fields,updated_at:new Date().toISOString()}).eq('id',cur.id); }
+  else { const ins=await sb.from('availability').insert({person_name:person,weekday:wd,user_id:state.user.id,...fields}).select(); const row=ins.data&&ins.data[0]; if(row){ (window._avail[person]=window._avail[person]||{})[wd]=row; } }
+}
+window.avMe=function(wd,can,btn){ const seg=btn.parentNode; seg.querySelectorAll('.avbtn').forEach(b=>b.classList.remove('on','off')); btn.classList.add(can?'on':'off'); _avUpsert(state.profile.name,wd,{can_work:can}); };
+window.avMeNote=function(wd,val){ _avUpsert(state.profile.name,wd,{note:val||null}); };
+window.avToggle=function(el){ const person=el.getAttribute('data-person'); const wd=+el.getAttribute('data-wd'); const nowOn=!el.classList.contains('on'); el.classList.toggle('on',nowOn); el.classList.toggle('off',!nowOn); const hadNote=el.querySelector('.avdot'); el.innerHTML=(nowOn?'✓':'✕')+(hadNote?'<i class="avdot"></i>':''); _avUpsert(person,wd,{can_work:nowOn}); };
 async function schTimeoff(v){
   const isAdmin=state.profile&&state.profile.role==='admin';
   const r=await sb.from('time_off').select('*').order('start_date',{ascending:false});
