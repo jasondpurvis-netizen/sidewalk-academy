@@ -979,7 +979,7 @@ window.autoDraft=async function(){
     const cap=minorCapEnd(n,iso); if(cap!=null){ const se=parseClock(sl.end); if(se!=null && se>cap+1e-9) return false; const ag=ageOn(n,iso); if(ag!=null&&ag<16&&hrs>8+1e-9) return false; }
     if(minRest){ const le=lastEnd[n]; if(le){ const gap=Math.round((new Date(iso+'T00:00')-new Date(le.iso+'T00:00'))/86400000); const ss=parseClock(sl.start); if(ss!=null&&gap>=0){ if(((gap*24)-le.end)+ss < minRest-1e-9) return false; } } }
     const pr=profileOf(n)||{};
-    if(pr.maxHrs && (hoursBy[n]||0)+hrs > +pr.maxHrs+1e-9) return false;
+    const mx=pr.maxHrs?+pr.maxHrs:otW; if((hoursBy[n]||0)+hrs > mx+1e-9) return false;
     if(pr.maxDays){ const dset=daysBy[n]; if((!dset||!dset.has(iso)) && (dset?dset.size:0) >= +pr.maxDays) return false; }
     return true; };
   const allNames=[]; Object.keys(roster).forEach(p=>roster[p].forEach(n=>allNames.push(n)));
