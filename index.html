@@ -762,6 +762,15 @@ async function vSchedule(v){
   ({overview:schOverview, schedule:schBoard, team:schTeam, timeoff:schTimeoff, logbook:schLogbook, reports:schReports}[stab]||schOverview)(body);
 }
 window.schGo=function(t){ state.ctx.stab=t; vSchedule(document.getElementById('view')); };
+/* ---------- Positions: single source of truth (stored as day_items kind='pos') ---------- */
+const POS_ORDER=['OJR','Owner','Manager','Supervisor','Trainer','Trainee','Team Member','Unassigned'];
+const POS_COL={OJR:'#DC2626',Owner:'#7C3AED',Manager:'#2563EB',Supervisor:'#0D9488',Trainer:'#0891B2',Trainee:'#D97706','Team Member':'#64748B',Unassigned:'#94A3B8'};
+const POS_PICK=['Owner','Manager','Supervisor','Trainer','Trainee','Team Member','Unassigned']; // OJR is a per-day designation, not a stored position
+window.POSCOL=v=>POS_COL[v]||'#94A3B8';
+async function loadPositions(){ const r=await sb.from('day_items').select('title,detail').eq('kind','pos'); const m={}; (r.data||[]).forEach(x=>{ if(x.title) m[x.title]=x.detail||'Unassigned'; }); window._posMap=m; return m; }
+function posOf(name){ return (window._posMap&&window._posMap[name])||'Unassigned'; }
+window.setPos=async function(name,pos){ await sb.from('day_items').delete().eq('kind','pos').eq('title',name); if(pos){ await sb.from('day_items').insert({kind:'pos',title:name,detail:pos,created_by:state.user.id}); } if(window._posMap) window._posMap[name]=pos; };
+function posSelect(name,cur){ return `<select onchange="setPos('${esc(name).replace(/'/g,"\\'")}',this.value);var d=this.parentNode.querySelector('.posdot');if(d)d.style.background=window.POSCOL(this.value)" style="padding:7px 9px;border:1px solid var(--line2);border-radius:8px;background:var(--card);color:var(--ink);font-family:inherit;font-size:13px">${POS_PICK.map(o=>`<option value="${o}"${o===cur?' selected':''}>${o}</option>`).join('')}</select>`; }
 async function schBoard(v){
   const isAdmin=state.profile&&state.profile.role==='admin';
   v.innerHTML='<div class="muted">Loading…</div>';
@@ -773,17 +782,17 @@ async function schBoard(v){
     sb.from('profiles').select('*'),
     sb.from('pay_rates').select('*'),
     sb.from('day_sales').select('*').gte('on_date',isoDays[0]).lte('on_date',isoDays[6]),
-    sb.from('published_weeks').select('*').eq('week_start',wkStart).maybeSingle()
+    sb.from('published_weeks').select('*').eq('week_start',wkStart).maybeSingle(),
+    loadPositions()
   ]);
   const shifts=rsh.data||[]; window._shifts={}; shifts.forEach(s=>window._shifts[s.id]=s); const team=(rpf.data||[]).filter(p=>p.role!=='admin'); window._team=team;
   const wage={}; (rpay.data||[]).forEach(p=>wage[p.person_name]=Number(p.wage)||0);
   const sales={}; (rsal.data||[]).forEach(d=>sales[d.on_date]=Number(d.sales)||0);
   const pub=rpub.data; const todayIso=isoDate(new Date());
   const byPD={}; shifts.forEach(s=>{ const k=(s.person_name||'')+'|'+s.on_date; (byPD[k]=byPD[k]||[]).push(s); });
-  const roleOf=p=>(p.title&&p.title.trim())||'Team';
-  const roles={}; team.forEach(p=>{ (roles[roleOf(p)]=roles[roleOf(p)]||[]).push(p); });
+  const roles={}; team.forEach(p=>{ const r=posOf(p.name); (roles[r]=roles[r]||[]).push(p); });
   const known=new Set(team.map(p=>p.name));
-  shifts.forEach(s=>{ if(s.person_name && !known.has(s.person_name)){ known.add(s.person_name); const r=s.role||'Team'; (roles[r]=roles[r]||[]).push({name:s.person_name,title:r}); } });
+  shifts.forEach(s=>{ if(s.person_name && !known.has(s.person_name)){ known.add(s.person_name); const r=posOf(s.person_name); (roles[r]=roles[r]||[]).push({name:s.person_name,title:r}); } });
   const fmtH=d=>{ const x=new Date(d); return x.toLocaleDateString(undefined,{weekday:'short'})+' '+(x.getMonth()+1)+'/'+x.getDate(); };
   const daysAhead = pub ? Math.round((start - new Date(pub.published_at))/86400000) : null;
   let h=`<div class="sched-bar"><div class="sched-nav"><button class="iconbtn" aria-label="Previous week" onclick="weekShift(-1)"><i class="ti ti-chevron-left"></i></button><button class="iconbtn" aria-label="Next week" onclick="weekShift(1)"><i class="ti ti-chevron-right"></i></button><button class="btn" style="width:auto" onclick="weekShift(0)">Today</button></div><div style="min-width:0"><div style="font-size:18px;font-weight:600;line-height:1.2">${fmtDay(days[0])} – ${fmtDay(days[6])}</div><div class="faint" style="font-size:12px;margin-top:2px">${pub?`<span style="color:var(--green)">●</span> Published${daysAhead>=0?' · posted '+daysAhead+' days ahead':''}`:'Draft — not published yet'}</div></div>`;
@@ -869,16 +878,17 @@ async function schOverview(v){
 }
 async function schTeam(v){
   const isAdmin=state.profile&&state.profile.role==='admin';
-  const [rpf,rsh,rpay]=await Promise.all([ sb.from('profiles').select('*'), sb.from('shifts').select('person_name,role'), sb.from('pay_rates').select('*') ]);
-  const team=(rpf.data||[]).filter(p=>p.role!=='admin').map(p=>({name:p.name,title:p.title||'Team',email:p.email,member:true}));
+  const [rpf,rsh,rpay]=await Promise.all([ sb.from('profiles').select('*'), sb.from('shifts').select('person_name,role'), sb.from('pay_rates').select('*'), loadPositions() ]);
+  const team=(rpf.data||[]).filter(p=>p.role!=='admin').map(p=>({name:p.name,title:posOf(p.name),email:p.email,member:true}));
   const known=new Set(team.map(p=>p.name));
-  (rsh.data||[]).forEach(s=>{ if(s.person_name&&!known.has(s.person_name)){ known.add(s.person_name); team.push({name:s.person_name,title:s.role||'Team',member:false}); } });
+  (rsh.data||[]).forEach(s=>{ if(s.person_name&&!known.has(s.person_name)){ known.add(s.person_name); team.push({name:s.person_name,title:posOf(s.person_name),member:false}); } });
   const wage={}; (rpay.data||[]).forEach(p=>wage[p.person_name]=Number(p.wage)||0);
   const roles={}; team.forEach(p=>{ (roles[p.title]=roles[p.title]||[]).push(p); });
-  let h=`<div class="faint" style="font-size:13px;margin-bottom:14px">${team.length} people${isAdmin?' · set pay rates in the Schedule tab':''}</div>`;
+  let h=`<div class="faint" style="font-size:13px;margin-bottom:14px">${team.length} people${isAdmin?' · positions are set in Onboarding':''}</div>`;
   if(!team.length) h=`<div class="card" style="padding:24px;text-align:center"><div class="faint">No team yet. Add shifts in the Schedule tab, or share your join code so they sign in.</div></div>`;
-  else Object.keys(roles).sort().forEach(role=>{
-    h+=`<div class="sec">${esc(role)}</div><div class="card">`+roles[role].map(p=>{ const inits=(p.name||'?').split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase(); return `<div class="row" style="padding:11px 15px;border-bottom:1px solid var(--line)"><span class="av">${esc(inits)}</span><div style="flex:1;min-width:0"><div style="font-weight:600;font-size:14px">${esc(p.name)}</div><div class="faint" style="font-size:12px">${p.member?(p.email?esc(p.email):'On the academy'):'Not on the academy yet'}</div></div>${isAdmin&&wage[p.name]?`<div class="faint" style="font-size:12.5px">${money(wage[p.name])}/hr</div>`:''}</div>`; }).join('')+`</div>`;
+  else Object.keys(roles).sort((a,b)=>{const ia=POS_ORDER.indexOf(a),ib=POS_ORDER.indexOf(b);return (ia<0?99:ia)-(ib<0?99:ib)||a.localeCompare(b);}).forEach(role=>{
+    const _bc=POS_COL[role]||'#94A3B8';
+    h+=`<div class="band" style="background:${_bc}14;color:${_bc};border-left:4px solid ${_bc};margin:16px 0 0">${esc(role)} <span style="opacity:.7;font-weight:500">· ${roles[role].length}</span></div><div class="card" style="margin-top:0">`+roles[role].map(p=>{ const inits=(p.name||'?').split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase(); return `<div class="row" style="padding:11px 15px;border-bottom:1px solid var(--line)"><span class="av">${esc(inits)}</span><div style="flex:1;min-width:0"><div style="font-weight:600;font-size:14px">${esc(p.name)}</div><div class="faint" style="font-size:12px">${p.member?(p.email?esc(p.email):'On the academy'):'Not on the academy yet'}</div></div>${isAdmin&&wage[p.name]?`<div class="faint" style="font-size:12.5px">${money(wage[p.name])}/hr</div>`:''}</div>`; }).join('')+`</div>`;
   });
   v.innerHTML=h;
 }
@@ -927,19 +937,45 @@ window.repWeek=function(n){ if(n===0){ state.ctx.wk=isoDate(weekStart(new Date()
 const ONBOARD_STEPS=['I-9 employment eligibility verified','E-Verify submitted','W-4 tax form signed','State tax form signed','Direct deposit set up','Employee handbook acknowledged','Food handler card on file','Allergen & safety briefing','Uniform & name tag issued','POS login created','Building tour & emergency exits','Shadow a full shift','Join the academy (sign in with the code)','Start the first training track'];
 async function vOnboarding(v){
   if(!(state.profile&&state.profile.role==='admin')){ go('home'); return; }
-  setTitle('Onboarding','From first day to certified — nothing missed');
+  setTitle('Onboarding',"Set each person's position, then nothing gets missed");
   v.innerHTML='<div class="muted">Loading…</div>';
-  const rh = await sb.from('hires').select('*').order('start_date',{ascending:false});
-  const rs = await sb.from('onboarding_steps').select('*').order('position');
+  const [rh,rs,rpf,rsh]=await Promise.all([
+    sb.from('hires').select('*').order('start_date',{ascending:false}),
+    sb.from('onboarding_steps').select('*').order('position'),
+    sb.from('profiles').select('name,role,email'),
+    sb.from('shifts').select('person_name')
+  ]);
+  await loadPositions();
   const byHire={}; (rs.data||[]).forEach(s=>{ (byHire[s.hire_id]=byHire[s.hire_id]||[]).push(s); });
-  let h=`<div class="card" style="padding:14px;margin-bottom:18px"><div style="font-weight:600;margin-bottom:8px">Add a new hire</div><div class="row" style="gap:8px;flex-wrap:wrap"><input id="hname" placeholder="Name" style="flex:1;min-width:140px;padding:9px 11px;border:1px solid var(--line2);border-radius:8px;background:var(--card);color:var(--ink);font-family:inherit"/><input id="hrole" placeholder="Role (e.g. Barista)" style="width:150px;padding:9px 11px;border:1px solid var(--line2);border-radius:8px;background:var(--card);color:var(--ink);font-family:inherit"/><input id="hdate" type="date" value="${isoDate(new Date())}" style="padding:9px;border:1px solid var(--line2);border-radius:8px;background:var(--card);color:var(--ink);font-family:inherit"/><button class="btn pri" style="width:auto" onclick="addHire()">Add</button></div><div class="faint" style="font-size:12px;margin-top:8px">Each hire gets a starter checklist. Share your join code so they sign in and begin training.</div></div>`;
-  if(!(rh.data||[]).length) h+=`<div class="card" style="padding:28px;text-align:center"><div class="faint">No one onboarding right now.</div></div>`;
-  h+=(rh.data||[]).map(hh=>{ const st=byHire[hh.id]||[]; const done=st.filter(s=>s.done).length; const pct=st.length?Math.round(done/st.length*100):0;
-    return `<div class="card" style="padding:15px;margin-bottom:12px"><div class="row"><div style="flex:1;min-width:0"><div style="font-weight:600">${esc(hh.name)} <span class="faint" style="font-weight:400;font-size:13px">· ${esc(hh.role||'')}</span></div><div class="faint" style="font-size:12px">Starts ${hh.start_date||'—'} · ${done} of ${st.length} steps</div></div><div style="width:110px"><div class="bar"><i style="width:${pct}%"></i></div></div><button class="btn" style="width:auto;padding:4px 9px;margin-left:10px" onclick="delHire(${hh.id})">✕</button></div><div style="margin-top:10px;border-top:1px solid var(--line);padding-top:8px">${st.map(s=>`<label style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:14px;cursor:pointer"><input type="checkbox" ${s.done?'checked':''} onchange="toggleStep(${s.id},this.checked)"/> <span style="${s.done?'text-decoration:line-through;color:#999':''}">${esc(s.label)}</span></label>`).join('')}</div></div>`;
+  const set=new Set();
+  (rpf.data||[]).filter(p=>p.role!=='admin').forEach(p=>set.add(p.name));
+  (rsh.data||[]).forEach(s=>{ if(s.person_name) set.add(s.person_name); });
+  Object.keys(window._posMap||{}).forEach(n=>set.add(n));
+  const roster=[...set].filter(Boolean);
+  const groups={}; roster.forEach(n=>{ const p=posOf(n); (groups[p]=groups[p]||[]).push(n); });
+  const ordered=Object.keys(groups).sort((a,b)=>{const ia=POS_ORDER.indexOf(a),ib=POS_ORDER.indexOf(b);return (ia<0?99:ia)-(ib<0?99:ib)||a.localeCompare(b);});
+
+  let h=`<div class="card" style="padding:16px;margin-bottom:18px"><div style="font-weight:700;margin-bottom:4px">Add a new hire</div><div class="faint" style="font-size:12.5px;margin-bottom:11px">Pick their position now — it follows them onto every schedule automatically.</div><div class="row" style="gap:8px;flex-wrap:wrap"><input id="hname" placeholder="Full name" style="flex:1;min-width:150px;padding:10px 12px;border:1px solid var(--line2);border-radius:9px;background:var(--card);color:var(--ink);font-family:inherit"/><select id="hpos" style="padding:10px;border:1px solid var(--line2);border-radius:9px;background:var(--card);color:var(--ink);font-family:inherit">${POS_PICK.map(o=>`<option value="${o}"${o==='Team Member'?' selected':''}>${o}</option>`).join('')}</select><input id="hdate" type="date" value="${isoDate(new Date())}" style="padding:10px;border:1px solid var(--line2);border-radius:9px;background:var(--card);color:var(--ink);font-family:inherit"/><button class="btn pri" style="width:auto" onclick="addHire()">Add hire</button></div><div class="faint" style="font-size:12px;margin-top:9px">They get a starter checklist below. Share your join code so they sign in and start training.</div></div>`;
+
+  h+=`<div class="sec">Team &amp; positions</div><div class="faint" style="font-size:12.5px;margin:-4px 0 10px">Change a position here once — it updates everywhere: schedule, team, and daily report. No position set = Unassigned.</div>`;
+  h+=`<div class="card" style="padding:6px 0;margin-bottom:20px">`;
+  if(!roster.length) h+=`<div class="faint" style="padding:20px;text-align:center">No team yet. Add a hire above, or share your join code.</div>`;
+  ordered.forEach(pos=>{ const c=POS_COL[pos]||'#94A3B8';
+    h+=`<div class="band" style="background:${c}14;color:${c};border-left:4px solid ${c};margin:8px 12px 4px">${esc(pos)} <span style="opacity:.7;font-weight:500">· ${groups[pos].length}</span></div>`;
+    groups[pos].slice().sort().forEach(n=>{ const inits=(n||'?').split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
+      h+=`<div class="row" style="padding:9px 15px;gap:10px"><span class="av">${esc(inits)}</span><div style="flex:1;min-width:0"><div style="font-weight:600;font-size:14px">${esc(n)}</div></div><span class="posdot" style="width:9px;height:9px;border-radius:50%;background:${c};flex-shrink:0"></span>${posSelect(n,pos)}</div>`;
+    });
+  });
+  h+=`</div>`;
+
+  h+=`<div class="sec">Onboarding in progress</div>`;
+  if(!(rh.data||[]).length) h+=`<div class="card" style="padding:26px;text-align:center"><div class="faint">No one onboarding right now. Add a hire above to start a checklist.</div></div>`;
+  h+=(rh.data||[]).map(hh=>{ const st=byHire[hh.id]||[]; const done=st.filter(s=>s.done).length; const pct=st.length?Math.round(done/st.length*100):0; const pos=posOf(hh.name); const c=POS_COL[pos]||'#94A3B8';
+    return `<div class="card" style="padding:15px;margin-bottom:12px"><div class="row"><div style="flex:1;min-width:0"><div style="font-weight:600">${esc(hh.name)} <span class="pill" style="background:${c}14;color:${c};font-size:11px;font-weight:600;margin-left:4px">${esc(pos)}</span></div><div class="faint" style="font-size:12px">Starts ${hh.start_date||'—'} · ${done} of ${st.length} steps</div></div><div style="width:110px"><div class="bar"><i style="width:${pct}%"></i></div></div><button class="btn" style="width:auto;padding:4px 9px;margin-left:10px" onclick="delHire(${hh.id})">✕</button></div><div style="margin-top:10px;border-top:1px solid var(--line);padding-top:8px">${st.map(s=>`<label style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:14px;cursor:pointer"><input type="checkbox" ${s.done?'checked':''} onchange="toggleStep(${s.id},this.checked)"/> <span style="${s.done?'text-decoration:line-through;color:#999':''}">${esc(s.label)}</span></label>`).join('')}</div></div>`;
   }).join('');
   v.innerHTML=h;
 }
-window.addHire=async function(){ const name=val('hname'); if(!name)return; const ins=await sb.from('hires').insert({name,role:val('hrole'),start_date:document.getElementById('hdate').value||null}).select(); if(ins.error){alert(ins.error.message);return;} const hid=ins.data&&ins.data[0]&&ins.data[0].id; if(hid) await sb.from('onboarding_steps').insert(ONBOARD_STEPS.map((l,i)=>({hire_id:hid,label:l,position:i}))); vOnboarding(document.getElementById('view')); };
+window.addHire=async function(){ const name=val('hname'); if(!name)return; const pos=(document.getElementById('hpos')||{}).value||'Team Member'; const ins=await sb.from('hires').insert({name,role:pos,start_date:document.getElementById('hdate').value||null}).select(); if(ins.error){alert(ins.error.message);return;} const hid=ins.data&&ins.data[0]&&ins.data[0].id; if(hid) await sb.from('onboarding_steps').insert(ONBOARD_STEPS.map((l,i)=>({hire_id:hid,label:l,position:i}))); await setPos(name,pos); vOnboarding(document.getElementById('view')); };
 window.toggleStep=async function(id,done){ await sb.from('onboarding_steps').update({done}).eq('id',id); };
 window.delHire=async function(id){ await sb.from('onboarding_steps').delete().eq('hire_id',id); await sb.from('hires').delete().eq('id',id); vOnboarding(document.getElementById('view')); };
 
