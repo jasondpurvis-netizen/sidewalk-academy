@@ -773,7 +773,7 @@ const POS_PICK=['Owner','Manager','Supervisor','Trainer','Trainee','Team Member'
 window.POSCOL=v=>POS_COL[v]||'#94A3B8';
 async function loadPositions(){ const r=await sb.from('day_items').select('title,detail').eq('kind','pos'); const m={}; (r.data||[]).forEach(x=>{ if(x.title) m[x.title]=x.detail||'Unassigned'; }); window._posMap=m; return m; }
 function posOf(name){ return (window._posMap&&window._posMap[name])||'Unassigned'; }
-window.setPos=async function(name,pos){ await sb.from('day_items').delete().eq('kind','pos').eq('title',name); if(pos){ await sb.from('day_items').insert({kind:'pos',title:name,detail:pos,created_by:state.user.id}); } if(window._posMap) window._posMap[name]=pos; };
+window.setPos=async function(name,pos){ await sb.from('day_items').delete().eq('kind','pos').eq('title',name); if(pos){ await sb.from('day_items').insert({kind:'pos',title:name,detail:pos,on_date:null,created_by:state.user.id}); } if(window._posMap) window._posMap[name]=pos; };
 function posSelect(name,cur){ return `<select onchange="setPos('${esc(name).replace(/'/g,"\\'")}',this.value);var d=this.parentNode.querySelector('.posdot');if(d)d.style.background=window.POSCOL(this.value)" style="padding:7px 9px;border:1px solid var(--line2);border-radius:8px;background:var(--card);color:var(--ink);font-family:inherit;font-size:13px">${POS_PICK.map(o=>`<option value="${o}"${o===cur?' selected':''}>${o}</option>`).join('')}</select>`; }
 async function schBoard(v){
   const isAdmin=state.profile&&state.profile.role==='admin';
@@ -1001,7 +1001,8 @@ async function vCalendar(v){
   let data;
   if(state.calCache && state.calCache.ym===ym){ data=state.calCache.data; }
   else { v.innerHTML='<div class="muted">Loading…</div>'; const r=await sb.from('day_items').select('*').gte('on_date',first).lte('on_date',last).order('created_at'); data=r.data||[]; state.calCache={ym,data}; }
-  const byd={}; (data||[]).forEach(it=>{ (byd[it.on_date]=byd[it.on_date]||[]).push(it); });
+  const CAL_HIDE=new Set(['pos','ojr','mission','vision']);
+  const byd={}; (data||[]).forEach(it=>{ if(CAL_HIDE.has(it.kind))return; (byd[it.on_date]=byd[it.on_date]||[]).push(it); });
   const hol={}; usHolidays(y).forEach(x=>hol[x.date]=x);
   const todayIso=isoDate(new Date()); const sel=state.ctx.day||(ym===todayIso.slice(0,7)?todayIso:first);
   let h=`<div class="sched-bar"><div class="sched-nav"><button class="iconbtn" aria-label="Previous month" onclick="calMonth(-1)"><i class="ti ti-chevron-left"></i></button><button class="iconbtn" aria-label="Next month" onclick="calMonth(1)"><i class="ti ti-chevron-right"></i></button><button class="btn" style="width:auto" onclick="calMonth(0)">This month</button></div><div style="font-size:18px;font-weight:600">${new Date(y,m-1,1).toLocaleDateString(undefined,{month:'long',year:'numeric'})}</div></div>`;
