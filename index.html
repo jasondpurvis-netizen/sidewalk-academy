@@ -718,7 +718,7 @@ async function vSchedule(v){
   const stab=state.ctx.stab||'overview';
   setTitle('Operations','Scheduling, team & the daily log — one place');
   const _w=document.querySelector('.wrap'); if(_w) _w.style.maxWidth='1180px';
-  const tabs=[['overview','Overview'],['schedule','Schedule'],['team','Team'],['timeoff','Time off'],['logbook','Log book'],['reports','Reports']];
+  const tabs=[['overview','Overview'],['schedule','Schedule'],['team','Team'],['timeoff','Time off'],['reports','Reports']];
   v.innerHTML=`<div class="schtabs">`+tabs.map(t=>`<button class="schtab${stab===t[0]?' on':''}" onclick="schGo('${t[0]}')">${t[1]}</button>`).join('')+`</div><div id="schbody"><div class="muted">Loading…</div></div>`;
   const body=document.getElementById('schbody');
   ({overview:schOverview, schedule:schBoard, team:schTeam, timeoff:schTimeoff, logbook:schLogbook, reports:schReports}[stab]||schOverview)(body);
@@ -758,7 +758,7 @@ async function schBoard(v){
   if(!shifts.length) h+=`<div class="card" style="padding:30px 22px;text-align:center;margin-bottom:14px"><div style="font-size:30px;color:var(--brand);margin-bottom:8px"><i class="ti ti-calendar-plus"></i></div><div style="font-weight:600;margin-bottom:3px">No shifts this week</div><div class="faint" style="font-size:13px">${isAdmin?'Add one below, or tap Copy week.':'Your shifts show here once leadership posts the schedule.'}</div></div>`;
   h+=`<div class="board"><div class="board-grid"><div class="bh bh-team">Team</div>`+days.map(d=>`<div class="bh ${isoDate(d)===todayIso?'bh-today':''}">${d.toLocaleDateString(undefined,{weekday:'short'})}<span>${d.getDate()}</span></div>`).join('');
   const dayHrs=isoDays.map(()=>0), dayCost=isoDays.map(()=>0);
-  const POS_ORDER=['OJR','Owner','Manager','Supervisor','Trainee','Team Member']; const POS_COL={OJR:'#DC2626',Owner:'#7C3AED',Manager:'#2563EB',Supervisor:'#0D9488',Trainee:'#D97706','Team Member':'#64748B'};
+  const POS_ORDER=['OJR','Owner','Manager','Supervisor','Trainee','Team Member','Unassigned']; const POS_COL={OJR:'#DC2626',Owner:'#7C3AED',Manager:'#2563EB',Supervisor:'#0D9488',Trainee:'#D97706','Team Member':'#64748B',Unassigned:'#94A3B8'};
   Object.keys(roles).sort((a,b)=>{const ia=POS_ORDER.indexOf(a),ib=POS_ORDER.indexOf(b);return (ia<0?99:ia)-(ib<0?99:ib)||a.localeCompare(b);}).forEach(role=>{
     const _bc=POS_COL[role]||'#94A3B8';
     h+=`<div class="band" style="background:${_bc}14;color:${_bc};border-left:4px solid ${_bc}">${esc(role)}</div>`;
