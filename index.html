@@ -977,8 +977,11 @@ window.autoDraft=async function(){
   const hoursBy={}; const lastEnd={}; const daysBy={};
   const under=n=>{ const mn=+((profileOf(n)||{}).minHrs||0); return mn>0 && (hoursBy[n]||0)<mn; };
   const draft=[]; let unfilled=[];
-  const OPEN_FLOOR=(state.settings&&state.settings.open_floor)||'05:30'; // no shift starts before this (kills junk 3am template rows)
-  const slots=tmpl.map(s=>{ const dow=(new Date(s.on_date+'T00:00').getDay()+6)%7; let st=s.start_time; if(st && st<OPEN_FLOOR && st<'05:00') st=OPEN_FLOOR; return {dow,start:st,end:s.end_time,kind:s.kind,station:(s.role||'').trim()}; }).filter(s=>{ const a=parseClock(s.start),b=parseClock(s.end); return !(a!=null&&b!=null&&b<=a); }).sort((a,b)=> a.dow-b.dow || (a.start||'').localeCompare(b.start||''));
+  const OPEN_FLOOR=(state.settings&&state.settings.open_floor)||'05:30'; // no shift starts before this (kills junk early-AM template rows)
+  const slots=tmpl.map(s=>{ const dow=(new Date(s.on_date+'T00:00').getDay()+6)%7; let st=s.start_time; if(st && st<OPEN_FLOOR) st=OPEN_FLOOR; return {dow,start:st,end:s.end_time,kind:s.kind,station:(s.role||'').trim()}; }).filter(s=>{ const a=parseClock(s.start),b=parseClock(s.end); return !(a!=null&&b!=null&&b<=a); });
+  // Fill the busiest days first so weekend/peak coverage claims people before lighter days use up their weekly day-quota
+  const _dem={}; slots.forEach(s=>{ _dem[s.dow]=(_dem[s.dow]||0)+1; });
+  slots.sort((a,b)=> (_dem[b.dow]-_dem[a.dow]) || (a.start||'').localeCompare(b.start||'') || a.dow-b.dow);
   const isRankLabel=s=>POS_ORDER.indexOf(s)>=0; // old template rows carry a RANK as role, not a real station
   const eligible=(n,sl,iso,hrs)=>{ if(!n) return false; if(onLeave(n,iso)) return false; if(draft.some(d=>d.person_name===n && d.on_date===iso)) return false; if(!fitsAvail(n,sl.dow,sl.start,sl.end)) return false;
     const pr=profileOf(n)||{};
