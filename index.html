@@ -394,7 +394,8 @@ async function vWhiteboard(v){
     sb.from('shifts').select('*').eq('on_date',iso),
     sb.from('day_items').select('*').eq('on_date',iso).order('created_at'),
     sb.from('rotations').select('*'),
-    sb.from('day_items').select('*').in('kind',['mission','vision'])
+    sb.from('day_items').select('*').in('kind',['mission','vision']),
+    loadDates(), loadArchived()
   ]);
   const shifts=(rsh.data||[]).sort((a,b)=>(a.start_time||'').localeCompare(b.start_time||''));
   const items=rit.data||[]; const rots=rrot.data||[];
@@ -405,6 +406,8 @@ async function vWhiteboard(v){
   let h='';
   if(hol) h+=`<div class="card" style="padding:13px 16px;margin-bottom:16px;background:var(--amber-soft);border-color:var(--amber)"><b style="color:var(--amber)">🎉 ${esc(hol.name)}</b> <span class="muted" style="font-size:13px">${hol.closed?'— closed today. Any perishables prepped today are waste after close.':'— banks/gov closed, expect it busier. Bump prep and staffing.'}</span></div>`;
   if(ojrItem&&ojrItem.detail) h+=`<div class="card" style="padding:12px 16px;margin-bottom:16px;background:var(--brand-soft);border-color:var(--brand-line)"><b style="color:var(--brand)"><i class="ti ti-user-star"></i> Today's OJR: ${esc(ojrItem.detail)}</b> <span class="muted" style="font-size:13px">— in charge of the shift today.</span></div>`;
+  const celebs=upcomingCelebrations(7);
+  if(celebs.length) h+=`<div class="card" style="padding:13px 16px;margin-bottom:16px;background:#FBF0DA;border-color:#EBD9AE"><b style="color:#B7791F"><i class="ti ti-cake"></i> Celebrations coming up</b><div style="margin-top:7px;font-size:13.5px;line-height:1.75">`+celebs.map(c=>`${c.emoji} ${celebLabel(c)}${c.days<=3?' <b style="color:#B7791F">·</b>':''}`).join('<br>')+`</div><div class="faint" style="font-size:12px;margin-top:7px">Plan a little something ahead of time.</div></div>`;
   h+=`<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(148px,1fr));margin-bottom:18px"><div class="otile"><div class="ol"><i class="ti ti-users"></i>On today</div><div class="ov">${shifts.length}</div></div><div class="otile"><div class="ol"><i class="ti ti-checkbox"></i>To-dos</div><div class="ov">${todos.length}</div></div><div class="otile"><div class="ol"><i class="ti ti-spray"></i>Cleanings due</div><div class="ov">${dueRots.length}</div></div></div>`;
   h+=`<div class="sec">On the floor today</div>`;
   if(!shifts.length) h+=`<div class="card" style="padding:20px;text-align:center"><div class="faint">No one scheduled today.</div></div>`;
@@ -730,12 +733,13 @@ async function vToday(v){
     sb.from('day_items').select('*').eq('on_date',iso).order('created_at'),
     sb.from('rotations').select('*').order('title'),
     sb.from('shift_notes').select('*').order('created_at',{ascending:false}).limit(8),
-    sb.from('day_items').select('*').gt('on_date',iso).order('on_date').limit(40)
+    sb.from('day_items').select('*').gt('on_date',iso).order('on_date').limit(40),
+    loadDates(), loadArchived()
   ]);
   const items=ri.data||[], rots=rr.data||[], notes=rn.data||[], upcoming=ru.data||[];
   const dueRots=rots.filter(r=>{ if(!r.last_done) return true; const d=new Date(r.last_done); d.setDate(d.getDate()+(r.cadence_days||7)); return d.toISOString().slice(0,10)<=iso; });
   const ojrItem=items.find(i=>i.kind==='ojr');
-  const boardItems=items.filter(i=>!['ojr','mission','vision','pos','pool','archived'].includes(i.kind));
+  const boardItems=items.filter(i=>!['ojr','mission','vision','pos','pool','archived','pdates'].includes(i.kind));
   const open=boardItems.filter(i=>!i.done);
   const parts=[];
   if(dueRots.length) parts.push(dueRots.length+' cleaning'+(dueRots.length>1?'s':'')+' due');
@@ -744,6 +748,8 @@ async function vToday(v){
   const other=open.filter(i=>['task'].includes(i.kind)); if(other.length) parts.push(other.length+' task'+(other.length>1?'s':''));
   let h='';
   if(ojrItem&&ojrItem.detail) h+=`<div class="card" style="padding:13px 16px;margin-bottom:14px;background:#FEECEC;border-color:#F4C7C7"><b style="color:#DC2626"><i class="ti ti-user-star"></i> Today's OJR: ${esc(ojrItem.detail)}</b> <span class="muted" style="font-size:13px">— in charge of the shift today.</span></div>`;
+  const todayCelebs=upcomingCelebrations(0);
+  if(todayCelebs.length) h+=`<div class="card" style="padding:13px 16px;margin-bottom:14px;background:#FBF0DA;border-color:#EBD9AE"><b style="color:#B7791F"><i class="ti ti-cake"></i> Today: </b><span style="font-size:14px">`+todayCelebs.map(c=>c.emoji+' '+(c.type==='Work anniversary'?esc(c.name)+"'s "+c.years+"-year work anniversary":esc(c.name)+"'s birthday")).join(' · ')+`</span> <span class="muted" style="font-size:13px">— make it a good one.</span></div>`;
   h+=`<div class="card" style="padding:16px 18px;margin-bottom:18px;background:var(--brand-soft);border-color:var(--brand-line)"><div style="font-weight:700;margin-bottom:4px">Here's today</div><div style="font-size:14px;color:#333">${parts.length?esc(parts.join(' · ')):'Nothing logged yet. Add what the day holds below.'}</div></div>`;
   const hToday=usHolidays(new Date().getFullYear()).find(x=>x.date===iso);
   if(hToday) h+=`<div class="card" style="padding:13px 16px;margin-bottom:16px;background:var(--amber-soft);border-color:var(--amber)"><b style="color:var(--amber)">🎉 ${esc(hToday.name)} today</b> <span class="muted" style="font-size:13px">${hToday.closed?"— we're closed. End of day: any perishable prepped today is waste after close. Don't over-prep.":"— banks and government closed, so expect it busier. Bump prep and add staff."}</span></div>`;
@@ -802,6 +808,17 @@ async function loadPositions(){ const r=await sb.from('day_items').select('title
 function posOf(name){ return (window._posMap&&window._posMap[name])||'Unassigned'; }
 async function loadArchived(){ const r=await sb.from('day_items').select('title').eq('kind','archived'); const s=new Set(); (r.data||[]).forEach(x=>{ if(x.title) s.add(x.title); }); window._archived=s; return s; }
 function isArchived(name){ return !!(window._archived&&window._archived.has(name)); }
+async function loadDates(){ const r=await sb.from('day_items').select('title,detail').eq('kind','pdates'); const m={}; (r.data||[]).forEach(x=>{ if(x.title){ try{m[x.title]=JSON.parse(x.detail||'{}');}catch(e){m[x.title]={};} } }); window._pdates=m; return m; }
+function _nextOccur(mm,dd){ const t=new Date(); t.setHours(0,0,0,0); const y=t.getFullYear(); let d=new Date(y,mm-1,dd); d.setHours(0,0,0,0); if(d<t) d=new Date(y+1,mm-1,dd); return d; }
+function _daysUntil(d){ const t=new Date(); t.setHours(0,0,0,0); return Math.round((d-t)/86400000); }
+function upcomingCelebrations(within){ within=within||7; const m=window._pdates||{}; const out=[];
+  Object.keys(m).forEach(name=>{ if(isArchived(name))return; const p=m[name]||{};
+    if(p.bday){ const a=p.bday.split('-').map(Number); if(a.length===2){ const d=_nextOccur(a[0],a[1]); const du=_daysUntil(d); if(du>=0&&du<=within) out.push({name,type:'Birthday',emoji:'🎂',date:d,days:du}); } }
+    if(p.hired){ const a=p.hired.split('-').map(Number); if(a.length===3){ const d=_nextOccur(a[1],a[2]); const du=_daysUntil(d); const years=d.getFullYear()-a[0]; if(du>=0&&du<=within&&years>=1) out.push({name,type:'Work anniversary',emoji:'🎉',date:d,days:du,years}); } }
+  });
+  return out.sort((a,b)=>a.days-b.days);
+}
+function celebLabel(c){ const when=c.days===0?'today':c.days===1?'tomorrow':'in '+c.days+' days'; return c.type==='Work anniversary'?(esc(c.name)+' — '+c.years+'-year work anniversary '+when):(esc(c.name)+"'s birthday "+when); }
 window.openArchive=function(name,editId){
   const cur = editId!=null ? (window._archMap&&window._archMap[editId]) : null; const d=cur?cur.d:{};
   let m=document.getElementById('archm'); if(m)m.remove();
@@ -813,6 +830,14 @@ window.openArchive=function(name,editId){
 };
 window.doArchive=async function(name,editId){ const reason=(document.getElementById('arReason')||{}).value||''; const rehire=(document.getElementById('arRehire')||{}).value||'Eligible'; const notes=((document.getElementById('arNotes')||{}).value||'').trim(); const detail=JSON.stringify({reason,rehire,notes,date:isoDate(new Date())}); if(editId!=null){ await sb.from('day_items').update({detail}).eq('id',editId); } else { await sb.from('day_items').insert({kind:'archived',title:name,on_date:null,detail,created_by:state.user.id}); if(window._archived)window._archived.add(name); } const m=document.getElementById('archm'); if(m)m.remove(); state.ctx.obtab='former'; vOnboarding(document.getElementById('view')); };
 window.restorePerson=async function(name){ await sb.from('day_items').delete().eq('kind','archived').eq('title',name); if(window._archived)window._archived.delete(name); vOnboarding(document.getElementById('view')); };
+window.openDates=function(name){
+  const p=(window._pdates&&window._pdates[name])||{};
+  let m=document.getElementById('pdm'); if(m)m.remove();
+  m=document.createElement('div'); m.id='pdm'; m.style.cssText='position:fixed;inset:0;background:rgba(16,24,40,.45);z-index:9999;display:flex;align-items:flex-end;justify-content:center';
+  m.innerHTML=`<div style="background:var(--card);width:100%;max-width:440px;border-radius:16px 16px 0 0;padding:20px 20px 28px;box-shadow:0 -8px 40px rgba(0,0,0,.22)"><div style="font-weight:700;font-size:16px">Dates for ${esc(name)}</div><div class="faint" style="font-size:12.5px;margin-bottom:15px">For birthday &amp; work-anniversary reminders — you'll get a heads-up a week out, a few days out, and day-of.</div><label style="font-size:12px;color:var(--muted)">Birthday</label><input type="date" id="pdBday" value="${p.bday?('2000-'+p.bday):''}" style="width:100%;padding:11px;margin:4px 0 12px;border:1px solid var(--line2);border-radius:9px;background:var(--card);color:var(--ink);font-family:inherit"/><label style="font-size:12px;color:var(--muted)">Hire date (for work anniversary)</label><input type="date" id="pdHired" value="${p.hired||''}" style="width:100%;padding:11px;margin:4px 0 2px;border:1px solid var(--line2);border-radius:9px;background:var(--card);color:var(--ink);font-family:inherit"/><div class="row" style="gap:8px;margin-top:16px"><button class="btn" style="width:auto;margin-left:auto" onclick="document.getElementById('pdm').remove()">Cancel</button><button class="btn pri" style="width:auto" onclick='doDates(${JSON.stringify(name)})'>Save</button></div></div>`;
+  document.body.appendChild(m); m.addEventListener('click',e=>{if(e.target===m)m.remove();});
+};
+window.doDates=async function(name){ const b=(document.getElementById('pdBday')||{}).value||''; const hr=(document.getElementById('pdHired')||{}).value||''; const bday=b?b.slice(5):''; await sb.from('day_items').delete().eq('kind','pdates').eq('title',name); if(bday||hr) await sb.from('day_items').insert({kind:'pdates',title:name,on_date:null,detail:JSON.stringify({bday,hired:hr}),created_by:state.user.id}); if(window._pdates)window._pdates[name]={bday,hired:hr}; const m=document.getElementById('pdm'); if(m)m.remove(); vOnboarding(document.getElementById('view')); };
 window.setPos=async function(name,pos){ await sb.from('day_items').delete().eq('kind','pos').eq('title',name); if(pos){ await sb.from('day_items').insert({kind:'pos',title:name,detail:pos,on_date:null,created_by:state.user.id}); } if(window._posMap) window._posMap[name]=pos; };
 function posSelect(name,cur){ return `<select onchange="setPos('${esc(name).replace(/'/g,"\\'")}',this.value);var d=this.parentNode.querySelector('.posdot');if(d)d.style.background=window.POSCOL(this.value)" style="padding:7px 9px;border:1px solid var(--line2);border-radius:8px;background:var(--card);color:var(--ink);font-family:inherit;font-size:13px">${POS_PICK.map(o=>`<option value="${o}"${o===cur?' selected':''}>${o}</option>`).join('')}</select>`; }
 async function schBoard(v){
@@ -1141,7 +1166,7 @@ async function vOnboarding(v){
     sb.from('shifts').select('person_name'),
     sb.from('day_items').select('*').eq('kind','archived')
   ]);
-  await loadPositions();
+  await loadPositions(); await loadDates();
   const archRows=(rarch.data||[]).map(r=>{ let d={}; try{d=JSON.parse(r.detail||'{}');}catch(e){} return {id:r.id,name:r.title,d}; }).sort((a,b)=>a.name.localeCompare(b.name));
   window._archived=new Set(archRows.map(a=>a.name)); window._archMap={}; archRows.forEach(a=>window._archMap[a.id]=a);
   const byHire={}; (rs.data||[]).forEach(s=>{ (byHire[s.hire_id]=byHire[s.hire_id]||[]).push(s); });
@@ -1174,7 +1199,8 @@ async function vOnboarding(v){
   ordered.forEach(pos=>{ const c=POS_COL[pos]||'#94A3B8';
     h+=`<div class="band" style="background:${c}14;color:${c};border-left:4px solid ${c};margin:8px 12px 4px">${esc(pos)} <span style="opacity:.7;font-weight:500">· ${groups[pos].length}</span></div>`;
     groups[pos].slice().sort().forEach(n=>{ const inits=(n||'?').split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
-      h+=`<div class="row" style="padding:9px 15px;gap:10px"><span class="av">${esc(inits)}</span><div style="flex:1;min-width:0"><div style="font-weight:600;font-size:14px">${esc(n)}</div></div><span class="posdot" style="width:9px;height:9px;border-radius:50%;background:${c};flex-shrink:0"></span>${posSelect(n,pos)}<button class="btn" style="width:auto;padding:6px 9px;color:#A32D2D;border-color:#F0C9C9" title="Mark no longer employed" onclick='openArchive(${JSON.stringify(n)})'><i class="ti ti-user-off"></i></button></div>`;
+      const _pd=(window._pdates&&window._pdates[n])||{}; const _hasD=_pd.bday||_pd.hired;
+      h+=`<div class="row" style="padding:9px 15px;gap:8px"><span class="av">${esc(inits)}</span><div style="flex:1;min-width:0"><div style="font-weight:600;font-size:14px">${esc(n)}</div></div><span class="posdot" style="width:9px;height:9px;border-radius:50%;background:${c};flex-shrink:0"></span>${posSelect(n,pos)}<button class="btn" style="width:auto;padding:6px 9px${_hasD?';color:var(--brand);border-color:var(--brand-line)':''}" title="Birthday & hire date" onclick='openDates(${JSON.stringify(n)})'><i class="ti ti-cake"></i></button><button class="btn" style="width:auto;padding:6px 9px;color:#A32D2D;border-color:#F0C9C9" title="Mark no longer employed" onclick='openArchive(${JSON.stringify(n)})'><i class="ti ti-user-off"></i></button></div>`;
     });
   });
   h+=`</div>`;
@@ -1206,7 +1232,7 @@ async function vCalendar(v){
   let data;
   if(state.calCache && state.calCache.ym===ym){ data=state.calCache.data; }
   else { v.innerHTML='<div class="muted">Loading…</div>'; const r=await sb.from('day_items').select('*').gte('on_date',first).lte('on_date',last).order('created_at'); data=r.data||[]; state.calCache={ym,data}; }
-  const CAL_HIDE=new Set(['pos','ojr','mission','vision','pool','archived']);
+  const CAL_HIDE=new Set(['pos','ojr','mission','vision','pool','archived','pdates']);
   const byd={}; (data||[]).forEach(it=>{ if(CAL_HIDE.has(it.kind))return; (byd[it.on_date]=byd[it.on_date]||[]).push(it); });
   const hol={}; usHolidays(y).forEach(x=>hol[x.date]=x);
   const todayIso=isoDate(new Date()); const sel=state.ctx.day||(ym===todayIso.slice(0,7)?todayIso:first);
