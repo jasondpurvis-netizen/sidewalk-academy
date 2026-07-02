@@ -783,6 +783,9 @@ window.schGo=function(t){ state.ctx.stab=t; vSchedule(document.getElementById('v
 const POS_ORDER=['OJR','Owner','Manager','Supervisor','Trainer','Trainee','Team Member','Unassigned'];
 const POS_COL={OJR:'#DC2626',Owner:'#7C3AED',Manager:'#2563EB',Supervisor:'#0D9488',Trainer:'#0891B2',Trainee:'#D97706','Team Member':'#64748B',Unassigned:'#94A3B8'};
 const POS_PICK=['Owner','Manager','Supervisor','Trainer','Trainee','Team Member','Unassigned']; // OJR is a per-day designation, not a stored position
+/* Scheduling law rules by jurisdiction — feeds auto-draft flags + time clock. Home store = AZ (minimal, no nagging). Full set for selling to CA/Seattle/NYC owners. Not legal advice. */
+const LAW_RULES={"US":{"meal_after_hrs":null,"ot_daily_hrs":null,"ot_weekly_hrs":40,"min_rest_between_shifts_hrs":null,"advance_notice_days":null},"AZ":{"meal_after_hrs":null,"ot_daily_hrs":null,"ot_weekly_hrs":40,"min_rest_between_shifts_hrs":null,"advance_notice_days":null},"CA":{"meal_after_hrs":5,"ot_daily_hrs":8,"ot_weekly_hrs":40,"min_rest_between_shifts_hrs":null,"advance_notice_days":null},"OR":{"meal_after_hrs":6,"ot_daily_hrs":null,"ot_weekly_hrs":40,"min_rest_between_shifts_hrs":10,"advance_notice_days":14},"Seattle":{"meal_after_hrs":5,"ot_daily_hrs":null,"ot_weekly_hrs":40,"min_rest_between_shifts_hrs":10,"advance_notice_days":14},"NYC":{"meal_after_hrs":6,"ot_daily_hrs":null,"ot_weekly_hrs":40,"min_rest_between_shifts_hrs":11,"advance_notice_days":14},"Chicago":{"meal_after_hrs":7.5,"ot_daily_hrs":null,"ot_weekly_hrs":40,"min_rest_between_shifts_hrs":10,"advance_notice_days":14},"LA":{"meal_after_hrs":5,"ot_daily_hrs":8,"ot_weekly_hrs":40,"min_rest_between_shifts_hrs":10,"advance_notice_days":null},"SF":{"meal_after_hrs":5,"ot_daily_hrs":8,"ot_weekly_hrs":40,"min_rest_between_shifts_hrs":null,"advance_notice_days":14},"Emeryville":{"meal_after_hrs":5,"ot_daily_hrs":8,"ot_weekly_hrs":40,"min_rest_between_shifts_hrs":11,"advance_notice_days":14}};
+function lawRules(){ const j=(state.settings&&state.settings.law_jurisdiction)||'AZ'; return LAW_RULES[j]||LAW_RULES.AZ; }
 window.POSCOL=v=>POS_COL[v]||'#94A3B8';
 async function loadPositions(){ const r=await sb.from('day_items').select('title,detail').eq('kind','pos'); const m={}; (r.data||[]).forEach(x=>{ if(x.title) m[x.title]=x.detail||'Unassigned'; }); window._posMap=m; return m; }
 function posOf(name){ return (window._posMap&&window._posMap[name])||'Unassigned'; }
@@ -815,13 +818,14 @@ async function schBoard(v){
   const fmtH=d=>{ const x=new Date(d); return x.toLocaleDateString(undefined,{weekday:'short'})+' '+(x.getMonth()+1)+'/'+x.getDate(); };
   const daysAhead = pub ? Math.round((start - new Date(pub.published_at))/86400000) : null;
   let h=`<div class="sched-bar"><div class="sched-nav"><button class="iconbtn" aria-label="Previous week" onclick="weekShift(-1)"><i class="ti ti-chevron-left"></i></button><button class="iconbtn" aria-label="Next week" onclick="weekShift(1)"><i class="ti ti-chevron-right"></i></button><button class="btn" style="width:auto" onclick="weekShift(0)">Today</button></div><div style="min-width:0"><div style="font-size:18px;font-weight:600;line-height:1.2">${fmtDay(days[0])} – ${fmtDay(days[6])}</div><div class="faint" style="font-size:12px;margin-top:2px">${pub?`<span style="color:var(--green)">●</span> Published${daysAhead>=0?' · posted '+daysAhead+' days ahead':''}`:'Draft — not published yet'}</div></div>`;
-  if(isAdmin) h+=`<div class="sched-actions"><button class="btn" style="width:auto" onclick="copyLastWeek()"><i class="ti ti-copy"></i> Copy week</button><button class="btn pri" style="width:auto" onclick="publishWeek()"><i class="ti ti-send"></i> ${pub?'Re-publish':'Publish'}</button></div>`;
+  if(isAdmin) h+=`<div class="sched-actions"><button class="btn" style="width:auto" onclick="autoDraft()"><i class="ti ti-wand"></i> Auto-draft</button><button class="btn" style="width:auto" onclick="copyLastWeek()"><i class="ti ti-copy"></i> Copy week</button><button class="btn pri" style="width:auto" onclick="publishWeek()"><i class="ti ti-send"></i> ${pub?'Re-publish':'Publish'}</button></div>`;
   h+=`</div>`;
   const allHrs=shifts.reduce((a,s)=>a+shiftHours(s),0); const allCost=shifts.reduce((a,s)=>a+shiftHours(s)*(wage[s.person_name]||0),0); const ppl=new Set(shifts.map(s=>s.person_name).filter(Boolean)).size;
   const totSales=isoDays.reduce((a,iso)=>a+(sales[iso]||0),0); const labpctO=(isAdmin&&totSales&&allCost)?Math.round(allCost/totSales*100):null;
   const metric=(ic,vv,ll,col)=>`<div class="metric"><div class="ml"><i class="ti ${ic}"></i>${ll}</div><div class="mv"${col?` style="color:${col}"`:''}>${vv}</div></div>`;
   h+=`<div class="metrics">${metric('ti-clock',allHrs?allHrs.toFixed(1):'0','Hours')}${metric('ti-currency-dollar',isAdmin&&allCost?money(allCost):'—','Labor')}${metric('ti-users',ppl,'Scheduled')}${metric('ti-percentage',labpctO!=null?labpctO+'%':'—','Labor %',labpctO!=null?(labpctO>30?'var(--amber)':'var(--green)'):'')}</div>`;
-  if(!shifts.length) h+=`<div class="card" style="padding:30px 22px;text-align:center;margin-bottom:14px"><div style="font-size:30px;color:var(--brand);margin-bottom:8px"><i class="ti ti-calendar-plus"></i></div><div style="font-weight:600;margin-bottom:3px">No shifts this week</div><div class="faint" style="font-size:13px">${isAdmin?'Add one below, or tap Copy week.':'Your shifts show here once leadership posts the schedule.'}</div></div>`;
+  if(window._draftSummary){ const ds=window._draftSummary; window._draftSummary=null; h+=`<div class="card" style="padding:14px 16px;margin-bottom:14px;background:var(--brand-soft);border-color:var(--brand-line)"><div style="font-weight:700;margin-bottom:3px">✨ Auto-draft ready — ${ds.made} shift${ds.made!==1?'s':''} placed${ds.unfilled?', '+ds.unfilled+' still open':''}</div><div class="faint" style="font-size:12.5px">Review below, tweak anything, then Publish. Nothing reaches the team until you publish.</div>${ds.flags.length?`<div style="margin-top:9px;font-size:13px;line-height:1.75;border-top:1px solid var(--brand-line);padding-top:8px">${ds.flags.map(f=>esc(f)).join('<br>')}</div>`:''}</div>`; }
+  if(!shifts.length) h+=`<div class="card" style="padding:30px 22px;text-align:center;margin-bottom:14px"><div style="font-size:30px;color:var(--brand);margin-bottom:8px"><i class="ti ti-calendar-plus"></i></div><div style="font-weight:600;margin-bottom:3px">No shifts this week</div><div class="faint" style="font-size:13px">${isAdmin?'Add one below, tap Copy week, or ✨ Auto-draft to build it from a past week.':'Your shifts show here once leadership posts the schedule.'}</div></div>`;
   h+=`<div class="board"><div class="board-grid"><div class="bh bh-team">Team</div>`+days.map(d=>`<div class="bh ${isoDate(d)===todayIso?'bh-today':''}">${d.toLocaleDateString(undefined,{weekday:'short'})}<span>${d.getDate()}</span></div>`).join('');
   const dayHrs=isoDays.map(()=>0), dayCost=isoDays.map(()=>0);
   const POS_ORDER=['OJR','Owner','Manager','Supervisor','Trainer','Trainee','Team Member','Unassigned']; const POS_COL={OJR:'#DC2626',Owner:'#7C3AED',Manager:'#2563EB',Supervisor:'#0D9488',Trainer:'#0891B2',Trainee:'#D97706','Team Member':'#64748B',Unassigned:'#94A3B8'};
@@ -864,6 +868,46 @@ window.setWage=async function(name,w){ sb.from('pay_rates').upsert({person_name:
 window.setSales=async function(iso,s){ sb.from('day_sales').upsert({on_date:iso, sales:Number(s)||0}).then(()=>{}); };
 window.publishWeek=async function(){ const wk=state.ctx.wk||isoDate(weekStart(new Date())); await sb.from('published_weeks').upsert({week_start:wk, published_at:new Date().toISOString()}); vSchedule(document.getElementById('view')); };
 window.copyLastWeek=async function(){ const base=state.ctx.wk?wkDate(state.ctx.wk):weekStart(new Date()); const ws=weekStart(base); const ps=new Date(ws); ps.setDate(ps.getDate()-7); const pe=new Date(ws); pe.setDate(pe.getDate()-1); const r=await sb.from('shifts').select('*').gte('on_date',isoDate(ps)).lte('on_date',isoDate(pe)); const rows=(r.data||[]).map(s=>{ const nd=new Date(s.on_date); nd.setDate(nd.getDate()+7); return {person_name:s.person_name,role:s.role,on_date:isoDate(nd),start_time:s.start_time,end_time:s.end_time,kind:s.kind,user_id:s.user_id,note:s.note}; }); if(!rows.length){ alert('No shifts last week to copy.'); return; } await sb.from('shifts').insert(rows); vSchedule(document.getElementById('view')); };
+window.autoDraft=async function(){
+  const base=state.ctx.wk?wkDate(state.ctx.wk):weekStart(new Date());
+  const ws=weekStart(base); const isoDays=[...Array(7)].map((_,i)=>{ const d=new Date(ws); d.setDate(d.getDate()+i); return isoDate(d); });
+  // find a template week: most recent non-empty week within 3 weeks back
+  let tmpl=[]; let twStart=null;
+  for(let back=1; back<=3 && !tmpl.length; back++){ const ps=new Date(ws); ps.setDate(ps.getDate()-7*back); const pe=new Date(ps); pe.setDate(pe.getDate()+6); const r=await sb.from('shifts').select('*').gte('on_date',isoDate(ps)).lte('on_date',isoDate(pe)); if((r.data||[]).length){ tmpl=r.data; twStart=isoDate(ps); } }
+  if(!tmpl.length){ alert('Auto-draft needs a past week to learn your coverage from. Build one week of shifts first, then Auto-draft will copy that shape and re-staff it around availability and time off.'); return; }
+  // existing shifts this week?
+  const cur=await sb.from('shifts').select('id').gte('on_date',isoDays[0]).lte('on_date',isoDays[6]);
+  if((cur.data||[]).length){ if(!confirm('This week already has '+cur.data.length+' shifts. Replace them with a fresh auto-draft?')) return; await sb.from('shifts').delete().gte('on_date',isoDays[0]).lte('on_date',isoDays[6]); }
+  // inputs
+  const [rav,rto]=await Promise.all([ sb.from('availability').select('person_name,weekday,can_work'), sb.from('time_off').select('*').eq('status','approved') ]);
+  await loadPositions();
+  const offDay={}; (rav.data||[]).forEach(a=>{ if(a.can_work===false){ (offDay[a.person_name]=offDay[a.person_name]||{})[a.weekday]=true; } });
+  const isOff=(person,wd)=>!!(offDay[person]&&offDay[person][wd]);
+  const onLeave=(person,iso)=>{ return (rto.data||[]).some(t=>t.person_name===person && iso>=t.start_date && iso<=(t.end_date||t.start_date)); };
+  // roster by position
+  const roster={}; Object.keys(window._posMap||{}).forEach(n=>{ const p=window._posMap[n]; (roster[p]=roster[p]||[]).push(n); });
+  const twStartD=wkDate(twStart);
+  const hoursBy={}; const closeByPersonDate={}; // for clopening
+  const draft=[]; let unfilled=[];
+  // build slots from template, sorted by date+start
+  const slots=tmpl.map(s=>{ const dow=(new Date(s.on_date+'T00:00').getDay()+6)%7; return {dow,start:s.start_time,end:s.end_time,kind:s.kind,pos:posOf(s.person_name),orig:s.person_name}; }).sort((a,b)=> a.dow-b.dow || (a.start||'').localeCompare(b.start||''));
+  slots.forEach(sl=>{ const iso=isoDays[sl.dow]; const hrs=shiftHours({start_time:sl.start,end_time:sl.end});
+    const eligible=(n)=> n && !isOff(n,sl.dow) && !onLeave(n,iso) && !(draft.some(d=>d.person_name===n && d.on_date===iso));
+    let pick=null;
+    if(eligible(sl.orig)) pick=sl.orig;
+    else { const pool=(roster[sl.pos]||[]).filter(eligible); pool.sort((a,b)=>(hoursBy[a]||0)-(hoursBy[b]||0)); pick=pool[0]||null; }
+    if(pick){ hoursBy[pick]=(hoursBy[pick]||0)+hrs; draft.push({person_name:pick,role:sl.pos,on_date:iso,start_time:sl.start,end_time:sl.end,kind:sl.kind,user_id:null}); }
+    else unfilled.push({day:isoDays[sl.dow],pos:sl.pos,start:sl.start,end:sl.end});
+  });
+  if(draft.length) await sb.from('shifts').insert(draft);
+  // flags
+  const R=lawRules(); const flags=[];
+  if(unfilled.length){ const byPos={}; unfilled.forEach(u=>{ byPos[u.pos]=(byPos[u.pos]||0)+1; }); flags.push('⚠ '+unfilled.length+' shift'+(unfilled.length>1?'s':'')+" couldn't be filled ("+Object.keys(byPos).map(p=>byPos[p]+' '+p).join(', ')+') — no one available for those.'); }
+  const otW=R.ot_weekly_hrs||40; const overs=Object.keys(hoursBy).filter(n=>hoursBy[n]>otW); if(overs.length) flags.push('⏰ Over '+otW+'h (overtime): '+overs.map(n=>n+' '+hoursBy[n].toFixed(1)+'h').join(', '));
+  if(R.meal_after_hrs){ const longs=draft.filter(d=>shiftHours(d)>R.meal_after_hrs); if(longs.length) flags.push('🍽 '+longs.length+' shift'+(longs.length>1?'s':'')+' over '+R.meal_after_hrs+'h — meal break required.'); }
+  window._draftSummary={made:draft.length, unfilled:unfilled.length, flags};
+  vSchedule(document.getElementById('view'));
+};
 const _d=iso=>new Date(iso+'T00:00');
 async function schOverview(v){
   const isAdmin=state.profile&&state.profile.role==='admin';
