@@ -800,7 +800,16 @@ async function loadPositions(){ const r=await sb.from('day_items').select('title
 function posOf(name){ return (window._posMap&&window._posMap[name])||'Unassigned'; }
 async function loadArchived(){ const r=await sb.from('day_items').select('title').eq('kind','archived'); const s=new Set(); (r.data||[]).forEach(x=>{ if(x.title) s.add(x.title); }); window._archived=s; return s; }
 function isArchived(name){ return !!(window._archived&&window._archived.has(name)); }
-window.archivePerson=async function(name){ if(!confirm('Mark '+name+' as no longer employed?\n\nThey drop off the active schedule, roster, availability and Team progress. Their history (past shifts, hours, training) is kept on record.')) return; await sb.from('day_items').insert({kind:'archived',title:name,on_date:null,created_by:state.user.id}); if(window._archived)window._archived.add(name); vOnboarding(document.getElementById('view')); };
+window.openArchive=function(name,editId){
+  const cur = editId!=null ? (window._archMap&&window._archMap[editId]) : null; const d=cur?cur.d:{};
+  let m=document.getElementById('archm'); if(m)m.remove();
+  const reasons=['Quit','Terminated','Laid off / seasonal','Job abandonment (no-show)','Mutual','Other'];
+  const rehires=[['Eligible','Eligible for rehire'],['Conditional','Conditional — case by case'],['No','Do not rehire']];
+  m=document.createElement('div'); m.id='archm'; m.style.cssText='position:fixed;inset:0;background:rgba(16,24,40,.45);z-index:9999;display:flex;align-items:flex-end;justify-content:center';
+  m.innerHTML=`<div style="background:var(--card);width:100%;max-width:460px;border-radius:16px 16px 0 0;padding:20px 20px 28px;box-shadow:0 -8px 40px rgba(0,0,0,.22)"><div style="font-weight:700;font-size:16px">${cur?'Edit record':'No longer employed'}</div><div class="faint" style="font-size:12.5px;margin-bottom:15px">${esc(name)} · drops off active views — history stays on record</div><label style="font-size:12px;color:var(--muted)">Reason for leaving</label><select id="arReason" style="width:100%;padding:11px;margin:4px 0 12px;border:1px solid var(--line2);border-radius:9px;background:var(--card);color:var(--ink);font-family:inherit">${reasons.map(r=>`<option${d.reason===r?' selected':''}>${r}</option>`).join('')}</select><label style="font-size:12px;color:var(--muted)">Rehire status</label><select id="arRehire" style="width:100%;padding:11px;margin:4px 0 12px;border:1px solid var(--line2);border-radius:9px;background:var(--card);color:var(--ink);font-family:inherit">${rehires.map(o=>`<option value="${o[0]}"${d.rehire===o[0]?' selected':''}>${o[1]}</option>`).join('')}</select><label style="font-size:12px;color:var(--muted)">Notes — why they left, anything a future you should know</label><textarea id="arNotes" placeholder="e.g. Great closer, left for school. Would take back in a heartbeat." style="width:100%;min-height:84px;padding:11px;margin:4px 0 2px;border:1px solid var(--line2);border-radius:9px;background:var(--card);color:var(--ink);font-family:inherit;font-size:14px;line-height:1.5">${esc(d.notes||'')}</textarea><div class="row" style="gap:8px;margin-top:14px"><button class="btn" style="width:auto;margin-left:auto" onclick="document.getElementById('archm').remove()">Cancel</button><button class="btn pri" style="width:auto" onclick='doArchive(${JSON.stringify(name)},${editId!=null?editId:'null'})'>${cur?'Save':'Archive'}</button></div></div>`;
+  document.body.appendChild(m); m.addEventListener('click',e=>{if(e.target===m)m.remove();});
+};
+window.doArchive=async function(name,editId){ const reason=(document.getElementById('arReason')||{}).value||''; const rehire=(document.getElementById('arRehire')||{}).value||'Eligible'; const notes=((document.getElementById('arNotes')||{}).value||'').trim(); const detail=JSON.stringify({reason,rehire,notes,date:isoDate(new Date())}); if(editId!=null){ await sb.from('day_items').update({detail}).eq('id',editId); } else { await sb.from('day_items').insert({kind:'archived',title:name,on_date:null,detail,created_by:state.user.id}); if(window._archived)window._archived.add(name); } const m=document.getElementById('archm'); if(m)m.remove(); state.ctx.obtab='former'; vOnboarding(document.getElementById('view')); };
 window.restorePerson=async function(name){ await sb.from('day_items').delete().eq('kind','archived').eq('title',name); if(window._archived)window._archived.delete(name); vOnboarding(document.getElementById('view')); };
 window.setPos=async function(name,pos){ await sb.from('day_items').delete().eq('kind','pos').eq('title',name); if(pos){ await sb.from('day_items').insert({kind:'pos',title:name,detail:pos,on_date:null,created_by:state.user.id}); } if(window._posMap) window._posMap[name]=pos; };
 function posSelect(name,cur){ return `<select onchange="setPos('${esc(name).replace(/'/g,"\\'")}',this.value);var d=this.parentNode.querySelector('.posdot');if(d)d.style.background=window.POSCOL(this.value)" style="padding:7px 9px;border:1px solid var(--line2);border-radius:8px;background:var(--card);color:var(--ink);font-family:inherit;font-size:13px">${POS_PICK.map(o=>`<option value="${o}"${o===cur?' selected':''}>${o}</option>`).join('')}</select>`; }
@@ -1104,38 +1113,51 @@ async function vOnboarding(v){
   if(!(state.profile&&state.profile.role==='admin')){ go('home'); return; }
   setTitle('Onboarding',"Set each person's position, then nothing gets missed");
   v.innerHTML='<div class="muted">Loading…</div>';
-  const [rh,rs,rpf,rsh]=await Promise.all([
+  const obtab=state.ctx.obtab||'team';
+  const [rh,rs,rpf,rsh,rarch]=await Promise.all([
     sb.from('hires').select('*').order('start_date',{ascending:false}),
     sb.from('onboarding_steps').select('*').order('position'),
     sb.from('profiles').select('name,role'),
-    sb.from('shifts').select('person_name')
+    sb.from('shifts').select('person_name'),
+    sb.from('day_items').select('*').eq('kind','archived')
   ]);
-  await loadPositions(); await loadArchived();
+  await loadPositions();
+  const archRows=(rarch.data||[]).map(r=>{ let d={}; try{d=JSON.parse(r.detail||'{}');}catch(e){} return {id:r.id,name:r.title,d}; }).sort((a,b)=>a.name.localeCompare(b.name));
+  window._archived=new Set(archRows.map(a=>a.name)); window._archMap={}; archRows.forEach(a=>window._archMap[a.id]=a);
   const byHire={}; (rs.data||[]).forEach(s=>{ (byHire[s.hire_id]=byHire[s.hire_id]||[]).push(s); });
   const set=new Set();
   (rpf.data||[]).filter(p=>p.role!=='admin').forEach(p=>set.add(p.name));
   (rsh.data||[]).forEach(s=>{ if(s.person_name) set.add(s.person_name); });
   Object.keys(window._posMap||{}).forEach(n=>set.add(n));
-  [...(window._archived||[])].forEach(n=>set.add(n));
-  const rosterAll=[...set].filter(Boolean);
-  const roster=rosterAll.filter(n=>!isArchived(n));
-  const archivedList=[...(window._archived||[])].filter(Boolean).sort();
+  const roster=[...set].filter(n=>n&&!isArchived(n));
   const groups={}; roster.forEach(n=>{ const p=posOf(n); (groups[p]=groups[p]||[]).push(n); });
   const ordered=Object.keys(groups).sort((a,b)=>{const ia=POS_ORDER.indexOf(a),ib=POS_ORDER.indexOf(b);return (ia<0?99:ia)-(ib<0?99:ib)||a.localeCompare(b);});
 
-  let h=`<div class="card" style="padding:16px;margin-bottom:18px"><div style="font-weight:700;margin-bottom:4px">Add a new hire</div><div class="faint" style="font-size:12.5px;margin-bottom:11px">Pick their position now — it follows them onto every schedule automatically.</div><div class="row" style="gap:8px;flex-wrap:wrap"><input id="hname" placeholder="Full name" style="flex:1;min-width:150px;padding:10px 12px;border:1px solid var(--line2);border-radius:9px;background:var(--card);color:var(--ink);font-family:inherit"/><select id="hpos" style="padding:10px;border:1px solid var(--line2);border-radius:9px;background:var(--card);color:var(--ink);font-family:inherit">${POS_PICK.map(o=>`<option value="${o}"${o==='Team Member'?' selected':''}>${o}</option>`).join('')}</select><input id="hdate" type="date" value="${isoDate(new Date())}" style="padding:10px;border:1px solid var(--line2);border-radius:9px;background:var(--card);color:var(--ink);font-family:inherit"/><button class="btn pri" style="width:auto" onclick="addHire()">Add hire</button></div><div class="faint" style="font-size:12px;margin-top:9px">They get a starter checklist below. Share your join code so they sign in and start training.</div></div>`;
+  const seg=(k,l,badge)=>`<button onclick="state.ctx.obtab='${k}';vOnboarding(document.getElementById('view'))" style="padding:7px 15px;font-size:13px;font-weight:600;border:none;cursor:pointer;font-family:inherit;background:${obtab===k?'var(--brand)':'var(--card)'};color:${obtab===k?'#fff':'var(--muted)'}">${l}${badge?' · '+badge:''}</button>`;
+  let h=`<div style="display:inline-flex;border:1px solid var(--line2);border-radius:9px;overflow:hidden;margin-bottom:18px">${seg('team','Active team')}${seg('former','Former team',archRows.length||'')}</div>`;
 
-  h+=`<div class="sec">Team &amp; positions</div><div class="faint" style="font-size:12.5px;margin:-4px 0 10px">Change a position here once — it updates everywhere: schedule, team, and daily report. No position set = Unassigned.</div>`;
+  if(obtab==='former'){
+    h+=`<div class="faint" style="font-size:12.5px;margin-bottom:12px">People who've left. Their history is kept for your records. Open a card to see why they left and whether you'd rehire — handy when someone reapplies a year later.</div>`;
+    if(!archRows.length) h+=`<div class="card" style="padding:26px;text-align:center"><div class="faint">No former team members. When someone leaves, use the ⊘ button on their name in Active team.</div></div>`;
+    const rehireMeta={Eligible:['Eligible for rehire','#1B7B3F','#E7F5EC'],Conditional:['Conditional','#B7791F','#FBF0DA'],No:['Do not rehire','#A32D2D','#FCEBEB']};
+    h+=archRows.map(a=>{ const rm=rehireMeta[a.d.rehire]||rehireMeta.Eligible; const inits=(a.name||'?').split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
+      return `<div class="card" style="padding:14px 16px;margin-bottom:10px"><div class="row" style="gap:10px"><span class="av">${esc(inits)}</span><div style="flex:1;min-width:0"><div style="font-weight:600;font-size:14px">${esc(a.name)}</div><div class="faint" style="font-size:12px">${esc(posOf(a.name))}${a.d.date?' · left '+esc(a.d.date):''}${a.d.reason?' · '+esc(a.d.reason):''}</div></div><span class="pill" style="background:${rm[2]};color:${rm[1]};font-size:11px;font-weight:700;white-space:nowrap">${rm[0]}</span></div>${a.d.notes?`<div style="margin-top:9px;font-size:13px;line-height:1.55;color:#444;background:var(--brand-soft);border-radius:8px;padding:9px 11px;white-space:pre-wrap">${esc(a.d.notes)}</div>`:''}<div class="row" style="gap:8px;margin-top:11px"><button class="btn" style="width:auto;padding:6px 11px" onclick='openArchive(${JSON.stringify(a.name)},${a.id})'>Edit</button><button class="btn pri" style="width:auto;padding:6px 11px" onclick='restorePerson(${JSON.stringify(a.name)})'>Restore &amp; rehire</button></div></div>`;
+    }).join('');
+    v.innerHTML=h; return;
+  }
+
+  h+=`<div class="card" style="padding:16px;margin-bottom:18px"><div style="font-weight:700;margin-bottom:4px">Add a new hire</div><div class="faint" style="font-size:12.5px;margin-bottom:11px">Pick their position now — it follows them onto every schedule automatically.</div><div class="row" style="gap:8px;flex-wrap:wrap"><input id="hname" placeholder="Full name" style="flex:1;min-width:150px;padding:10px 12px;border:1px solid var(--line2);border-radius:9px;background:var(--card);color:var(--ink);font-family:inherit"/><select id="hpos" style="padding:10px;border:1px solid var(--line2);border-radius:9px;background:var(--card);color:var(--ink);font-family:inherit">${POS_PICK.map(o=>`<option value="${o}"${o==='Team Member'?' selected':''}>${o}</option>`).join('')}</select><input id="hdate" type="date" value="${isoDate(new Date())}" style="padding:10px;border:1px solid var(--line2);border-radius:9px;background:var(--card);color:var(--ink);font-family:inherit"/><button class="btn pri" style="width:auto" onclick="addHire()">Add hire</button></div><div class="faint" style="font-size:12px;margin-top:9px">They get a starter checklist below. Share your join code so they sign in and start training.</div></div>`;
+
+  h+=`<div class="sec">Team &amp; positions</div><div class="faint" style="font-size:12.5px;margin:-4px 0 10px">Change a position here once — it updates everywhere: schedule, team, and daily report. The ⊘ button marks someone no longer employed.</div>`;
   h+=`<div class="card" style="padding:6px 0;margin-bottom:20px">`;
   if(!roster.length) h+=`<div class="faint" style="padding:20px;text-align:center">No team yet. Add a hire above, or share your join code.</div>`;
   ordered.forEach(pos=>{ const c=POS_COL[pos]||'#94A3B8';
     h+=`<div class="band" style="background:${c}14;color:${c};border-left:4px solid ${c};margin:8px 12px 4px">${esc(pos)} <span style="opacity:.7;font-weight:500">· ${groups[pos].length}</span></div>`;
     groups[pos].slice().sort().forEach(n=>{ const inits=(n||'?').split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
-      h+=`<div class="row" style="padding:9px 15px;gap:10px"><span class="av">${esc(inits)}</span><div style="flex:1;min-width:0"><div style="font-weight:600;font-size:14px">${esc(n)}</div></div><span class="posdot" style="width:9px;height:9px;border-radius:50%;background:${c};flex-shrink:0"></span>${posSelect(n,pos)}<button class="btn" style="width:auto;padding:6px 9px;color:#A32D2D;border-color:#F0C9C9" title="Mark no longer employed" onclick="archivePerson('${esc(n).replace(/'/g,"\\'")}')"><i class="ti ti-user-off"></i></button></div>`;
+      h+=`<div class="row" style="padding:9px 15px;gap:10px"><span class="av">${esc(inits)}</span><div style="flex:1;min-width:0"><div style="font-weight:600;font-size:14px">${esc(n)}</div></div><span class="posdot" style="width:9px;height:9px;border-radius:50%;background:${c};flex-shrink:0"></span>${posSelect(n,pos)}<button class="btn" style="width:auto;padding:6px 9px;color:#A32D2D;border-color:#F0C9C9" title="Mark no longer employed" onclick='openArchive(${JSON.stringify(n)})'><i class="ti ti-user-off"></i></button></div>`;
     });
   });
   h+=`</div>`;
-  if(archivedList.length){ h+=`<div class="sec">No longer employed</div><div class="faint" style="font-size:12.5px;margin:-4px 0 10px">Off the active schedule &amp; rosters — history kept on record. Restore anytime.</div><div class="card" style="padding:2px 0;margin-bottom:20px">`+archivedList.map(n=>{ const inits=(n||'?').split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase(); return `<div class="row" style="padding:10px 15px;gap:10px;opacity:.72"><span class="av">${esc(inits)}</span><div style="flex:1;min-width:0"><div style="font-weight:600;font-size:14px">${esc(n)}</div><div class="faint" style="font-size:12px">Archived · ${esc(posOf(n))}</div></div><button class="btn" style="width:auto;padding:6px 11px" onclick="restorePerson('${esc(n).replace(/'/g,"\\'")}')">Restore</button></div>`; }).join('')+`</div>`; }
 
   h+=`<div class="sec">Onboarding in progress</div>`;
   if(!(rh.data||[]).length) h+=`<div class="card" style="padding:26px;text-align:center"><div class="faint">No one onboarding right now. Add a hire above to start a checklist.</div></div>`;
