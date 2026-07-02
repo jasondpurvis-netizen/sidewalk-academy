@@ -463,7 +463,7 @@ async function vCommunity(v){
   const tag = (state.ctx.tag||'').toLowerCase();
   setTitle("Community", tag?('Posts tagged '+tag):"Talk it through together");
   const visible = CHANNELS.filter(c=> c[0]!=='leadership' || isAdmin);
-  if(!state.community){ v.innerHTML=`<div class="muted">Loading…</div>`; const [p,c,m,rx,rd]=await Promise.all([ sb.from('posts').select('*').order('created_at',{ascending:false}), sb.from('comments').select('*').order('created_at'), sb.from('channel_modes').select('*'), sb.from('reactions').select('*'), sb.from('channel_reads').select('*').eq('user_id',state.user.id), sb.from('profiles').select('id,name') ]); state.community={posts:p.data||[],comments:c.data||[],modes:m.data||[],reactions:rx.data||[],reads:rd.data||[],profiles:pf.data||[]}; }
+  if(!state.community){ v.innerHTML=`<div class="muted">Loading…</div>`; const [p,c,m,rx,rd,pf]=await Promise.all([ sb.from('posts').select('*').order('created_at',{ascending:false}), sb.from('comments').select('*').order('created_at'), sb.from('channel_modes').select('*'), sb.from('reactions').select('*'), sb.from('channel_reads').select('*').eq('user_id',state.user.id), sb.from('profiles').select('id,name') ]); state.community={posts:p.data||[],comments:c.data||[],modes:m.data||[],reactions:rx.data||[],reads:rd.data||[],profiles:pf.data||[]}; }
   let posts = tag ? state.community.posts.filter(p=>(p.body||'').toLowerCase().includes(tag) && (p.channel!=='leadership'||isAdmin)) : state.community.posts.filter(p=>p.channel===ch);
   const cBy={}; state.community.comments.forEach(c=>{ (cBy[c.post_id]=cBy[c.post_id]||[]).push(c); });
   const cur = CHANNELS.find(c=>c[0]===ch)||CHANNELS[0];
