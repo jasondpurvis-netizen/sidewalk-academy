@@ -841,8 +841,9 @@ window.restorePerson=async function(name){ await sb.from('day_items').delete().e
 function _reRenderPeople(){ const v=document.getElementById('view'); if(state.page==='schedule') vSchedule(v); else if(state.page==='onboarding') vOnboarding(v); else vTeam(v); }
 window.openProfile=function(name){
   const p=profileOf(name); const pos=posOf(name);
-  const STATIONS=(state.settings&&Array.isArray(state.settings.stations)&&state.settings.stations.length)?state.settings.stations:['Bake / Prep','Register','Bar / Espresso'];
   const myRoles=Array.isArray(p.roles)?p.roles:[];
+  const _baseStations=(state.settings&&Array.isArray(state.settings.stations)&&state.settings.stations.length)?state.settings.stations:['Bake / Prep','Register','Bar / Espresso'];
+  const STATIONS=[...new Set([..._baseStations, ...myRoles])]; // always show anything this person already has checked, even if it's since left the shop's list — never silently drop a selection
   const DOW=['Mon','Tue','Wed','Thu','Fri','Sat','Sun']; const myDaysOff=Array.isArray(p.daysOff)?p.daysOff:[]; const dayOffBoxes=DOW.map((d,i)=>`<label style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;background:var(--bg);border:1px solid var(--line2);border-radius:8px;padding:6px 9px;cursor:pointer"><input type="checkbox" class="prDayOff" value="${i}" ${myDaysOff.indexOf(i)>=0?'checked':''}/> ${d}</label>`).join('');
   const stationBoxes=STATIONS.map(s=>`<label style="display:inline-flex;align-items:center;gap:7px;font-size:13px;background:var(--bg);border:1px solid var(--line2);border-radius:8px;padding:7px 11px;cursor:pointer"><input type="checkbox" class="prRoleCb" value="${esc(s)}" ${myRoles.includes(s)?'checked':''}/> ${esc(s)}</label>`).join('');
   const F=(id,lbl,type,val,ph)=>`<div style="flex:1;min-width:120px"><label style="font-size:11px;color:var(--muted)">${lbl}</label><input id="${id}" type="${type||'text'}" value="${val?esc(String(val)):''}" placeholder="${ph||''}" style="width:100%;padding:9px 10px;margin-top:3px;border:1px solid var(--line2);border-radius:8px;background:var(--card);color:var(--ink);font-family:inherit;font-size:14px"/></div>`;
@@ -1002,7 +1003,7 @@ window.autoDraft=async function(){
   const fitsAvail=(person,wd,sStart,sEnd)=>{ const a=avMap[person]&&avMap[person][wd]; if(!a) return true; if(a.can_work===false) return false; const win=parseWin(a.note); if(win){ const ws=parseClock(win[0]),we=parseClock(win[1]),ss=parseClock(sStart),se=parseClock(sEnd); if(ws==null||we==null||ss==null||se==null) return true; return ss>=ws-1e-9 && se<=we+1e-9; } return true; };
   const ageOn=(person,iso)=>{ const dob=(profileOf(person)||{}).dob; if(!dob||dob.length<10) return null; const b=new Date(dob+'T00:00'),d=new Date(iso+'T00:00'); let a=d.getFullYear()-b.getFullYear(); const m=d.getMonth()-b.getMonth(); if(m<0||(m===0&&d.getDate()<b.getDate())) a--; return a; };
   const minorCapEnd=(person,iso)=>{ const a=ageOn(person,iso); if(a==null||a>=16) return null; const mo=+iso.slice(5,7); return (mo>=6&&mo<=8)?21:19; };
-  const roster={}; Object.keys(window._posMap||{}).forEach(n=>{ if(isArchived(n))return; (roster[posOf(n)]=roster[posOf(n)]||[]).push(n); });
+  const roster={}; Object.keys(window._posMap||{}).forEach(n=>{ if(isArchived(n))return; if(posOf(n)==='Trainee')return; (roster[posOf(n)]=roster[posOf(n)]||[]).push(n); }); // Trainees are NOT auto-scheduled — they ride as an extra and you place their (short) training shifts by hand
   const hoursBy={}; const lastEnd={}; const daysBy={};
   const under=n=>{ const mn=+((profileOf(n)||{}).minHrs||0); return mn>0 && (hoursBy[n]||0)<mn; };
   const draft=[]; let unfilled=[];
