@@ -1330,12 +1330,37 @@ async function vTeam(v){
   const tab=state.ctx.ttab||'roster';
   setTitle('Team','Your people — profiles, progress & former team');
   const seg=(k,l)=>`<button onclick="state.ctx.ttab='${k}';vTeam(document.getElementById('view'))" style="padding:7px 15px;font-size:13px;font-weight:600;border:none;cursor:pointer;font-family:inherit;background:${tab===k?'var(--brand)':'var(--card)'};color:${tab===k?'#fff':'var(--muted)'}">${l}</button>`;
-  v.innerHTML=`<div style="display:inline-flex;border:1px solid var(--line2);border-radius:9px;overflow:hidden;margin-bottom:18px;flex-wrap:wrap">${seg('roster','Roster')}${seg('progress','Academy progress')}${seg('former','Former team')}</div><div id="teambody"><div class="muted">Loading…</div></div>`;
+  v.innerHTML=`<div style="display:inline-flex;border:1px solid var(--line2);border-radius:9px;overflow:hidden;margin-bottom:18px;flex-wrap:wrap">${seg('roster','Roster')}${seg('skills','Skills')}${seg('progress','Academy progress')}${seg('former','Former team')}</div><div id="teambody"><div class="muted">Loading…</div></div>`;
   const body=document.getElementById('teambody');
   if(tab==='progress'){ vSummary(body); return; }
   if(tab==='former'){ teamFormer(body); return; }
+  if(tab==='skills'){ vTeamSkills(body); return; }
   teamRoster(body);
 }
+async function vTeamSkills(v){
+  v.innerHTML='<div class="muted">Loading…</div>';
+  await loadProfiles(); await loadPositions(); await loadArchived();
+  const base=(state.settings&&Array.isArray(state.settings.stations)&&state.settings.stations.length)?state.settings.stations:['Bake / Prep','Register','Bar / Espresso'];
+  const extra=new Set(); Object.keys(window._profiles||{}).forEach(n=>{ ((window._profiles[n]||{}).roles||[]).forEach(r=>{ if(base.indexOf(r)<0) extra.add(r); }); });
+  const cols=[...base, ...extra];
+  const people=Object.keys(window._posMap||{}).filter(n=>posOf(n)!=='Owner'&&!isArchived(n)).sort((a,b)=>{ const ra=POS_ORDER.indexOf(posOf(a)),rb=POS_ORDER.indexOf(posOf(b)); return (ra<0?99:ra)-(rb<0?99:rb) || a.localeCompare(b); });
+  const isLeaderX=n=>['Owner','Manager','Supervisor'].includes(posOf(n));
+  const canO=n=>{ const c=(window._profiles[n]||{}).caps; return (c&&typeof c==='object')?(('open'in c)?!!c.open:isLeaderX(n)):isLeaderX(n); };
+  const canC=n=>{ const c=(window._profiles[n]||{}).caps; return (c&&typeof c==='object')?(('close'in c)?!!c.close:isLeaderX(n)):isLeaderX(n); };
+  const hasRole=(n,st)=>((window._profiles[n]||{}).roles||[]).indexOf(st)>=0;
+  const jn=x=>String(x).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  const box=(chk,h)=>`<input type="checkbox" ${chk?'checked':''} onclick="${h}" style="width:17px;height:17px;cursor:pointer"/>`;
+  const vth=(t,col)=>`<th style="padding:6px 7px;font-size:11px;font-weight:700;color:${col||'var(--muted)'};white-space:nowrap;writing-mode:vertical-rl;transform:rotate(180deg);height:78px;vertical-align:bottom">${esc(t)}</th>`;
+  let h=`<div class="faint" style="font-size:12.5px;margin-bottom:12px">Who can work what — tap any box to toggle, it saves as you go. Open &amp; close are built in; the rest are your stations (edit that list in Settings). The number under each column is how many people you've got trained there — a <span style="color:var(--amber)">low count</span> is a cross-training gap.</div><div style="overflow-x:auto;border:1px solid var(--line);border-radius:10px"><table style="border-collapse:collapse;font-size:12.5px;width:100%"><thead><tr><th style="padding:6px 10px;text-align:left;position:sticky;left:0;background:var(--card);z-index:2"></th>${vth('Open','var(--brand)')}${vth('Close','var(--brand)')}${cols.map(c=>vth(c)).join('')}</tr></thead><tbody>`;
+  people.forEach(n=>{ h+=`<tr style="border-top:1px solid var(--line)"><td style="padding:7px 10px;position:sticky;left:0;background:var(--card);white-space:nowrap;z-index:1"><span style="font-weight:600">${esc(n.split(' ')[0])}</span> <span class="faint" style="font-size:11px">${esc(posOf(n))}</span></td><td style="text-align:center;padding:5px">${box(canO(n),`toggleCap('${jn(n)}','open',this.checked)`)}</td><td style="text-align:center;padding:5px">${box(canC(n),`toggleCap('${jn(n)}','close',this.checked)`)}</td>${cols.map(st=>`<td style="text-align:center;padding:5px">${box(hasRole(n,st),`toggleRole('${jn(n)}','${jn(st)}',this.checked)`)}</td>`).join('')}</tr>`; });
+  const cnt=c=>`<td style="text-align:center;font-size:12px;font-weight:800;color:${c<=1?'var(--amber)':'var(--muted)'}">${c}</td>`;
+  h+=`<tr style="border-top:2px solid var(--line2);background:var(--bg)"><td style="padding:7px 10px;position:sticky;left:0;background:var(--bg);font-size:11px;color:var(--muted);font-weight:700">Trained</td>${cnt(people.filter(canO).length)}${cnt(people.filter(canC).length)}${cols.map(st=>cnt(people.filter(n=>hasRole(n,st)).length)).join('')}</tr></tbody></table></div>`;
+  v.innerHTML=h;
+}
+window._roleSaveTmr={};
+function _saveProfileNow(name){ clearTimeout(window._roleSaveTmr[name]); window._roleSaveTmr[name]=setTimeout(async()=>{ const d=window._profiles[name]; if(!d)return; try{ await sb.from('day_items').delete().eq('kind','profile').eq('title',name); await sb.from('day_items').insert({kind:'profile',title:name,on_date:null,detail:JSON.stringify(d),created_by:state.user.id}); }catch(e){} },500); }
+window.toggleRole=function(name,station,checked){ const d=window._profiles[name]||(window._profiles[name]={}); const roles=Array.isArray(d.roles)?d.roles:(d.roles=[]); const i=roles.indexOf(station); if(checked&&i<0) roles.push(station); if(!checked&&i>=0) roles.splice(i,1); _saveProfileNow(name); const c=document.querySelector('#teambody'); };
+window.toggleCap=function(name,cap,checked){ const d=window._profiles[name]||(window._profiles[name]={}); const caps=(d.caps&&typeof d.caps==='object')?d.caps:(d.caps={}); caps[cap]=!!checked; _saveProfileNow(name); };
 async function teamRoster(v){
   v.innerHTML='<div class="muted">Loading…</div>';
   const [rpf,rsh]=await Promise.all([ sb.from('profiles').select('name,role'), sb.from('shifts').select('person_name') ]);
