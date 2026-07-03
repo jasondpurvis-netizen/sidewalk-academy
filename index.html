@@ -356,14 +356,14 @@ async function submitAuth(){
 
 /* ---------- Access levels (permissions) ---------- */
 const ROLE_LABELS={5:'Owner',4:'GM',3:'Manager',2:'Supervisor',1:'Team member'};
-const PERM_DEFAULT={whiteboard:1,home:1,ask:1,journal:1,build:5,setup:4,team:3,onboarding:3,today:1,schedule:1,checklists:1,sales:4,calendar:1,community:1,resources:1,downloads:1,settings:5,pay:5,clock:5};
-const PERM_LABELS={build:'Training (author courses)',setup:'Setup',team:'Team',onboarding:'Onboarding',schedule:'Schedule',sales:'Sales',pay:'Pay rates',settings:'Settings',today:'Daily Report',checklists:'Checklists',calendar:'Calendar',community:'Community',resources:'Resources',downloads:'Downloads'};
+const PERM_DEFAULT={whiteboard:1,home:1,ask:1,journal:1,build:5,setup:4,team:3,onboarding:3,today:1,schedule:1,checklists:1,sales:4,saleshist:4,calendar:1,community:1,resources:1,downloads:1,settings:5,pay:5,clock:5};
+const PERM_LABELS={build:'Training (author courses)',setup:'Setup',team:'Team',onboarding:'Onboarding',schedule:'Schedule',sales:'Sales',saleshist:'Sales history import',pay:'Pay rates',settings:'Settings',today:'Daily Report',checklists:'Checklists',calendar:'Calendar',community:'Community',resources:'Resources',downloads:'Downloads'};
 function myRank(){ if(state.profile&&state.profile.role==='admin') return 5; const pos=(window._posMap&&window._posMap[(state.profile&&state.profile.name)||''])||''; if(pos==='Owner')return 5; if(pos==='GM'||pos==='General Manager')return 4; if(pos==='Manager')return 3; if(pos==='Supervisor')return 2; return 1; }
 function permOf(page){ const o=state.perms&&state.perms[page]; return (o&&+o)||PERM_DEFAULT[page]||1; }
 function canSee(page){ return myRank()>=permOf(page); }
 function renderApp(){
   const isAdmin = state.profile && state.profile.role==="admin";
-  const NAV_ALL=[["",[["whiteboard","Whiteboard","ti-layout-dashboard"]]],["Academy",[["home","Academy","ti-school"],["ask","Ask","ti-bulb"],["journal","Journal","ti-notebook"],["build","Training","ti-tools"]]],["Operations",[["setup","Setup","ti-list-check"],["team","Team","ti-users"],["onboarding","Onboarding","ti-user-plus"],["today","Daily Report","ti-clipboard-list"],["schedule","Schedule","ti-calendar-week"],["checklists","Checklists","ti-checklist"],["sales","Sales","ti-chart-line"],["calendar","Calendar","ti-calendar-month"]]],["Shared",[["community","Community","ti-messages"],["resources","Resources","ti-files"],["downloads","Downloads","ti-download"]]],["",[["settings","Settings","ti-settings"]]]];
+  const NAV_ALL=[["",[["whiteboard","Whiteboard","ti-layout-dashboard"]]],["Academy",[["home","Academy","ti-school"],["ask","Ask","ti-bulb"],["journal","Journal","ti-notebook"],["build","Training","ti-tools"]]],["Operations",[["setup","Setup","ti-list-check"],["team","Team","ti-users"],["onboarding","Onboarding","ti-user-plus"],["today","Daily Report","ti-clipboard-list"],["schedule","Schedule","ti-calendar-week"],["checklists","Checklists","ti-checklist"],["sales","Sales","ti-chart-line"],["saleshist","Sales history","ti-history"],["calendar","Calendar","ti-calendar-month"]]],["Shared",[["community","Community","ti-messages"],["resources","Resources","ti-files"],["downloads","Downloads","ti-download"]]],["",[["settings","Settings","ti-settings"]]]];
   const nav = NAV_ALL.map(([g,items])=>[g, items.filter(([p])=>canSee(p))]).filter(([g,items])=>items.length);
   root.innerHTML = `<div class="app">
     <aside class="side">
@@ -379,7 +379,7 @@ function renderApp(){
   const PI={whiteboard:'ti-layout-dashboard',home:'ti-school',summary:'ti-chart-bar',team:'ti-users',onboarding:'ti-user-plus',ask:'ti-bulb',build:'ti-tools',today:'ti-clipboard-list',schedule:'ti-calendar-week',calendar:'ti-calendar-month',community:'ti-messages',resources:'ti-files',downloads:'ti-download',settings:'ti-settings',journal:'ti-notebook',track:'ti-book-2',lesson:'ti-book-2',feedback:'ti-message-2'};
   const _ti=document.getElementById('topicon'); if(_ti)_ti.innerHTML='<i class="ti '+(PI[state.page]||'ti-point')+'"></i>';
   const v=document.getElementById("view");
-  ({whiteboard:vWhiteboard, home:vHome, track:vTrack, lesson:vLesson, summary:vSummary, team:vTeam, journal:vJournal, community:vCommunity, feedback:vFeedback, downloads:vDownloads, settings:vSettings, resources:vResources, ask:vAsk, build:vBuild, today:vToday, schedule:vSchedule, onboarding:vOnboarding, calendar:vCalendar, sales:vSales, checklists:vChecklists, setup:vSetup, pay:vPay, clock:vClock}[state.page]||vHome)(v);
+  ({whiteboard:vWhiteboard, home:vHome, track:vTrack, lesson:vLesson, summary:vSummary, team:vTeam, journal:vJournal, community:vCommunity, feedback:vFeedback, downloads:vDownloads, settings:vSettings, resources:vResources, ask:vAsk, build:vBuild, today:vToday, schedule:vSchedule, onboarding:vOnboarding, calendar:vCalendar, sales:vSales, checklists:vChecklists, setup:vSetup, pay:vPay, clock:vClock, saleshist:vSalesHist}[state.page]||vHome)(v);
 }
 function setTitle(t,s){ document.getElementById("ttl").textContent=t; document.getElementById("tsub").textContent=s||""; }
 window.toggleNav=function(open){ const s=document.querySelector('.side'); const sc=document.getElementById('scrim'); if(!s)return; s.classList.toggle('open',open); if(sc)sc.classList.toggle('open',open); };
@@ -884,7 +884,8 @@ async function schBoard(v){
   const base = state.ctx.wk ? wkDate(state.ctx.wk) : weekStart(new Date());
   const start=weekStart(base); const days=[...Array(7)].map((_,i)=>{ const d=new Date(start); d.setDate(d.getDate()+i); return d; });
   const isoDays=days.map(isoDate); const wkStart=isoDays[0];
-  const [rsh,rpf,rpay,rsal,rpub,rojr,rto] = await Promise.all([
+  const lyDates=isoDays.map(iso=>{ const x=new Date(iso+'T00:00'); x.setFullYear(x.getFullYear()-1); return isoDate(x); });
+  const [rsh,rpf,rpay,rsal,rpub,rojr,rto,rhr] = await Promise.all([
     sb.from('shifts').select('*').gte('on_date',isoDays[0]).lte('on_date',isoDays[6]),
     sb.from('profiles').select('*'),
     sb.from('pay_rates').select('*'),
@@ -892,6 +893,7 @@ async function schBoard(v){
     sb.from('published_weeks').select('*').eq('week_start',wkStart).maybeSingle(),
     sb.from('day_items').select('on_date,detail').eq('kind','ojr').gte('on_date',isoDays[0]).lte('on_date',isoDays[6]),
     sb.from('time_off').select('*').eq('status','approved'),
+    sb.from('day_items').select('on_date,detail').eq('kind','hourly').in('on_date',lyDates),
     loadPositions(),
     loadArchived(),
     loadProfiles()
@@ -931,6 +933,21 @@ async function schBoard(v){
     });
     const _M=covRules.matrix; if(_M&&_M.blocks&&_M.blocks.length){ let peak=0; _M.blocks.forEach(b=>{ (b.n||[]).forEach(x=>{ if(+x>peak)peak=+x; }); }); if(peak>_rost.length) W.push([1,`Your busiest block needs ${peak} people, but you have ${_rost.length} on the roster — expect open shifts.`]); }
     if(W.length){ W.sort((a,b)=>b[0]-a[0]); const nB=W.filter(w=>w[0]===2).length; h+=`<div class="card" style="padding:13px 15px;margin-bottom:14px;border-left:4px solid ${nB?'#B32D2D':'var(--amber)'}"><div style="font-weight:700;font-size:13.5px;margin-bottom:7px">${nB?'⛔':'⚠️'} Before you draft — ${W.length} thing${W.length>1?'s':''} to check</div>`+W.map(w=>`<div style="display:flex;gap:8px;align-items:flex-start;font-size:12.5px;padding:3px 0;color:var(--ink)"><span style="color:${w[0]===2?'#B32D2D':'var(--amber)'};font-weight:800;line-height:1.4">•</span><span>${w[1]}</span></div>`).join('')+`</div>`; }
+  }
+  if(isAdmin){ const lyH={}; (rhr.data||[]).forEach(x=>{ try{ lyH[x.on_date]=JSON.parse(x.detail||'{}'); }catch(e){} });
+    if(Object.keys(lyH).length){
+      let gmax=1; isoDays.forEach((iso,i)=>{ const d=lyH[lyDates[i]]; if(d&&d.byHour) Object.values(d.byHour).forEach(v=>{ if(+v>gmax)gmax=+v; }); });
+      const HRS=[]; for(let hh=5;hh<=21;hh++) HRS.push(hh); const fmtHr=hh=>((hh%12)||12)+(hh<12?'a':'p');
+      h+=`<div class="sec">Last year, this week — by hour <span class="faint" style="font-weight:400;font-size:11.5px">staff to the real curve, not just the matrix</span></div><div class="card" style="padding:10px 8px;overflow-x:auto"><div style="min-width:540px">`;
+      isoDays.forEach((iso,i)=>{ const d=lyH[lyDates[i]]; const dt=_d(iso), lyDt=_d(lyDates[i]);
+        if(!d||!d.byHour){ h+=`<div style="display:flex;align-items:center;gap:10px;padding:5px 8px;border-top:1px solid var(--line)"><div style="width:120px;font-size:12px;font-weight:600">${dt.toLocaleDateString(undefined,{weekday:'short'})} <span class="faint" style="font-weight:400">${dt.getMonth()+1}/${dt.getDate()}</span></div><div class="faint" style="font-size:11.5px">no data for ${lyDt.getMonth()+1}/${lyDt.getDate()} last year</div></div>`; return; }
+        let peakH=null,peakV=0; Object.keys(d.byHour).forEach(k=>{ if(+d.byHour[k]>peakV){peakV=+d.byHour[k];peakH=+k;} });
+        h+=`<div style="display:flex;align-items:center;gap:10px;padding:6px 8px;border-top:1px solid var(--line)"><div style="width:120px;font-size:12px;font-weight:600">${dt.toLocaleDateString(undefined,{weekday:'short'})} <span class="faint" style="font-weight:400">${dt.getMonth()+1}/${dt.getDate()}</span></div><div style="flex:1;display:flex;align-items:flex-end;gap:2px;height:34px">`+HRS.map(hh=>{ const v=+((d.byHour||{})[hh]||0); const ht=Math.round(v/gmax*32); const pk=hh===peakH; return `<div title="${fmtHr(hh)}: ${money(v)}" style="flex:1;height:${Math.max(1,ht)}px;background:${pk?'#B32D2D':'var(--brand)'};opacity:${v?1:.15};border-radius:1px"></div>`; }).join('')+`</div><div style="width:112px;text-align:right;font-size:11.5px"><div style="font-weight:700;color:#B32D2D">busiest ${fmtHr(peakH)}</div><div class="faint">${money(d.total||0)}</div></div></div>`;
+      });
+      h+=`</div><div class="faint" style="font-size:11px;padding:6px 10px">Red = last year's busiest hour that day. If it's earlier/later than your matrix assumes, bump staffing for that day.</div></div>`;
+    } else {
+      h+=`<div class="sec">Last year, this week — by hour</div><div class="card" style="padding:16px"><div class="faint" style="font-size:12.5px">No hourly history loaded yet. <b style="color:var(--brand);cursor:pointer" onclick="go('saleshist')">Import last year's hourly sales</b> and you'll see each day's real curve right here — a big help for staffing the days that break your matrix (holidays, weather, local events).</div></div>`;
+    }
   }
   const burdenMul=1+((covRules.burdenPct||0)/100);
   const allHrs=shifts.reduce((a,s)=>a+shiftHours(s),0); const allCost=shifts.reduce((a,s)=>a+shiftHours(s)*(wage[s.person_name]||0),0)*burdenMul; const ppl=new Set(shifts.map(s=>s.person_name).filter(n=>n&&n!=='__OPEN__')).size;
@@ -1493,6 +1510,22 @@ async function vSales(v){
   v.innerHTML=h;
 }
 
+/* ---------- Sales history: import hourly POS sales (powers last-year-by-hour) ---------- */
+async function vSalesHist(v){
+  if(!canSee('saleshist')){ go('home'); return; }
+  setTitle('Sales history',"Load last year's hourly sales so the scheduler sees the real curve");
+  v.innerHTML='<div class="muted">Loading…</div>';
+  const r=await sb.from('day_items').select('on_date').eq('kind','hourly');
+  const dates=(r.data||[]).map(x=>x.on_date).filter(Boolean).sort();
+  const have=dates.length, first=dates[0], last=dates[dates.length-1];
+  let h=`<div class="card" style="padding:16px 18px;margin-bottom:16px"><div style="font-weight:700;font-size:15px">Hourly sales on file</div>${have?`<div style="font-size:13.5px;margin-top:5px">${have} day${have>1?'s':''} loaded · ${esc(fmtDay(_d(first)))} → ${esc(fmtDay(_d(last)))}</div>`:`<div class="faint" style="font-size:13px;margin-top:5px">Nothing loaded yet — import a POS export below.</div>`}<div class="faint" style="font-size:12px;margin-top:6px">This powers the “last year, this day, by hour” panel on the Schedule and holiday comparisons. Once your POS is connected live, this stays current automatically.</div></div>`;
+  h+=`<div class="card" style="padding:18px"><div style="font-weight:700;font-size:15px;margin-bottom:4px">Import hourly sales</div><div class="faint" style="font-size:12.5px;margin-bottom:12px">Export an <b>hourly sales</b> report from your POS as a CSV (Toast: Reports → Sales, export), then drop it here. You'll pick which columns are the date, the hour, and the sales — I'll figure out the rest.</div><input type="file" id="hsFile" accept=".csv,text/csv" style="font-size:13px" onchange="hsPick(this)"/><div id="hsMap" style="margin-top:14px"></div></div>`;
+  v.innerHTML=h;
+}
+function _csvParse(text){ const rows=[]; let i=0,field='',row=[],inQ=false; const pushF=()=>{row.push(field);field='';}; const pushR=()=>{rows.push(row);row=[];}; while(i<text.length){ const c=text[i]; if(inQ){ if(c==='"'){ if(text[i+1]==='"'){field+='"';i++;} else inQ=false; } else field+=c; } else { if(c==='"')inQ=true; else if(c===',')pushF(); else if(c==='\n'){pushF();pushR();} else if(c==='\r'){} else field+=c; } i++; } if(field.length||row.length){pushF();pushR();} return rows.filter(r=>r.length&&r.some(x=>String(x).trim()!=='')); }
+window.hsPick=function(inp){ const f=inp.files&&inp.files[0]; if(!f)return; const rd=new FileReader(); rd.onload=()=>{ const rows=_csvParse(String(rd.result||'')); if(rows.length<2){ alert('Could not read rows from that file.'); return; } window._hsHead=rows[0]; window._hsRows=rows.slice(1); const opts=window._hsHead.map((c,i)=>`<option value="${i}">${esc(c||('Column '+(i+1)))}</option>`).join(''); const guess=kw=>{ const idx=window._hsHead.findIndex(c=>kw.test(String(c||'').toLowerCase())); return idx<0?0:idx; }; const sel=(id,lbl,g)=>`<div><div class="faint" style="font-size:11px;margin-bottom:2px">${lbl}</div><select id="${id}" style="padding:8px;border:1px solid var(--line2);border-radius:8px;background:var(--card);color:var(--ink);font-family:inherit">${opts}</select></div>`; const m=document.getElementById('hsMap'); m.innerHTML=`<div class="faint" style="font-size:12px;margin-bottom:8px">${window._hsRows.length} rows found. Map the columns:</div><div class="row" style="gap:10px;flex-wrap:wrap">${sel('hsDate','Date')}${sel('hsHour','Hour / time')}${sel('hsSales','Net sales')}</div><div class="row" style="margin-top:14px"><button class="btn pri" style="width:auto" onclick="hsImport()">Import</button><span class="muted" id="hsMsg" style="font-size:13px;margin-left:10px"></span></div>`; document.getElementById('hsDate').value=guess(/date|day/); document.getElementById('hsHour').value=guess(/hour|time/); document.getElementById('hsSales').value=guess(/net|sales|amount|total|revenue/); }; rd.readAsText(f); };
+window.hsImport=async function(){ if(!window._hsRows)return; const di=+document.getElementById('hsDate').value, hi=+document.getElementById('hsHour').value, si=+document.getElementById('hsSales').value; const parseHour=v=>{ v=String(v||'').trim(); let m=v.match(/(\d{1,2})\s*(am|pm)/i); if(m){ let hh=+m[1]%12; if(/pm/i.test(m[2]))hh+=12; return hh; } m=v.match(/(\d{1,2}):(\d{2})/); if(m) return +m[1]; m=v.match(/^(\d{1,2})$/); return m?+m[1]:null; }; const parseDate=v=>{ v=String(v||'').trim(); const d=new Date(v); return isNaN(d)?null:isoDate(d); }; const byDate={}; let n=0; window._hsRows.forEach(r=>{ const iso=parseDate(r[di]); const hr=parseHour(r[hi]); const sal=Number(String(r[si]||'').replace(/[^0-9.\-]/g,''))||0; if(iso&&hr!=null&&hr>=0&&hr<=23){ (byDate[iso]=byDate[iso]||{})[hr]=(byDate[iso][hr]||0)+sal; n++; } }); const dates=Object.keys(byDate); const msg=document.getElementById('hsMsg'); if(!dates.length){ if(msg)msg.textContent='No valid rows — check the column mapping.'; return; } if(msg)msg.textContent='Importing '+dates.length+' days…'; for(const iso of dates){ const total=Object.values(byDate[iso]).reduce((a,b)=>a+b,0); await sb.from('day_items').delete().eq('kind','hourly').eq('on_date',iso); await sb.from('day_items').insert({kind:'hourly',on_date:iso,title:iso,detail:JSON.stringify({byHour:byDate[iso],total}),created_by:state.user.id}); } if(msg)msg.textContent='Done ✓ '+dates.length+' days from '+n+' rows.'; window._hsRows=null; setTimeout(()=>go('saleshist'),1400); };
+
 /* ---------- Checklists: open/close/clean, check-off + photo proof ---------- */
 const CL_DEFAULTS=[
   {title:'Opening',items:['Unlock & disarm alarm','Lights & music on','Espresso machine & grinders on','Check & log cooler/freezer temps','Pull, date & stock bagels','Brew first batch of coffee','Stock register, count drawer','Fresh sanitizer buckets','Restrooms stocked & clean','Flip the Open sign']},
@@ -1749,7 +1782,7 @@ async function vCalendar(v){
   let data;
   if(state.calCache && state.calCache.ym===ym){ data=state.calCache.data; }
   else { v.innerHTML='<div class="muted">Loading…</div>'; const r=await sb.from('day_items').select('*').gte('on_date',first).lte('on_date',last).order('created_at'); data=r.data||[]; state.calCache={ym,data}; }
-  const CAL_HIDE=new Set(['pos','ojr','mission','vision','pool','archived','pdates','profile','covrules','stations','daylog','cltmpl','clrun','actual','punch']);
+  const CAL_HIDE=new Set(['pos','ojr','mission','vision','pool','archived','pdates','profile','covrules','stations','daylog','cltmpl','clrun','actual','punch','hourly']);
   const byd={}; (data||[]).forEach(it=>{ if(CAL_HIDE.has(it.kind))return; (byd[it.on_date]=byd[it.on_date]||[]).push(it); });
   const hol={}; usHolidays(y).forEach(x=>hol[x.date]=x);
   const todayIso=isoDate(new Date()); const sel=state.ctx.day||(ym===todayIso.slice(0,7)?todayIso:first);
