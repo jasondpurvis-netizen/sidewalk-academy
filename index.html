@@ -870,7 +870,8 @@ async function schBoard(v){
     sb.from('day_items').select('on_date,detail').eq('kind','ojr').gte('on_date',isoDays[0]).lte('on_date',isoDays[6]),
     sb.from('time_off').select('*').eq('status','approved'),
     loadPositions(),
-    loadArchived()
+    loadArchived(),
+    loadProfiles()
   ]);
   const ojrByDay={}; (rojr.data||[]).forEach(o=>{ if(o.on_date) ojrByDay[o.on_date]=o.detail; });
   let covRules={requireLeader:true,shiftLen:8,minLen:4,maxLen:8,targetPct:'',burdenPct:'',matrix:{blocks:[]},days:{},roleReqs:[]}; try{ const rc=await sb.from('day_items').select('detail').eq('kind','covrules').maybeSingle(); const cd=JSON.parse((rc.data&&rc.data.detail)||'{}'); covRules={requireLeader:cd.requireLeader!==false, shiftLen:+(cd.shiftLen)||8, minLen:+(cd.minLen)||4, maxLen:+(cd.maxLen)||8, targetPct:cd.targetPct||'', burdenPct:+(cd.burdenPct)||0, matrix:cd.matrix||{blocks:[]}, days:cd.days||{}, roleReqs:Array.isArray(cd.roleReqs)?cd.roleReqs:[]}; }catch(e){}
@@ -889,6 +890,23 @@ async function schBoard(v){
   let h=`<div class="sched-bar"><div class="sched-nav"><button class="iconbtn" aria-label="Previous week" onclick="weekShift(-1)"><i class="ti ti-chevron-left"></i></button><button class="iconbtn" aria-label="Next week" onclick="weekShift(1)"><i class="ti ti-chevron-right"></i></button><button class="btn" style="width:auto" onclick="weekShift(0)">Today</button></div><div style="min-width:0"><div style="font-size:18px;font-weight:600;line-height:1.2">${fmtDay(days[0])} – ${fmtDay(days[6])}</div><div class="faint" style="font-size:12px;margin-top:2px">${pub?`<span style="color:var(--green)">●</span> Published${daysAhead>=0?' · posted '+daysAhead+' days ahead':''}`:'Draft — not published yet'}</div></div>`;
   if(isAdmin) h+=`<div class="sched-actions"><button class="btn" style="width:auto" onclick="autoDraft()"><i class="ti ti-wand"></i> Auto-draft</button><button class="btn" style="width:auto" onclick="copyLastWeek()"><i class="ti ti-copy"></i> Copy week</button><button class="btn pri" style="width:auto" onclick="publishWeek()"><i class="ti ti-send"></i> ${pub?'Re-publish':'Publish'}</button></div>`;
   h+=`</div>`;
+  if(isAdmin){ const _rost=team.map(p=>p.name); const _isLead=n=>['Owner','Manager','Supervisor'].includes(posOf(n)); const _capO=n=>{ const c=(profileOf(n)||{}).caps; return (c&&typeof c==='object'&&'open'in c)?!!c.open:_isLead(n); }; const _capC=n=>{ const c=(profileOf(n)||{}).caps; return (c&&typeof c==='object'&&'close'in c)?!!c.close:_isLead(n); }; const _has=(n,st)=>((profileOf(n)||{}).roles||[]).includes(st); const _lvl=(n,st)=>{ const s=(profileOf(n)||{}).skillLevels; if(s&&typeof s==='object'&&(st in s))return +s[st]||0; return _has(n,st)?2:0; }; const fn=n=>esc((n||'').split(' ')[0]); const W=[];
+    _rost.forEach(n=>{ const p=profileOf(n)||{}; const mx=+p.maxHrs,mn=+p.minHrs,ms=+p.maxShift,md=(p.maxDays===''||p.maxDays==null)?null:+p.maxDays;
+      if(mx>0&&mn>0&&mx<mn) W.push([1,`${fn(n)}'s max hours (${mx}) are below their min (${mn}) — they can never hit their minimum.`]);
+      if(ms>0&&ms<covRules.minLen) W.push([1,`${fn(n)}'s longest shift (${ms}h) is under your ${covRules.minLen}h minimum shift — they won't fit any shift.`]);
+      if(md!=null&&md<1) W.push([1,`${fn(n)}'s max days is ${md} — they can't be scheduled at all.`]);
+    });
+    const openers=_rost.filter(_capO), closers=_rost.filter(_capC);
+    if(covRules.requireLeader&&openers.length===0) W.push([2,`No one can open. Every day needs an opener — set "Can open" for a leader on the Skills grid.`]);
+    if(covRules.requireLeader&&closers.length===0) W.push([2,`No one can close. Every day needs a closer — set "Can close" for a leader on the Skills grid.`]);
+    (covRules.roleReqs||[]).forEach(rq=>{ if(!rq||!rq.role)return; const cnt=Math.max(1,+rq.count||1); const lab=esc(rq.label||(rq.role==='__open__'?'Opening leader':rq.role==='__close__'?'Closing leader':rq.role));
+      if(rq.role==='__open__'){ if(openers.length<cnt) W.push([openers.length?1:2,`Requirement "${lab}" needs ${cnt} who can open, but only ${openers.length} can.`]); }
+      else if(rq.role==='__close__'){ if(closers.length<cnt) W.push([closers.length?1:2,`Requirement "${lab}" needs ${cnt} who can close, but only ${closers.length} can.`]); }
+      else { const trained=_rost.filter(n=>_has(n,rq.role)); if(trained.length===0) W.push([2,`Requirement "${lab}" needs someone trained on ${esc(rq.role)}, but no one is.`]); else if(trained.length<cnt) W.push([1,`Requirement "${lab}" needs ${cnt} trained on ${esc(rq.role)}, but only ${trained.length} ${trained.length===1?'is':'are'}.`]); if(+rq.minLevel>1){ const q=_rost.filter(n=>_lvl(n,rq.role)>=+rq.minLevel); if(q.length<cnt) W.push([1,`Requirement "${lab}" wants ${cnt} at a higher skill level on ${esc(rq.role)}, but only ${q.length} qualif${q.length===1?'ies':'y'}.`]); } }
+    });
+    const _M=covRules.matrix; if(_M&&_M.blocks&&_M.blocks.length){ let peak=0; _M.blocks.forEach(b=>{ (b.n||[]).forEach(x=>{ if(+x>peak)peak=+x; }); }); if(peak>_rost.length) W.push([1,`Your busiest block needs ${peak} people, but you have ${_rost.length} on the roster — expect open shifts.`]); }
+    if(W.length){ W.sort((a,b)=>b[0]-a[0]); const nB=W.filter(w=>w[0]===2).length; h+=`<div class="card" style="padding:13px 15px;margin-bottom:14px;border-left:4px solid ${nB?'#B32D2D':'var(--amber)'}"><div style="font-weight:700;font-size:13.5px;margin-bottom:7px">${nB?'⛔':'⚠️'} Before you draft — ${W.length} thing${W.length>1?'s':''} to check</div>`+W.map(w=>`<div style="display:flex;gap:8px;align-items:flex-start;font-size:12.5px;padding:3px 0;color:var(--ink)"><span style="color:${w[0]===2?'#B32D2D':'var(--amber)'};font-weight:800;line-height:1.4">•</span><span>${w[1]}</span></div>`).join('')+`</div>`; }
+  }
   const burdenMul=1+((covRules.burdenPct||0)/100);
   const allHrs=shifts.reduce((a,s)=>a+shiftHours(s),0); const allCost=shifts.reduce((a,s)=>a+shiftHours(s)*(wage[s.person_name]||0),0)*burdenMul; const ppl=new Set(shifts.map(s=>s.person_name).filter(n=>n&&n!=='__OPEN__')).size;
   const totSales=isoDays.reduce((a,iso)=>a+(sales[iso]||0),0); const labpctO=(isAdmin&&totSales&&allCost)?Math.round(allCost/totSales*100):null;
