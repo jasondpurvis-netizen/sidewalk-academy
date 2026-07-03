@@ -219,7 +219,7 @@ const STALL_DAYS=5;
 const DEFAULT_BRAND='#4A9CAD';
 const DEFAULT_NAME='Sidewalk Academy';
 const DEFAULT_LOGO="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%234A9CAD'/%3E%3Ctext x='50' y='71' font-family='Georgia,serif' font-style='italic' font-size='60' fill='white' text-anchor='middle'%3ES%3C/text%3E%3C/svg%3E";
-async function loadSettings(){ const { data } = await sb.from('settings').select('*').eq('id',1).maybeSingle(); const s=data||{}; state.settings = Object.assign({}, s, { academy_name: s.academy_name||DEFAULT_NAME, brand_color: s.brand_color||DEFAULT_BRAND, logo_url: s.logo_url||DEFAULT_LOGO }); try{ const rs=await sb.from('day_items').select('detail').eq('kind','stations').maybeSingle(); const arr=JSON.parse((rs.data&&rs.data.detail)||'[]'); if(Array.isArray(arr)) state.settings.stations=arr; }catch(e){} applyBrand(state.settings.brand_color); }
+async function loadSettings(){ const { data } = await sb.from('settings').select('*').eq('id',1).maybeSingle(); const s=data||{}; state.settings = Object.assign({}, s, { academy_name: s.academy_name||DEFAULT_NAME, brand_color: s.brand_color||DEFAULT_BRAND, logo_url: s.logo_url||DEFAULT_LOGO }); try{ const rs=await sb.from('day_items').select('detail').eq('kind','stations').maybeSingle(); const arr=JSON.parse((rs.data&&rs.data.detail)||'[]'); if(Array.isArray(arr)) state.settings.stations=arr; }catch(e){} try{ const rp=await sb.from('day_items').select('detail').eq('kind','perms').maybeSingle(); state.perms=JSON.parse((rp.data&&rp.data.detail)||'{}'); }catch(e){ state.perms={}; } applyBrand(state.settings.brand_color); }
 
 function esc(s){ return (s||"").replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c])); }
 function richBody(html){
@@ -354,11 +354,17 @@ async function submitAuth(){
   state.busy=false; if(document.getElementById("go")) document.getElementById("go").textContent = state.authMode==="in"?"Sign in":"Create account";
 }
 
+/* ---------- Access levels (permissions) ---------- */
+const ROLE_LABELS={4:'Owner',3:'Manager',2:'Supervisor',1:'Team member'};
+const PERM_DEFAULT={whiteboard:1,home:1,ask:1,journal:1,build:3,setup:4,team:3,onboarding:3,today:1,schedule:1,checklists:1,sales:3,calendar:1,community:1,resources:1,downloads:1,settings:4,pay:4,clock:4};
+const PERM_LABELS={build:'Build (courses)',setup:'Setup',team:'Team',onboarding:'Onboarding',schedule:'Schedule',sales:'Sales',pay:'Pay rates',settings:'Settings',today:'Daily Report',checklists:'Checklists',calendar:'Calendar',community:'Community',resources:'Resources',downloads:'Downloads'};
+function myRank(){ if(state.profile&&state.profile.role==='admin') return 4; const pos=(window._posMap&&window._posMap[(state.profile&&state.profile.name)||''])||''; if(pos==='Owner')return 4; if(pos==='Manager')return 3; if(pos==='Supervisor')return 2; return 1; }
+function permOf(page){ const o=state.perms&&state.perms[page]; return (o&&+o)||PERM_DEFAULT[page]||1; }
+function canSee(page){ return myRank()>=permOf(page); }
 function renderApp(){
   const isAdmin = state.profile && state.profile.role==="admin";
-  const nav = isAdmin
-    ? [["",[["whiteboard","Whiteboard","ti-layout-dashboard"]]],["Academy",[["home","Academy","ti-school"],["ask","Ask","ti-bulb"],["build","Build","ti-tools"]]],["Operations",[["setup","Setup","ti-list-check"],["team","Team","ti-users"],["onboarding","Onboarding","ti-user-plus"],["today","Daily Report","ti-clipboard-list"],["schedule","Schedule","ti-calendar-week"],["clock","Time Clock","ti-clock-hour-4"],["checklists","Checklists","ti-checklist"],["sales","Sales","ti-chart-line"],["calendar","Calendar","ti-calendar-month"]]],["Shared",[["community","Community","ti-messages"],["resources","Resources","ti-files"],["downloads","Downloads","ti-download"]]],["",[["settings","Settings","ti-settings"]]]]
-    : [["",[["whiteboard","Whiteboard","ti-layout-dashboard"],["home","Home","ti-home"],["ask","Ask","ti-bulb"],["journal","Journal","ti-notebook"]]],["Operations",[["today","Daily Report","ti-clipboard-list"],["schedule","Schedule","ti-calendar-week"],["checklists","Checklists","ti-checklist"],["calendar","Calendar","ti-calendar-month"]]],["Shared",[["community","Community","ti-messages"],["resources","Resources","ti-files"],["downloads","Downloads","ti-download"]]]];
+  const NAV_ALL=[["",[["whiteboard","Whiteboard","ti-layout-dashboard"]]],["Academy",[["home","Academy","ti-school"],["ask","Ask","ti-bulb"],["journal","Journal","ti-notebook"],["build","Build","ti-tools"]]],["Operations",[["setup","Setup","ti-list-check"],["team","Team","ti-users"],["onboarding","Onboarding","ti-user-plus"],["today","Daily Report","ti-clipboard-list"],["schedule","Schedule","ti-calendar-week"],["checklists","Checklists","ti-checklist"],["sales","Sales","ti-chart-line"],["calendar","Calendar","ti-calendar-month"]]],["Shared",[["community","Community","ti-messages"],["resources","Resources","ti-files"],["downloads","Downloads","ti-download"]]],["",[["settings","Settings","ti-settings"]]]];
+  const nav = NAV_ALL.map(([g,items])=>[g, items.filter(([p])=>canSee(p))]).filter(([g,items])=>items.length);
   root.innerHTML = `<div class="app">
     <aside class="side">
       <div class="brand" onclick="go('whiteboard')" style="cursor:pointer${state.settings&&state.settings.logo_url?';flex-direction:column;align-items:flex-start;gap:9px;padding:20px 18px':''}">${state.settings&&state.settings.logo_url?`<img src="${state.settings.logo_url}" style="max-width:190px;max-height:64px;width:auto;height:auto;object-fit:contain;display:block" alt="logo"/><div><b>${esc((state.settings&&state.settings.academy_name)||'Academy')}</b><span>Training</span></div>`:`<div class="lg">${esc(((state.settings&&state.settings.academy_name)||'A').charAt(0).toUpperCase())}</div><div><b>${esc((state.settings&&state.settings.academy_name)||'Academy')}</b><span>Training</span></div>`}</div>
@@ -708,7 +714,7 @@ window.draftLesson=async function(){ const raw=val('proc'); const title=val('pro
 
 /* ---------- Build (custom tracks) ---------- */
 async function vBuild(v){
-  if(!(state.profile&&state.profile.role==='admin')){ go('home'); return; }
+  if(!canSee(state.page)){ go('home'); return; }
   setTitle('Build','Create your own courses, lessons & glossary');
   v.innerHTML='<div class="muted">Loading…</div>';
   const { data:_pf } = await sb.from('profiles').select('*'); window._team=(_pf||[]).filter(p=>p.role!=='admin');
@@ -1461,7 +1467,7 @@ window.repWeek=function(n){ if(n===0){ state.ctx.wk=isoDate(weekStart(new Date()
 
 /* ---------- Sales KPIs (from day_sales; Toast can feed this later) ---------- */
 async function vSales(v){
-  if(!(state.profile&&state.profile.role==='admin')){ go('home'); return; }
+  if(!canSee(state.page)){ go('home'); return; }
   setTitle('Sales','Your numbers — today, this month, year to date');
   v.innerHTML='<div class="muted">Loading…</div>';
   const now=new Date(); const y=now.getFullYear(); const iso=d=>isoDate(d);
@@ -1524,7 +1530,7 @@ window.clDelTmpl=async function(tid){ if(!confirm('Delete this checklist entirel
 
 /* ---------- Time Clock — shared station; tap your name to clock in/out ---------- */
 async function vClock(v){
-  if(!(state.profile&&state.profile.role==='admin')){ go('home'); return; }
+  if(!canSee(state.page)){ go('home'); return; }
   setTitle('Time Clock','Tap your name to clock in or out');
   v.innerHTML='<div class="muted">Loading…</div>';
   const today=isoDate(new Date());
@@ -1549,7 +1555,7 @@ window.clockOut=async function(p){ const punch=window._punch||{}; const rec=punc
 
 /* ---------- Pay rates — private, leadership-only page ---------- */
 async function vPay(v){
-  if(!(state.profile&&state.profile.role==='admin')){ go('home'); return; }
+  if(!canSee(state.page)){ go('home'); return; }
   setTitle('Pay rates','Leadership only — hourly wages that power labor cost');
   v.innerHTML='<div class="muted">Loading…</div>';
   await loadPositions(); await loadArchived();
@@ -1597,7 +1603,7 @@ async function schWhoson(v){
 
 /* ---------- Schedule Setup: one page, in order, self-checking ---------- */
 async function vSetup(v){
-  if(!(state.profile&&state.profile.role==='admin')){ go('home'); return; }
+  if(!canSee(state.page)){ go('home'); return; }
   setTitle('Setup','Set it up once, in order — then auto-draft does the work');
   v.innerHTML='<div class="muted">Loading…</div>';
   const [rav,rprof,rpay,rcov,rsh]=await Promise.all([
@@ -1635,7 +1641,7 @@ async function vSetup(v){
 window.setupSaveGoal=async function(){ const val=+((document.getElementById('setupGoal')||{}).value)||0; const r=await sb.from('day_items').select('detail').eq('kind','covrules').maybeSingle(); let cd={}; try{cd=JSON.parse((r.data&&r.data.detail)||'{}');}catch(e){} cd.targetPct=val>0?val:''; await sb.from('day_items').delete().eq('kind','covrules'); await sb.from('day_items').insert({kind:'covrules',title:'coverage',on_date:null,detail:JSON.stringify(cd),created_by:state.user.id}); go('setup'); };
 
 async function vTeam(v){
-  if(!(state.profile&&state.profile.role==='admin')){ go('home'); return; }
+  if(!canSee(state.page)){ go('home'); return; }
   const tab=state.ctx.ttab||'roster';
   setTitle('Team','Your people — profiles, progress & former team');
   const seg=(k,l)=>`<button onclick="state.ctx.ttab='${k}';vTeam(document.getElementById('view'))" style="padding:7px 15px;font-size:13px;font-weight:600;border:none;cursor:pointer;font-family:inherit;background:${tab===k?'var(--brand)':'var(--card)'};color:${tab===k?'#fff':'var(--muted)'}">${l}</button>`;
@@ -1702,7 +1708,7 @@ async function teamFormer(v){
 }
 const ONBOARD_STEPS=['I-9 employment eligibility verified','E-Verify submitted','W-4 tax form signed','State tax form signed','Direct deposit set up','Employee handbook acknowledged','Food handler card on file','Allergen & safety briefing','Uniform & name tag issued','POS login created','Building tour & emergency exits','Shadow a full shift','Join the academy (sign in with the code)','Start the first training track'];
 async function vOnboarding(v){
-  if(!(state.profile&&state.profile.role==='admin')){ go('home'); return; }
+  if(!canSee(state.page)){ go('home'); return; }
   setTitle('Onboarding','Bring a new hire up to speed — add them, run the checklist');
   v.innerHTML='<div class="muted">Loading…</div>';
   const [rh,rs]=await Promise.all([
@@ -1763,7 +1769,7 @@ window.calAdd=async function(iso){ const kind=document.getElementById('calkind')
 
 /* ---------- boot ---------- */
 async function vSettings(v){
-  if(!(state.profile&&state.profile.role==='admin')){ go('home'); return; }
+  if(!canSee(state.page)){ go('home'); return; }
   setTitle("Settings","Make it yours");
   const s=state.settings||{};
   v.innerHTML=`<div class="card" style="padding:22px;max-width:480px">
@@ -1773,13 +1779,15 @@ async function vSettings(v){
     <div style="margin-bottom:20px"><label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px">Team join code</label><input id="setjoin" type="text" value="${esc(s.join_code||'')}" placeholder="e.g. SIDEWALK" style="width:100%;max-width:220px;padding:10px 12px;border:1px solid var(--line2);border-radius:9px;font-size:14px;background:var(--card);color:var(--ink);font-family:inherit;letter-spacing:1px"/><div class="faint" style="font-size:12px;margin-top:6px">New team members enter this code to join — it keeps strangers out. Post it in the shop, or have them scan below.</div>${s.join_code?`<div style="margin-top:12px;display:flex;align-items:center;gap:14px"><img src="https://api.qrserver.com/v1/create-qr-code/?size=130x130&data=${encodeURIComponent(location.origin)}" style="width:104px;height:104px;border:1px solid var(--line);border-radius:10px;padding:6px;background:#fff"/><div class="muted" style="font-size:13px">Scan to open the academy on a phone, then sign up with code <b>${esc(s.join_code)}</b>.</div></div>`:''}</div>
     <div class="row"><button class="btn pri" style="width:auto" onclick="saveSettings()">Save</button><span class="muted" id="setmsg" style="font-size:13px;margin-left:10px"></span></div>
   </div>
-  <div class="card" style="padding:22px;max-width:480px;margin-top:16px"><div style="font-size:13px;font-weight:600;margin-bottom:6px">Stations &amp; skills</div><div class="faint" style="font-size:12px;margin-bottom:12px">Your restaurant's own roles — bake, register, bar, grill, drive-thru, whatever fits your shop. These become checkboxes on each person's profile, so the schedule only puts people where they're trained. Open and close are built in, so no need to add them.</div><div id="stationList" style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:10px"></div><div class="row" style="gap:8px"><input id="stationNew" type="text" placeholder="Add a station…" style="flex:1;padding:9px 11px;border:1px solid var(--line2);border-radius:8px;background:var(--card);color:var(--ink);font-family:inherit" onkeydown="if(event.key==='Enter'){addStation();event.preventDefault();}"/><button class="btn" style="width:auto" onclick="addStation()">Add</button></div><div class="row" style="margin-top:12px"><button class="btn pri" style="width:auto" onclick="saveStations()">Save stations</button><span class="muted" id="stmsg" style="font-size:13px;margin-left:10px"></span></div></div>`;
+  <div class="card" style="padding:22px;max-width:480px;margin-top:16px"><div style="font-size:13px;font-weight:600;margin-bottom:6px">Stations &amp; skills</div><div class="faint" style="font-size:12px;margin-bottom:12px">Your restaurant's own roles — bake, register, bar, grill, drive-thru, whatever fits your shop. These become checkboxes on each person's profile, so the schedule only puts people where they're trained. Open and close are built in, so no need to add them.</div><div id="stationList" style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:10px"></div><div class="row" style="gap:8px"><input id="stationNew" type="text" placeholder="Add a station…" style="flex:1;padding:9px 11px;border:1px solid var(--line2);border-radius:8px;background:var(--card);color:var(--ink);font-family:inherit" onkeydown="if(event.key==='Enter'){addStation();event.preventDefault();}"/><button class="btn" style="width:auto" onclick="addStation()">Add</button></div><div class="row" style="margin-top:12px"><button class="btn pri" style="width:auto" onclick="saveStations()">Save stations</button><span class="muted" id="stmsg" style="font-size:13px;margin-left:10px"></span></div></div>
+  <div class="card" style="padding:22px;max-width:520px;margin-top:16px"><div style="font-size:13px;font-weight:600;margin-bottom:6px">Access &amp; permissions</div><div class="faint" style="font-size:12px;margin-bottom:12px">Set the minimum role that can open each area. Owners always see everything. A person's role comes from their position on the team — Owner, Manager, Supervisor, or everyone else counts as Team member.</div><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="color:var(--muted)"><th style="text-align:left;padding:5px 8px">Area</th><th style="text-align:left;padding:5px 8px">Who can open it</th></tr></thead><tbody>${Object.keys(PERM_LABELS).map(pg=>`<tr style="border-top:1px solid var(--line)"><td style="padding:7px 8px;font-weight:600">${esc(PERM_LABELS[pg])}</td><td style="padding:7px 8px"><select class="permSel" data-pg="${pg}" style="padding:7px 9px;border:1px solid var(--line2);border-radius:8px;background:var(--card);color:var(--ink);font-family:inherit">${[4,3,2,1].map(r=>`<option value="${r}"${permOf(pg)===r?' selected':''}>${ROLE_LABELS[r]}${r===1?' (everyone)':(r===4?' only':' and up')}</option>`).join('')}</select></td></tr>`).join('')}</tbody></table></div><div class="row" style="margin-top:14px"><button class="btn pri" style="width:auto" onclick="savePerms()">Save access levels</button><span class="muted" id="permsg" style="font-size:13px;margin-left:10px"></span></div></div>`;
   const ci=document.getElementById('setcolor'); if(ci) ci.addEventListener('input',e=>applyBrand(e.target.value));
   ((state.settings&&state.settings.stations&&state.settings.stations.length)?state.settings.stations:['Bake / Prep','Register','Bar / Espresso']).forEach(st=>_addStationPill(st));
 }
 function _addStationPill(v){ const list=document.getElementById('stationList'); if(!list||!v)return; const span=document.createElement('span'); span.setAttribute('data-st',v); span.style.cssText='background:var(--bg);border:1px solid var(--line2);border-radius:8px;padding:6px 10px;font-size:13px;display:inline-flex;align-items:center;gap:6px'; span.textContent=v; const x=document.createElement('span'); x.textContent='×'; x.style.cssText='cursor:pointer;color:#B32D2D;font-weight:700;margin-left:2px'; x.onclick=function(){ span.remove(); }; span.appendChild(x); list.appendChild(span); }
 window.addStation=function(){ const inp=document.getElementById('stationNew'); const v=(inp.value||'').trim(); if(!v)return; if([...document.querySelectorAll('#stationList [data-st]')].some(e=>(e.getAttribute('data-st')||'').toLowerCase()===v.toLowerCase())){ inp.value=''; return; } _addStationPill(v); inp.value=''; inp.focus(); };
 window.saveStations=async function(){ const arr=[...document.querySelectorAll('#stationList [data-st]')].map(e=>e.getAttribute('data-st')).filter(Boolean); await sb.from('day_items').delete().eq('kind','stations'); if(arr.length) await sb.from('day_items').insert({kind:'stations',title:'stations',on_date:null,detail:JSON.stringify(arr),created_by:state.user.id}); state.settings.stations=arr; const m=document.getElementById('stmsg'); if(m)m.textContent='Saved ✓'; };
+window.savePerms=async function(){ const perms={}; document.querySelectorAll('.permSel').forEach(s=>{ perms[s.getAttribute('data-pg')]=+s.value; }); await sb.from('day_items').delete().eq('kind','perms'); await sb.from('day_items').insert({kind:'perms',title:'perms',on_date:null,detail:JSON.stringify(perms),created_by:state.user.id}); state.perms=perms; const m=document.getElementById('permsg'); if(m)m.textContent='Saved ✓ — updates as you move around'; };
 window.saveSettings=async function(){
   const name=(document.getElementById('setname').value||'').trim();
   const color=document.getElementById('setcolor').value;
@@ -1803,6 +1811,7 @@ async function boot(){
   if(!session){ state.user=null; render(); return; }
   state.user = session.user; state.busy=false;
   await ensureProfile();
+  try{ await loadPositions(); }catch(e){}
   await loadAll();
   if(!applyHash()){
     let np='whiteboard',nc={};
