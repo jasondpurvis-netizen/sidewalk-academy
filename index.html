@@ -188,6 +188,16 @@
   .side{box-shadow:1px 0 0 var(--line)}
   .top h1{letter-spacing:-.01em}
   .lesson-row{transition:background .12s ease}
+  @media print{
+    .side,.navscrim,.schtabs,.sched-nav,.sched-actions,.btn,.iconbtn,.no-print,.top .row{display:none!important}
+    .app,.main{display:block!important}
+    .wrap{max-width:100%!important;padding:0 6px!important}
+    .card{break-inside:avoid;box-shadow:none!important;border:1px solid #ccc!important}
+    .print-only{display:block!important}
+    body,.app{background:#fff!important}
+    .sec{margin-top:12px}
+  }
+  .print-only{display:none}
 </style>
 </head>
 <body>
@@ -347,7 +357,7 @@ async function submitAuth(){
 function renderApp(){
   const isAdmin = state.profile && state.profile.role==="admin";
   const nav = isAdmin
-    ? [["",[["whiteboard","Whiteboard","ti-layout-dashboard"]]],["Academy",[["home","Academy","ti-school"],["ask","Ask","ti-bulb"],["build","Build","ti-tools"]]],["Operations",[["team","Team","ti-users"],["onboarding","Onboarding","ti-user-plus"],["today","Daily Report","ti-clipboard-list"],["schedule","Schedule","ti-calendar-week"],["checklists","Checklists","ti-checklist"],["sales","Sales","ti-chart-line"],["calendar","Calendar","ti-calendar-month"]]],["Shared",[["community","Community","ti-messages"],["resources","Resources","ti-files"],["downloads","Downloads","ti-download"]]],["",[["settings","Settings","ti-settings"]]]]
+    ? [["",[["whiteboard","Whiteboard","ti-layout-dashboard"]]],["Academy",[["home","Academy","ti-school"],["ask","Ask","ti-bulb"],["build","Build","ti-tools"]]],["Operations",[["setup","Setup","ti-list-check"],["team","Team","ti-users"],["onboarding","Onboarding","ti-user-plus"],["today","Daily Report","ti-clipboard-list"],["schedule","Schedule","ti-calendar-week"],["checklists","Checklists","ti-checklist"],["sales","Sales","ti-chart-line"],["calendar","Calendar","ti-calendar-month"]]],["Shared",[["community","Community","ti-messages"],["resources","Resources","ti-files"],["downloads","Downloads","ti-download"]]],["",[["settings","Settings","ti-settings"]]]]
     : [["",[["whiteboard","Whiteboard","ti-layout-dashboard"],["home","Home","ti-home"],["ask","Ask","ti-bulb"],["journal","Journal","ti-notebook"]]],["Operations",[["today","Daily Report","ti-clipboard-list"],["schedule","Schedule","ti-calendar-week"],["checklists","Checklists","ti-checklist"],["calendar","Calendar","ti-calendar-month"]]],["Shared",[["community","Community","ti-messages"],["resources","Resources","ti-files"],["downloads","Downloads","ti-download"]]]];
   root.innerHTML = `<div class="app">
     <aside class="side">
@@ -363,7 +373,7 @@ function renderApp(){
   const PI={whiteboard:'ti-layout-dashboard',home:'ti-school',summary:'ti-chart-bar',team:'ti-users',onboarding:'ti-user-plus',ask:'ti-bulb',build:'ti-tools',today:'ti-clipboard-list',schedule:'ti-calendar-week',calendar:'ti-calendar-month',community:'ti-messages',resources:'ti-files',downloads:'ti-download',settings:'ti-settings',journal:'ti-notebook',track:'ti-book-2',lesson:'ti-book-2',feedback:'ti-message-2'};
   const _ti=document.getElementById('topicon'); if(_ti)_ti.innerHTML='<i class="ti '+(PI[state.page]||'ti-point')+'"></i>';
   const v=document.getElementById("view");
-  ({whiteboard:vWhiteboard, home:vHome, track:vTrack, lesson:vLesson, summary:vSummary, team:vTeam, journal:vJournal, community:vCommunity, feedback:vFeedback, downloads:vDownloads, settings:vSettings, resources:vResources, ask:vAsk, build:vBuild, today:vToday, schedule:vSchedule, onboarding:vOnboarding, calendar:vCalendar, sales:vSales, checklists:vChecklists}[state.page]||vHome)(v);
+  ({whiteboard:vWhiteboard, home:vHome, track:vTrack, lesson:vLesson, summary:vSummary, team:vTeam, journal:vJournal, community:vCommunity, feedback:vFeedback, downloads:vDownloads, settings:vSettings, resources:vResources, ask:vAsk, build:vBuild, today:vToday, schedule:vSchedule, onboarding:vOnboarding, calendar:vCalendar, sales:vSales, checklists:vChecklists, setup:vSetup}[state.page]||vHome)(v);
 }
 function setTitle(t,s){ document.getElementById("ttl").textContent=t; document.getElementById("tsub").textContent=s||""; }
 window.toggleNav=function(open){ const s=document.querySelector('.side'); const sc=document.getElementById('scrim'); if(!s)return; s.classList.toggle('open',open); if(sc)sc.classList.toggle('open',open); };
@@ -560,7 +570,7 @@ async function vCommunity(v){
   if(!posts||!posts.length) h+=`<div class="card" style="padding:34px;text-align:center"><div style="font-size:26px;margin-bottom:8px">💬</div><div class="muted" style="font-size:14px">Nothing here yet.${canPost?' Start the conversation.':''}</div></div>`;
   else h+=posts.map(p=>{
     const cs=cBy[p.id]||[];
-    return `<div class="card" style="padding:15px 17px;margin-bottom:12px"><div class="row" style="gap:10px;margin-bottom:9px"><div style="width:34px;height:34px;border-radius:50%;background:#EFE9E2;color:#7a6f63;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;flex-shrink:0">${esc((p.author_name||'?').charAt(0).toUpperCase())}</div><div style="flex:1;min-width:0"><div style="font-weight:600;font-size:14px">${esc(p.author_name||'Someone')}</div><div class="faint" style="font-size:12px">${timeAgo(p.created_at)}</div></div></div><div class="muted" style="line-height:1.55;white-space:pre-wrap">${linkifyTags(p.body)}</div>`+
+    return `<div class="card" style="padding:15px 17px;margin-bottom:12px"><div class="row" style="gap:10px;margin-bottom:9px"><div style="width:34px;height:34px;border-radius:50%;background:#EFE9E2;color:#7a6f63;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;flex-shrink:0">${esc((p.author_name||'?').charAt(0).toUpperCase())}</div><div style="flex:1;min-width:0"><div style="font-weight:600;font-size:14px">${esc(p.author_name||'Someone')}</div><div class="faint" style="font-size:12px">${timeAgo(p.created_at)}${p.edited?' · edited':''}</div></div>${(p.author_id===state.user.id||isAdmin)?`<button onclick="editPost(${p.id})" class="no-print" title="Edit" style="border:none;background:none;color:var(--faint);cursor:pointer;font-size:12.5px;align-self:flex-start">Edit</button><button onclick="delPostC(${p.id})" class="no-print" title="Delete" style="border:none;background:none;color:var(--faint);cursor:pointer;font-size:16px;line-height:1;align-self:flex-start">×</button>`:''}</div><div class="muted" style="line-height:1.55;white-space:pre-wrap">${linkifyTags(p.body)}</div>`+
       (cs.length?`<div style="margin-top:10px;border-top:1px solid var(--line)">`+cs.map(c=>`<div style="padding:9px 0 0"><span style="font-weight:600;font-size:13px">${esc(c.author_name||'Someone')}</span> <span class="muted" style="font-size:13px;white-space:pre-wrap">${esc(c.body)}</span></div>`).join('')+`</div>`:``)+
       `${p.media_url?(p.media_type==='video'?`<video src="${p.media_url}" controls playsinline style="width:100%;max-height:420px;margin-top:11px;border-radius:11px;background:#000"></video>`:`<img src="${p.media_url}" loading="lazy" style="width:100%;margin-top:11px;border-radius:11px;display:block"/>`):''}`+
       reactionBar(p)+
@@ -581,6 +591,9 @@ function reactionBar(p){
   return `<div style="margin-top:11px"><div class="row" style="gap:6px;flex-wrap:wrap">`+bar+`</div>`+(who?`<div class="faint" style="font-size:11.5px;margin-top:6px;line-height:1.5">${esc(who)}</div>`:'')+`</div>`;
 }
 window.react=async function(pid,emoji){ const mine=state.user.id; const arr=state.community.reactions||(state.community.reactions=[]); const idx=arr.findIndex(r=>r.post_id===pid&&r.user_id===mine&&r.emoji===emoji); if(idx>=0){ arr.splice(idx,1); sb.from('reactions').delete().eq('post_id',pid).eq('user_id',mine).eq('emoji',emoji).then(()=>{}); } else { arr.push({post_id:pid,user_id:mine,emoji}); sb.from('reactions').insert({post_id:pid,user_id:mine,emoji}).then(()=>{}); } vCommunity(document.getElementById('view')); };
+window.editPost=function(pid){ const p=(state.community.posts||[]).find(x=>x.id===pid); if(!p)return; const m=document.createElement('div'); m.id='epm'; m.style.cssText='position:fixed;inset:0;background:rgba(16,24,40,.45);z-index:9999;display:flex;align-items:flex-end;justify-content:center'; m.onclick=e=>{if(e.target===m)m.remove();}; m.innerHTML=`<div style="background:var(--card);width:100%;max-width:480px;border-radius:16px 16px 0 0;padding:20px 20px 26px"><div style="font-weight:700;font-size:16px;margin-bottom:10px">Edit post</div><textarea id="epbody" style="width:100%;min-height:120px;padding:11px;border:1px solid var(--line2);border-radius:9px;font-size:14px;font-family:inherit;color:var(--ink);background:var(--card)">${esc(p.body||'')}</textarea><div class="row" style="gap:8px;margin-top:14px"><button class="btn" style="width:auto;margin-left:auto" onclick="document.getElementById('epm').remove()">Cancel</button><button class="btn pri" style="width:auto" onclick="savePostEdit(${pid})">Save</button></div></div>`; document.body.appendChild(m); setTimeout(()=>{const t=document.getElementById('epbody'); if(t){t.focus();t.setSelectionRange(t.value.length,t.value.length);}},0); };
+window.savePostEdit=async function(pid){ const body=((document.getElementById('epbody')||{}).value||'').trim(); if(!body)return; const r=await sb.from('posts').update({body}).eq('id',pid); if(r&&r.error){ alert('Could not save: '+r.error.message); return; } const p=(state.community.posts||[]).find(x=>x.id===pid); if(p)p.body=body; const m=document.getElementById('epm'); if(m)m.remove(); vCommunity(document.getElementById('view')); };
+window.delPostC=async function(pid){ if(!confirm('Delete this post? This can’t be undone.'))return; await sb.from('comments').delete().eq('post_id',pid); await sb.from('reactions').delete().eq('post_id',pid); await sb.from('posts').delete().eq('id',pid); state.community=null; go('community',{ch:state.ctx.ch||'announcements'}); };
 window._npmedia=null;
 window.pickMedia=function(inp){ const f=inp.files&&inp.files[0]; if(!f)return; if(f.size>60*1024*1024){ alert('That file is over 60 MB. Please pick a shorter video or a smaller photo.'); inp.value=''; return; } window._npmedia=f; const url=URL.createObjectURL(f); const isVid=f.type.startsWith('video'); const pv=document.getElementById('npprev'); if(pv) pv.innerHTML=(isVid?`<video src="${url}" style="max-width:100%;max-height:240px;border-radius:10px" controls></video>`:`<img src="${url}" style="max-width:100%;max-height:240px;border-radius:10px;display:block"/>`)+`<div class="row" style="margin-top:5px;gap:8px"><span class="faint" style="font-size:12px">${esc(f.name)}</span><span style="color:var(--brand);cursor:pointer;font-size:12px;font-weight:600" onclick="clearMedia()">Remove</span></div>`; };
 window.clearMedia=function(){ window._npmedia=null; const p=document.getElementById('npprev'); if(p)p.innerHTML=''; const i=document.getElementById('npfile'); if(i)i.value=''; };
@@ -795,10 +808,10 @@ async function vSchedule(v){
   const stab=state.ctx.stab||'overview';
   setTitle('Operations','Scheduling, team & the daily log — one place');
   const _w=document.querySelector('.wrap'); if(_w) _w.style.maxWidth='1180px';
-  const tabs=[['overview','Overview'],['schedule','Schedule'],['team','Team'],['availability','Availability'],['timeoff','Time off'],['pool','Shift pool'],['logbook','Log book'],['reports','Reports']];
+  const tabs=[['overview','Overview'],['whoson',"Who's on"],['schedule','Schedule'],['team','Team'],['availability','Availability'],['timeoff','Time off'],['pool','Shift pool'],['logbook','Log book'],['reports','Reports']];
   v.innerHTML=`<div class="schtabs">`+tabs.map(t=>`<button class="schtab${stab===t[0]?' on':''}" onclick="schGo('${t[0]}')">${t[1]}</button>`).join('')+`</div><div id="schbody"><div class="muted">Loading…</div></div>`;
   const body=document.getElementById('schbody');
-  ({overview:schOverview, schedule:schBoard, team:schTeam, availability:schAvail, timeoff:schTimeoff, pool:schPool, logbook:schLogbook, reports:schReports}[stab]||schOverview)(body);
+  ({overview:schOverview, whoson:schWhoson, schedule:schBoard, team:schTeam, availability:schAvail, timeoff:schTimeoff, pool:schPool, logbook:schLogbook, reports:schReports}[stab]||schOverview)(body);
 }
 window.schGo=function(t){ state.ctx.stab=t; vSchedule(document.getElementById('view')); };
 /* ---------- Positions: single source of truth (stored as day_items kind='pos') ---------- */
@@ -1356,26 +1369,28 @@ window.setTO=async function(id,st){ await sb.from('time_off').update({status:st}
 async function schLogbook(v){
   const isAdmin=state.profile&&state.profile.role==='admin';
   const d0=state.ctx.logDate||isoDate(new Date());
-  const [rsh,rpay,rsal,rlog,rmeta,rcov]=await Promise.all([
+  const [rsh,rpay,rsal,rlog,rmeta,rcov,ractRow]=await Promise.all([
     sb.from('shifts').select('*').eq('on_date',d0),
     sb.from('pay_rates').select('*'),
     sb.from('day_sales').select('*').eq('on_date',d0).maybeSingle(),
     sb.from('log_entries').select('*').eq('on_date',d0).order('created_at',{ascending:false}),
     sb.from('day_items').select('*').eq('kind','daylog').eq('on_date',d0).maybeSingle(),
-    sb.from('day_items').select('detail').eq('kind','covrules').maybeSingle()
+    sb.from('day_items').select('detail').eq('kind','covrules').maybeSingle(),
+    sb.from('day_items').select('detail').eq('kind','actual').eq('on_date',d0).maybeSingle()
   ]);
   await loadPositions();
   let burden=0; try{ burden=+JSON.parse((rcov.data&&rcov.data.detail)||'{}').burdenPct||0; }catch(e){}
   const wage={}; (rpay.data||[]).forEach(p=>wage[p.person_name]=Number(p.wage)||0);
   const shifts=(rsh.data||[]).filter(s=>s.person_name&&s.person_name!=='__OPEN__');
   const hrs=shifts.reduce((a,s)=>a+shiftHours(s),0); const cost=shifts.reduce((a,s)=>a+shiftHours(s)*(wage[s.person_name]||0),0)*(1+burden/100);
-  const sales=rsal.data?Number(rsal.data.sales)||0:0; const pct=(sales&&cost)?cost/sales*100:null;
+  const forecast=rsal.data?Number(rsal.data.sales)||0:0; let actual=0; try{ actual=ractRow&&ractRow.data?Number(JSON.parse(ractRow.data.detail||'{}').amount)||0:0; }catch(e){} const useSales=actual||forecast; const pct=(useSales&&cost)?cost/useSales*100:null; const varP=(forecast&&actual)?((actual-forecast)/forecast*100):null;
   let meta={score:0,summary:''}; try{ if(rmeta.data) meta=Object.assign(meta,JSON.parse(rmeta.data.detail||'{}')); }catch(e){}
   window._logScoreVal=meta.score||0;
   const dt=_d(d0); const SCORES=[[1,'Rough','#B32D2D'],[2,'OK','#B7791F'],[3,'Good','#2563EB'],[4,'Great','#1B7B3F']];
   let h=`<div class="sched-bar"><div class="sched-nav"><button class="iconbtn" onclick="logDay(-1)"><i class="ti ti-chevron-left"></i></button><button class="iconbtn" onclick="logDay(1)"><i class="ti ti-chevron-right"></i></button><button class="btn" style="width:auto" onclick="logDay(0)">Today</button></div><div style="font-size:18px;font-weight:600">${dt.toLocaleDateString(undefined,{weekday:'long',month:'short',day:'numeric'})}</div></div>`;
   const cell=(l,vv,c)=>`<div style="flex:1;min-width:88px;text-align:center"><div class="faint" style="font-size:11px;text-transform:uppercase;letter-spacing:.03em">${l}</div><div style="font-size:20px;font-weight:800;color:${c||'var(--ink)'}">${vv}</div></div>`;
-  h+=`<div class="card" style="padding:15px"><div class="row" style="gap:10px;flex-wrap:wrap">${cell('Sales',isAdmin?`<input type="number" id="logSales" value="${sales||''}" placeholder="0" oninput="logSetSales('${d0}',this.value)" style="width:96px;text-align:center;font-size:19px;font-weight:800;border:1px solid var(--line2);border-radius:8px;padding:3px 6px;background:var(--card);color:var(--ink)"/>`:(sales?money(sales):'—'))}${isAdmin?cell('Labor',money(cost)):''}${isAdmin?cell('Labor %',pct!=null?pct.toFixed(0)+'%':'—',pct!=null&&pct>30?'var(--amber)':'var(--green)'):''}${cell('On shift',new Set(shifts.map(s=>s.person_name)).size)}${cell('Hours',hrs.toFixed(1))}</div></div>`;
+  const actCell=`<div style="flex:1;min-width:96px;text-align:center"><div class="faint" style="font-size:11px;text-transform:uppercase;letter-spacing:.03em">Actual</div><div style="font-size:20px;font-weight:800">${isAdmin?`<input type="number" id="logActual" value="${actual||''}" placeholder="0" oninput="logSetActual('${d0}',this.value)" style="width:96px;text-align:center;font-size:19px;font-weight:800;border:1px solid var(--line2);border-radius:8px;padding:3px 6px;background:var(--card);color:var(--ink)"/>`:(actual?money(actual):'—')}</div>${varP!=null?`<div style="font-size:11px;font-weight:800;color:${varP>=0?'#1B7B3F':'#B32D2D'}">${varP>=0?'▲':'▼'} ${Math.abs(varP).toFixed(0)}% vs forecast</div>`:''}</div>`;
+  h+=`<div class="card" style="padding:15px"><div class="row" style="gap:10px;flex-wrap:wrap">${cell('Forecast',forecast?money(forecast):'—')}${actCell}${isAdmin?cell('Labor',money(cost)):''}${isAdmin?cell('Labor %',pct!=null?pct.toFixed(0)+'%':'—',pct!=null&&pct>30?'var(--amber)':'var(--green)'):''}${cell('Hours',hrs.toFixed(1))}</div><div class="faint" style="font-size:11px;margin-top:8px">Forecast comes from the projected sales you set on the Schedule. Enter the day's actual here at close.</div></div>`;
   h+=`<div class="sec">How did the day go?</div><div class="card" style="padding:15px"><div class="row" style="gap:8px;flex-wrap:wrap;margin-bottom:12px" id="scoreRow">${SCORES.map(s=>`<button onclick="logScore(${s[0]})" data-sc="${s[0]}" style="flex:1;min-width:70px;padding:10px;border-radius:9px;border:2px solid ${meta.score==s[0]?s[2]:'var(--line2)'};background:${meta.score==s[0]?s[2]:'var(--card)'};color:${meta.score==s[0]?'#fff':'var(--muted)'};font-weight:700;font-size:13px;cursor:pointer;font-family:inherit">${s[1]}</button>`).join('')}</div><textarea id="logSummary" placeholder="Shift summary — what the next leader should know. Wins, problems, follow-ups…" style="width:100%;min-height:70px;padding:11px;border:1px solid var(--line2);border-radius:9px;font-size:14px;font-family:inherit;color:var(--ink);background:var(--card)">${esc(meta.summary||'')}</textarea><div class="row" style="margin-top:9px"><button class="btn pri" style="width:auto;margin-left:auto" onclick="logSaveMeta('${d0}')">Save the day</button><span id="logmsg" class="muted" style="font-size:13px;align-self:center;margin-left:8px"></span></div></div>`;
   const cats=['note','maintenance','incident','cash','staffing','other']; const cico={note:'ti-note',maintenance:'ti-tool',incident:'ti-alert-triangle',cash:'ti-cash',staffing:'ti-users',other:'ti-dots'};
   h+=`<div class="sec">Issues, maintenance &amp; notes</div><div class="card" style="padding:13px 15px;margin-bottom:14px"><div class="row" style="gap:8px;flex-wrap:wrap;margin-bottom:8px"><select id="lgcat" style="padding:9px;border:1px solid var(--line2);border-radius:8px;background:var(--card);color:var(--ink);font-family:inherit">${cats.map(c=>`<option value="${c}">${c[0].toUpperCase()+c.slice(1)}</option>`).join('')}</select></div><textarea id="lgbody" placeholder="Log something — a broken grinder, a cash discrepancy, a guest issue…" style="width:100%;min-height:56px;padding:11px;border:1px solid var(--line2);border-radius:9px;font-size:14px;font-family:inherit;color:var(--ink);background:var(--card)"></textarea><div class="row" style="margin-top:8px"><button class="btn" style="width:auto;margin-left:auto" onclick="addLog('${d0}')">Add note</button></div></div>`;
@@ -1387,6 +1402,7 @@ async function schLogbook(v){
 window.logDay=function(n){ const cur=state.ctx.logDate?new Date(state.ctx.logDate+'T00:00'):new Date(); if(n===0){ state.ctx.logDate=isoDate(new Date()); } else { cur.setDate(cur.getDate()+n); state.ctx.logDate=isoDate(cur); } schGo('logbook'); };
 window.logScore=function(s){ window._logScoreVal=s; const cols={1:'#B32D2D',2:'#B7791F',3:'#2563EB',4:'#1B7B3F'}; document.querySelectorAll('#scoreRow [data-sc]').forEach(b=>{ const on=+b.getAttribute('data-sc')===s; b.style.border='2px solid '+(on?cols[s]:'var(--line2)'); b.style.background=on?cols[s]:'var(--card)'; b.style.color=on?'#fff':'var(--muted)'; }); };
 window.logSetSales=function(iso,val){ clearTimeout(window._logSalesTmr); window._logSalesTmr=setTimeout(()=>{ sb.from('day_sales').upsert({on_date:iso,sales:Number(val)||0}).then(()=>{}); },500); };
+window.logSetActual=function(iso,val){ clearTimeout(window._logActTmr); window._logActTmr=setTimeout(async()=>{ await sb.from('day_items').delete().eq('kind','actual').eq('on_date',iso); if(Number(val)>0) await sb.from('day_items').insert({kind:'actual',on_date:iso,title:'actual',detail:JSON.stringify({amount:Number(val)}),created_by:state.user.id}); },500); };
 window.logSaveMeta=async function(iso){ const summary=(document.getElementById('logSummary')||{}).value||''; const score=window._logScoreVal||0; await sb.from('day_items').delete().eq('kind','daylog').eq('on_date',iso); await sb.from('day_items').insert({kind:'daylog',on_date:iso,title:'daylog',detail:JSON.stringify({score,summary}),created_by:state.user.id}); const m=document.getElementById('logmsg'); if(m)m.textContent='Saved ✓'; };
 window.addLog=async function(iso){ const body=(document.getElementById('lgbody')||{}).value.trim(); if(!body){ alert('Write something first.'); return; } await sb.from('log_entries').insert({author_id:state.user.id, author_name:state.profile.name, category:(document.getElementById('lgcat')||{}).value||'note', on_date:iso||isoDate(new Date()), body}); schGo('logbook'); };
 window.delLog=async function(id,iso){ await sb.from('log_entries').delete().eq('id',id); schGo('logbook'); };
@@ -1394,20 +1410,24 @@ async function schReports(v){
   const isAdmin=state.profile&&state.profile.role==='admin';
   const base=state.ctx.wk?wkDate(state.ctx.wk):weekStart(new Date());
   const start=weekStart(base); const days=[...Array(7)].map((_,i)=>{const d=new Date(start);d.setDate(d.getDate()+i);return isoDate(d);});
-  const [rsh,rpay,rsal,rcov]=await Promise.all([ sb.from('shifts').select('*').gte('on_date',days[0]).lte('on_date',days[6]), sb.from('pay_rates').select('*'), sb.from('day_sales').select('*').gte('on_date',days[0]).lte('on_date',days[6]), sb.from('day_items').select('detail').eq('kind','covrules').maybeSingle() ]);
+  const [rsh,rpay,rsal,rcov,ract]=await Promise.all([ sb.from('shifts').select('*').gte('on_date',days[0]).lte('on_date',days[6]), sb.from('pay_rates').select('*'), sb.from('day_sales').select('*').gte('on_date',days[0]).lte('on_date',days[6]), sb.from('day_items').select('detail').eq('kind','covrules').maybeSingle(), sb.from('day_items').select('on_date,detail').eq('kind','actual').gte('on_date',days[0]).lte('on_date',days[6]) ]);
   let target=0,burden=0; try{ const cd=JSON.parse((rcov.data&&rcov.data.detail)||'{}'); target=+cd.targetPct||0; burden=+cd.burdenPct||0; }catch(e){} const bMul=1+(burden/100);
   const shifts=(rsh.data||[]).filter(s=>s.person_name&&s.person_name!=='__OPEN__'); const opens=(rsh.data||[]).filter(s=>s.person_name==='__OPEN__').length;
   const wage={}; (rpay.data||[]).forEach(p=>wage[p.person_name]=Number(p.wage)||0);
-  const sales={}; (rsal.data||[]).forEach(d=>sales[d.on_date]=Number(d.sales)||0);
+  const forecast={}; (rsal.data||[]).forEach(d=>forecast[d.on_date]=Number(d.sales)||0);
+  const actual={}; (ract.data||[]).forEach(x=>{ try{ actual[x.on_date]=Number(JSON.parse(x.detail||'{}').amount)||0; }catch(e){} });
+  const sales={}; days.forEach(iso=>{ sales[iso]=actual[iso]||forecast[iso]||0; });
   const per={}; shifts.forEach(s=>{ const k=s.person_name; const hrs=shiftHours(s); (per[k]=per[k]||{hrs:0,cost:0,dset:new Set()}); per[k].hrs+=hrs; per[k].cost+=hrs*(wage[k]||0); per[k].dset.add(s.on_date); });
   const names=Object.keys(per).sort((a,b)=>per[b].hrs-per[a].hrs);
   const byDay=days.map(iso=>{ const ds=shifts.filter(s=>s.on_date===iso); const hrs=ds.reduce((a,s)=>a+shiftHours(s),0); const cost=ds.reduce((a,s)=>a+shiftHours(s)*(wage[s.person_name]||0),0)*bMul; const sal=sales[iso]||0; return {iso,hrs,cost,sal,pct:(sal&&cost)?cost/sal*100:null,heads:new Set(ds.map(s=>s.person_name)).size}; });
   const totHrs=names.reduce((a,n)=>a+per[n].hrs,0); const totCost=names.reduce((a,n)=>a+per[n].cost,0)*bMul; const totSales=days.reduce((a,iso)=>a+(sales[iso]||0),0); const labpct=(totSales&&totCost)?(totCost/totSales*100):null; const otW=(lawRules().ot_weekly_hrs)||40;
+  const totForecast=days.reduce((a,iso)=>a+(forecast[iso]||0),0); const totActual=days.reduce((a,iso)=>a+(actual[iso]||0),0); const svar=(totForecast&&totActual)?((totActual-totForecast)/totForecast*100):null;
   const maxDC=Math.max(1,...byDay.map(d=>d.cost)); const maxPH=Math.max(1,...names.map(n=>per[n].hrs));
   const pctCol=p=>p==null?'var(--muted)':(target&&p>target+0.5?'#B32D2D':(target&&p>target-2?'var(--amber)':'var(--green)'));
-  let h=`<div class="sched-bar"><div class="sched-nav"><button class="iconbtn" onclick="repWeek(-1)"><i class="ti ti-chevron-left"></i></button><button class="iconbtn" onclick="repWeek(1)"><i class="ti ti-chevron-right"></i></button><button class="btn" style="width:auto" onclick="repWeek(0)">This week</button></div><div style="font-size:18px;font-weight:600">${fmtDay(_d(days[0]))} – ${fmtDay(_d(days[6]))}</div></div>`;
+  let h=`<div class="print-only" style="margin-bottom:10px"><div style="font-size:20px;font-weight:800">Labor report</div><div style="font-size:13px;color:#555">${fmtDay(_d(days[0]))} – ${fmtDay(_d(days[6]))}</div></div>`;
+  h+=`<div class="sched-bar"><div class="sched-nav"><button class="iconbtn" onclick="repWeek(-1)"><i class="ti ti-chevron-left"></i></button><button class="iconbtn" onclick="repWeek(1)"><i class="ti ti-chevron-right"></i></button><button class="btn" style="width:auto" onclick="repWeek(0)">This week</button></div><div style="font-size:18px;font-weight:600;flex:1">${fmtDay(_d(days[0]))} – ${fmtDay(_d(days[6]))}</div><button class="btn no-print" style="width:auto" onclick="window.print()"><i class="ti ti-printer"></i> Print / PDF</button></div>`;
   const card=(lbl,val,sub,col)=>`<div class="card" style="padding:14px 16px;flex:1;min-width:130px"><div class="faint" style="font-size:11.5px;text-transform:uppercase;letter-spacing:.03em;margin-bottom:4px">${lbl}</div><div style="font-size:24px;font-weight:800;line-height:1;color:${col||'var(--ink)'}">${val}</div>${sub?`<div class="faint" style="font-size:11.5px;margin-top:4px">${sub}</div>`:''}</div>`;
-  h+=`<div class="row" style="gap:12px;flex-wrap:wrap;margin-bottom:6px">${card('Total hours',totHrs.toFixed(1),names.length+' people'+(opens?` · <span style="color:#B32D2D">${opens} open</span>`:''))}${isAdmin?card('Labor cost',money(totCost),burden?`incl. ${burden}% burden`:'wages'):''}${isAdmin?card('Sales',totSales?money(totSales):'—',totSales?'':'add in Schedule'):''}${isAdmin?card('Labor %',labpct!=null?labpct.toFixed(1)+'%':'—',target?('goal '+target+'%'):'',pctCol(labpct)):''}</div>`;
+  h+=`<div class="row" style="gap:12px;flex-wrap:wrap;margin-bottom:6px">${card('Total hours',totHrs.toFixed(1),names.length+' people'+(opens?` · <span style="color:#B32D2D">${opens} open</span>`:''))}${isAdmin?card('Labor cost',money(totCost),burden?`incl. ${burden}% burden`:'wages'):''}${isAdmin?card('Sales',totSales?money(totSales):'—',(totActual&&totForecast)?`f'cast ${money(totForecast)} · ${svar>=0?'+':''}${svar.toFixed(0)}% vs`:(totForecast?('forecast '+money(totForecast)):'add in Schedule')):''}${isAdmin?card('Labor %',labpct!=null?labpct.toFixed(1)+'%':'—',target?('goal '+target+'%'):'',pctCol(labpct)):''}</div>`;
   if(isAdmin){ h+=`<div class="sec">By day</div><div class="card" style="padding:6px 4px"><table style="width:100%;border-collapse:collapse;font-size:12.5px"><thead><tr style="color:var(--muted)"><th style="text-align:left;padding:6px 10px">Day</th><th style="text-align:right;padding:6px 6px">Hrs</th><th style="text-align:right;padding:6px 6px">Labor</th><th style="padding:6px 8px;width:34%"></th><th style="text-align:right;padding:6px 6px">Sales</th><th style="text-align:right;padding:6px 10px">Labor %</th></tr></thead><tbody>`+byDay.map(d=>{ const dt=_d(d.iso); const tod=d.iso===isoDate(new Date()); return `<tr style="border-top:1px solid var(--line)${tod?';background:var(--brand-soft)':''}"><td style="padding:7px 10px;font-weight:600">${dt.toLocaleDateString(undefined,{weekday:'short'})} <span class="faint" style="font-weight:400">${dt.getMonth()+1}/${dt.getDate()}</span></td><td style="text-align:right;padding:7px 6px">${d.hrs?d.hrs.toFixed(1):'—'}</td><td style="text-align:right;padding:7px 6px">${d.cost?money(d.cost):'—'}</td><td style="padding:7px 8px"><div style="height:7px;border-radius:4px;background:var(--line);overflow:hidden"><i style="display:block;height:100%;width:${Math.round(d.cost/maxDC*100)}%;background:var(--brand)"></i></div></td><td style="text-align:right;padding:7px 6px">${d.sal?money(d.sal):'—'}</td><td style="text-align:right;padding:7px 10px;font-weight:700;color:${pctCol(d.pct)}">${d.pct!=null?d.pct.toFixed(0)+'%':'—'}</td></tr>`; }).join('')+`</tbody></table></div>`; }
   h+=`<div class="sec">Hours by person</div>`;
   if(!names.length) h+=`<div class="card" style="padding:22px;text-align:center"><div class="faint">No shifts scheduled this week.</div></div>`;
@@ -1422,8 +1442,9 @@ async function vSales(v){
   setTitle('Sales','Your numbers — today, this month, year to date');
   v.innerHTML='<div class="muted">Loading…</div>';
   const now=new Date(); const y=now.getFullYear(); const iso=d=>isoDate(d);
-  const r=await sb.from('day_sales').select('*').gte('on_date',(y-1)+'-01-01').lte('on_date',iso(now));
+  const [r,ra]=await Promise.all([ sb.from('day_sales').select('*').gte('on_date',(y-1)+'-01-01').lte('on_date',iso(now)), sb.from('day_items').select('on_date,detail').eq('kind','actual').gte('on_date',(y-1)+'-01-01').lte('on_date',iso(now)) ]);
   const map={}; (r.data||[]).forEach(d=>map[d.on_date]=Number(d.sales)||0);
+  (ra.data||[]).forEach(x=>{ try{ const a=Number(JSON.parse(x.detail||'{}').amount)||0; if(a) map[x.on_date]=a; }catch(e){} }); // actual overrides forecast where recorded
   const sumRange=(s,e)=>{ let t=0; Object.keys(map).forEach(k=>{ if(k>=s&&k<=e) t+=map[k]; }); return t; };
   const todayIso=iso(now); const lyToday=iso(new Date(y-1,now.getMonth(),now.getDate()));
   const mStart=iso(new Date(y,now.getMonth(),1)); const mStartLY=iso(new Date(y-1,now.getMonth(),1)); const mEndLY=iso(new Date(y-1,now.getMonth(),now.getDate()));
@@ -1477,6 +1498,76 @@ window.clAddTmpl=async function(){ const name=prompt('Name this checklist (e.g. 
 window.clEdit=async function(tid){ const r=await sb.from('day_items').select('*').eq('id',tid).maybeSingle(); let d={}; try{d=JSON.parse((r.data&&r.data.detail)||'{}');}catch(e){} const items=(d.items||[]).join('\n'); const m=document.createElement('div'); m.id='clem'; m.style.cssText='position:fixed;inset:0;background:rgba(16,24,40,.45);z-index:9999;display:flex;align-items:flex-end;justify-content:center'; m.onclick=e=>{if(e.target===m)m.remove();}; m.innerHTML=`<div style="background:var(--card);width:100%;max-width:460px;border-radius:16px 16px 0 0;padding:20px 20px 26px"><div style="font-weight:700;font-size:16px;margin-bottom:4px">Edit “${esc((r.data||{}).title||'')}”</div><div class="faint" style="font-size:12px;margin-bottom:10px">One task per line.</div><textarea id="clItems" style="width:100%;min-height:220px;padding:11px;border:1px solid var(--line2);border-radius:9px;font-size:14px;font-family:inherit;color:var(--ink);background:var(--card)">${esc(items)}</textarea><div class="row" style="gap:8px;margin-top:14px"><button class="btn" style="width:auto;color:#A32D2D;border-color:#F0C9C9" onclick="clDelTmpl(${tid})">Delete list</button><button class="btn" style="width:auto;margin-left:auto" onclick="document.getElementById('clem').remove()">Cancel</button><button class="btn pri" style="width:auto" onclick="clSaveTmpl(${tid})">Save</button></div></div>`; document.body.appendChild(m); };
 window.clSaveTmpl=async function(tid){ const items=((document.getElementById('clItems')||{}).value||'').split('\n').map(s=>s.trim()).filter(Boolean); await sb.from('day_items').update({detail:JSON.stringify({items})}).eq('id',tid); const m=document.getElementById('clem'); if(m)m.remove(); go('checklists'); };
 window.clDelTmpl=async function(tid){ if(!confirm('Delete this checklist entirely?'))return; await sb.from('day_items').delete().eq('id',tid); const m=document.getElementById('clem'); if(m)m.remove(); go('checklists'); };
+
+/* ---------- Who's on: live timeline + time off + closed days ---------- */
+async function schWhoson(v){
+  v.innerHTML='<div class="muted">Loading…</div>';
+  const todayIso=isoDate(new Date()); const now=new Date(); const nowH=now.getHours()+now.getMinutes()/60;
+  const [rsh,rto]=await Promise.all([ sb.from('shifts').select('*').eq('on_date',todayIso).order('start_time'), sb.from('time_off').select('*').eq('status','approved') ]);
+  await loadPositions();
+  const shifts=(rsh.data||[]).filter(s=>s.person_name&&s.person_name!=='__OPEN__');
+  let mn=24,mx=0; shifts.forEach(s=>{ const a=parseClock(s.start_time),b=parseClock(s.end_time); if(a!=null&&a<mn)mn=a; if(b!=null&&b>mx)mx=b; });
+  if(mn>=mx){ mn=6; mx=15; } mn=Math.floor(mn); mx=Math.ceil(mx); const span=Math.max(1,mx-mn);
+  const onNow=shifts.filter(s=>{const a=parseClock(s.start_time),b=parseClock(s.end_time); return a!=null&&b!=null&&nowH>=a&&nowH<b;});
+  const next=shifts.filter(s=>{const a=parseClock(s.start_time); return a!=null&&a>nowH;}).slice(0,3);
+  let h=`<div class="sec">On the floor — ${_d(todayIso).toLocaleDateString(undefined,{weekday:'long',month:'short',day:'numeric'})}</div>`;
+  h+=`<div class="card" style="padding:14px 16px;margin-bottom:14px"><span style="font-size:22px;font-weight:800;color:var(--brand)">${onNow.length}</span> <span class="faint">on the clock right now</span>${onNow.length?` — ${onNow.map(s=>esc(s.person_name.split(' ')[0])).join(', ')}`:''}${next.length?`<div class="faint" style="font-size:12.5px;margin-top:6px">Next in: ${next.map(s=>esc(s.person_name.split(' ')[0])+' @'+fmtClock(s.start_time)).join(' · ')}</div>`:''}</div>`;
+  if(!shifts.length) h+=`<div class="card" style="padding:22px;text-align:center"><div class="faint">No one scheduled today.</div></div>`;
+  else{ const marks=[]; for(let hh=mn;hh<=mx;hh++) marks.push(hh);
+    h+=`<div class="card" style="padding:14px 12px 16px;overflow-x:auto"><div style="min-width:520px;position:relative"><div style="position:relative;height:16px;margin-left:96px;border-bottom:1px solid var(--line)">`+marks.map(hh=>`<span style="position:absolute;left:${(hh-mn)/span*100}%;font-size:10px;color:var(--muted);transform:translateX(-50%)">${((hh%12)||12)}${hh<12?'a':'p'}</span>`).join('')+`</div>`;
+    shifts.forEach(s=>{ const a=parseClock(s.start_time),b=parseClock(s.end_time); const L=Math.max(0,(a-mn)/span*100), W=Math.max(2,(b-a)/span*100); const isNow=nowH>=a&&nowH<b; const c=POSCOL(posOf(s.person_name)); h+=`<div style="display:flex;align-items:center;height:30px;margin-top:5px"><div style="width:92px;font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:4px">${esc(s.person_name.split(' ')[0])}</div><div style="position:relative;flex:1;height:22px;background:var(--bg);border-radius:5px"><div style="position:absolute;left:${L}%;width:${W}%;height:100%;border-radius:5px;background:${isNow?c:c+'59'};display:flex;align-items:center;padding:0 6px;font-size:10px;color:#fff;font-weight:600;white-space:nowrap;overflow:hidden">${fmtClock(s.start_time)}–${fmtClock(s.end_time)}</div></div></div>`; });
+    if(nowH>=mn&&nowH<=mx){ h+=`<div style="position:absolute;top:16px;bottom:0;left:calc(96px + ${(nowH-mn)/span*100}% * (100% - 96px) / 100);width:2px;background:#DC2626;pointer-events:none"></div>`; }
+    h+=`</div></div>`;
+  }
+  const horizon=isoDate((()=>{const d=new Date();d.setDate(d.getDate()+14);return d;})());
+  const to=(rto.data||[]).filter(t=>(t.end_date||t.start_date)>=todayIso && t.start_date<=horizon).sort((a,b)=>a.start_date.localeCompare(b.start_date));
+  h+=`<div class="sec">Time off — next 2 weeks</div>`;
+  if(!to.length) h+=`<div class="card" style="padding:16px;text-align:center"><div class="faint">No approved time off coming up.</div></div>`;
+  else h+=`<div class="card">`+to.map(t=>`<div class="row" style="padding:10px 15px;border-bottom:1px solid var(--line);gap:10px"><i class="ti ti-plane" style="color:var(--brand)"></i><div style="flex:1"><div style="font-weight:600;font-size:13.5px">${esc(t.person_name)}</div><div class="faint" style="font-size:12px">${esc(fmtDay(_d(t.start_date)))}${t.end_date&&t.end_date!==t.start_date?' – '+esc(fmtDay(_d(t.end_date))):''}${t.reason?' · '+esc(t.reason):''}</div></div></div>`).join('')+`</div>`;
+  const y=new Date().getFullYear(); const hols=usHolidays(y).concat(usHolidays(y+1)).filter(x=>x.closed && x.date>=todayIso).slice(0,6);
+  h+=`<div class="sec">Closed / blocked days</div>`;
+  if(!hols.length) h+=`<div class="card" style="padding:16px;text-align:center"><div class="faint">No upcoming closures. Mark closures in Calendar.</div></div>`;
+  else h+=`<div class="card">`+hols.map(x=>`<div class="row" style="padding:10px 15px;border-bottom:1px solid var(--line);gap:10px"><i class="ti ti-lock" style="color:#B32D2D"></i><div style="flex:1"><div style="font-weight:600;font-size:13.5px">${esc(x.name)}</div><div class="faint" style="font-size:12px">${esc(fmtDay(_d(x.date)))} · closed</div></div></div>`).join('')+`</div>`;
+  v.innerHTML=h;
+}
+
+/* ---------- Schedule Setup: one page, in order, self-checking ---------- */
+async function vSetup(v){
+  if(!(state.profile&&state.profile.role==='admin')){ go('home'); return; }
+  setTitle('Setup','Set it up once, in order — then auto-draft does the work');
+  v.innerHTML='<div class="muted">Loading…</div>';
+  const [rav,rprof,rpay,rcov,rsh]=await Promise.all([
+    sb.from('availability').select('person_name').limit(1),
+    sb.from('day_items').select('title,detail').eq('kind','profile'),
+    sb.from('pay_rates').select('person_name').limit(1),
+    sb.from('day_items').select('detail').eq('kind','covrules').maybeSingle(),
+    sb.from('shifts').select('id').limit(1)
+  ]);
+  await loadPositions(); await loadArchived();
+  const roster=rosterNames();
+  const profs={}; (rprof.data||[]).forEach(x=>{try{profs[x.title]=JSON.parse(x.detail||'{}');}catch(e){}});
+  const anyRoles=roster.some(n=>Array.isArray((profs[n]||{}).roles)&&profs[n].roles.length);
+  const anyRules=roster.some(n=>{const p=profs[n]||{};return p.priority||p.maxHrs||p.minHrs||p.maxDays||(Array.isArray(p.daysOff)&&p.daysOff.length)||p.timePref;});
+  let cov={}; try{ cov=JSON.parse((rcov.data&&rcov.data.detail)||'{}'); }catch(e){}
+  const hasMatrix=cov.matrix&&cov.matrix.blocks&&cov.matrix.blocks.length;
+  const hasReq=(Array.isArray(cov.roleReqs)&&cov.roleReqs.length)||(Array.isArray(cov.blackouts)&&cov.blackouts.length);
+  const steps=[
+    {t:'Add your team',d:'Everyone who gets scheduled has to be on your roster first.',ok:roster.length>0,go:"go('onboarding')",cta:'Add people'},
+    {t:'Set availability',d:'When each person can work. The draft never schedules outside it.',ok:!!(rav.data&&rav.data.length),go:"state.ctx.stab='availability';go('schedule')",cta:'Set availability'},
+    {t:'Set roles & skill levels',d:'Which stations each person can work, and how strong (Learning → Expert).',ok:anyRoles,go:"state.ctx.ttab='skills';go('team')",cta:'Open Skills grid'},
+    {t:'Set who can open & close',d:'Only trusted leaders should open or close — set it on the same Skills grid.',ok:anyRoles,go:"state.ctx.ttab='skills';go('team')",cta:'Skills grid'},
+    {t:'Set each person’s rules',d:'Priority, max hours, max days, usual days off, and morning/closing fit.',ok:anyRules,go:"state.ctx.ttab='roster';go('team')",cta:'Open Team'},
+    {t:'Enter pay rates',d:'Powers your labor $ and labor % everywhere.',ok:!!(rpay.data&&rpay.data.length),go:"state.ctx.stab='schedule';go('schedule')",cta:'Add pay'},
+    {t:'Build your coverage matrix',d:'How many people you need at each time of day — the draft matches this curve.',ok:hasMatrix,go:"state.ctx.stab='schedule';go('schedule')",cta:'Build matrix'},
+    {t:'Add required roles & protected windows',d:'Opening leader, a baker at 6, no clock-outs mid-rush.',ok:hasReq,go:"state.ctx.stab='schedule';go('schedule')",cta:'Set requirements'},
+    {t:'Set your labor % goal',d:'The draft keeps you at or under your target.',ok:!!cov.targetPct,go:"state.ctx.stab='schedule';go('schedule')",cta:'Set goal'},
+    {t:'Run auto-draft',d:'Everything above comes together into a near-final schedule you just tweak.',ok:!!(rsh.data&&rsh.data.length),go:"state.ctx.stab='schedule';go('schedule')",cta:'Go to Schedule'}
+  ];
+  const done=steps.filter(s=>s.ok).length; let firstOpen=steps.findIndex(s=>!s.ok);
+  let h=`<div class="card" style="padding:16px 18px;margin-bottom:16px"><div style="font-weight:700;font-size:15px">You're ${done} of ${steps.length} set up</div><div style="height:8px;border-radius:5px;background:var(--line);overflow:hidden;margin-top:9px"><i style="display:block;height:100%;width:${Math.round(done/steps.length*100)}%;background:${done===steps.length?'#1B7B3F':'var(--brand)'}"></i></div><div class="faint" style="font-size:12.5px;margin-top:8px">Work top to bottom. Each step checks itself — a green check means it's done. You can come back and change anything any time.</div></div>`;
+  h+=steps.map((s,i)=>{ const next=i===firstOpen; return `<div class="card" style="padding:14px 16px;margin-bottom:10px;display:flex;gap:13px;align-items:center;border-left:4px solid ${s.ok?'#1B7B3F':(next?'var(--brand)':'var(--line2)')}"><div style="width:30px;height:30px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;background:${s.ok?'#1B7B3F':'var(--brand-soft)'};color:${s.ok?'#fff':'var(--brand)'}">${s.ok?'✓':(i+1)}</div><div style="flex:1;min-width:0"><div style="font-weight:700;font-size:14.5px">${s.t}${next?' <span class="pill" style="background:var(--brand-soft);color:var(--brand);font-size:10px;font-weight:800;padding:1px 7px;margin-left:4px">START HERE</span>':''}</div><div class="faint" style="font-size:12.5px;margin-top:2px">${s.d}</div></div><button class="btn${s.ok?'':' pri'}" style="width:auto;flex:none" onclick="${s.go}">${s.cta}</button></div>`; }).join('');
+  v.innerHTML=h;
+}
 
 async function vTeam(v){
   if(!(state.profile&&state.profile.role==='admin')){ go('home'); return; }
@@ -1584,7 +1675,7 @@ async function vCalendar(v){
   let data;
   if(state.calCache && state.calCache.ym===ym){ data=state.calCache.data; }
   else { v.innerHTML='<div class="muted">Loading…</div>'; const r=await sb.from('day_items').select('*').gte('on_date',first).lte('on_date',last).order('created_at'); data=r.data||[]; state.calCache={ym,data}; }
-  const CAL_HIDE=new Set(['pos','ojr','mission','vision','pool','archived','pdates','profile','covrules','stations','daylog','cltmpl','clrun']);
+  const CAL_HIDE=new Set(['pos','ojr','mission','vision','pool','archived','pdates','profile','covrules','stations','daylog','cltmpl','clrun','actual']);
   const byd={}; (data||[]).forEach(it=>{ if(CAL_HIDE.has(it.kind))return; (byd[it.on_date]=byd[it.on_date]||[]).push(it); });
   const hol={}; usHolidays(y).forEach(x=>hol[x.date]=x);
   const todayIso=isoDate(new Date()); const sel=state.ctx.day||(ym===todayIso.slice(0,7)?todayIso:first);
