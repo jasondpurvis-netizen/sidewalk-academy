@@ -11,7 +11,8 @@
   :root{
     --ink:#1A1A1A; --muted:#6B6B6B; --faint:#9A9A9A;
     --brand:#4A9CAD; --brand-soft:#EAF4F6; --brand-line:#CDE6EB;
-    --accent:#C9D92E; --accent-soft:#F7FAD9; --accent-line:#E2EC9C; --accent-ink:#5E6B0A;
+    --accent:#F4C43C; --accent-2:#E5A800; --accent-soft:#FDF3D6; --accent-line:#F2DE9A; --accent-ink:#6E5000;
+    --tealdark:#164852; --tealmid:#2E7D8A; --teallite:#57A9B7;
     --bg:#FFFFFF; --card:#FFFFFF; --line:#ECEEEF; --line2:#E0E4E6;
     --green:#1D7A5A; --green-soft:#E4F2EC; --amber:#A9701A; --amber-soft:#F8EEDC;
   }
@@ -60,8 +61,21 @@
   .top .sub{color:var(--muted);font-size:14px}
   .wrap{padding:18px 28px 50px;max-width:840px}
   .card{background:var(--card);border:1px solid var(--line);border-radius:12px}
-.entrycard{transition:transform .13s ease, box-shadow .13s ease}
-.entrycard:hover{transform:translateY(-2px);box-shadow:0 12px 28px rgba(16,24,40,.10)}
+.entrycard{transition:transform .14s ease, box-shadow .14s ease}
+.entrycard:hover{transform:translateY(-3px);box-shadow:0 16px 34px rgba(16,24,40,.13)}
+.phero{position:relative;overflow:hidden;border-radius:20px;padding:32px 32px 28px;background:linear-gradient(135deg,var(--tealdark) 0%,var(--tealmid) 52%,var(--teallite) 100%);box-shadow:0 16px 38px rgba(20,72,82,.30);margin-bottom:20px}
+.phero-in{position:relative;z-index:2}
+.phero-eyebrow{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--accent);font-weight:800;margin:0 0 13px}
+.phero-title{font-size:34px;line-height:1.05;font-weight:800;letter-spacing:-.02em;color:#fff;margin:0}
+.phero-title .hl{color:var(--accent)}
+.phero-sub{color:#DCEEF1;font-size:14.5px;margin-top:12px;max-width:470px;line-height:1.5}
+.phero-cta{display:inline-flex;align-items:center;gap:9px;margin-top:20px;background:var(--accent);color:#3A2B00;font-weight:800;font-size:13px;padding:11px 20px;border-radius:999px;box-shadow:0 6px 16px rgba(244,196,60,.42);cursor:pointer;border:none;line-height:1}
+.phero-cta .pd{width:19px;height:19px;border-radius:50%;background:#3A2B00;color:var(--accent);display:inline-flex;align-items:center;justify-content:center;font-size:10px}
+.phero-svg{position:absolute;inset:0;z-index:1;pointer-events:none}
+.phero-heart{position:absolute;right:-40px;bottom:-58px;z-index:1;opacity:.10;fill:none;stroke:#fff;stroke-width:1.3;pointer-events:none}
+.emedallion{width:56px;height:56px;border-radius:16px;display:flex;align-items:center;justify-content:center;margin-bottom:15px;flex-shrink:0}
+.entrygrid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:640px){.phero-title{font-size:26px}.phero{padding:24px 20px}.emedallion{width:48px;height:48px}.entrygrid{grid-template-columns:1fr}}
   .row{display:flex;align-items:center;gap:14px}
   .pill{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:500;padding:4px 10px;border-radius:999px}
   .pill.g{background:var(--green-soft);color:var(--green)}
@@ -460,21 +474,27 @@ async function vWhiteboard(v){
 }
 window.toggleWhyEdit=function(){ const e=document.getElementById('whyEdit'); if(e) e.style.display = (e.style.display==='none'?'block':'none'); };
 window.saveMV=async function(){ const m=(document.getElementById('wbmission')||{}).value||''; const vv=(document.getElementById('wbvision')||{}).value||''; for(const [k,val] of [['mission',m.trim()],['vision',vv.trim()]]){ await sb.from('day_items').delete().eq('kind',k); if(val) await sb.from('day_items').insert({kind:k,detail:val,title:k,created_by:state.user.id}); } go('whiteboard'); };
+function heroTile(){ return `<svg class="phero-svg" width="100%" height="100%" viewBox="0 0 400 200" preserveAspectRatio="none"><defs><pattern id="swtile" width="40" height="40" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path d="M20 0 L40 20 L20 40 L0 20 Z" fill="none" stroke="#EAF7FA" stroke-width="1.1"/><circle cx="20" cy="20" r="2.2" fill="#EAF7FA"/><path d="M20 6 L20 34 M6 20 L34 20" stroke="#EAF7FA" stroke-width=".7"/></pattern></defs><rect width="400" height="200" fill="url(#swtile)" opacity=".13"/></svg><svg class="phero-heart" viewBox="0 0 24 24" width="230" height="230"><path d="M12 21s-7-4.5-9.5-8.5C.7 9.6 2 6 5.2 6c2 0 3.2 1.2 3.9 2.2C9.6 7.2 10.8 6 12.8 6 16 6 17.3 9.6 15.5 12.5 13 16.5 12 21 12 21z"/></svg>`; }
+function heroBanner(eyebrow,titleHTML,sub,ctaHTML){ return `<div class="phero">${heroTile()}<div class="phero-in"><div class="phero-eyebrow">${eyebrow}</div><div class="phero-title">${titleHTML}</div>${sub?`<div class="phero-sub">${sub}</div>`:''}${ctaHTML||''}</div></div>`; }
 function vHome(v){
   const name=state.profile?state.profile.name:"";
   const _first=((name||'').split(/\s+/)[0]||name); setTitle(`Welcome back, ${_first.charAt(0).toUpperCase()+_first.slice(1)}`, "Your training");
-  let cont=null;
-  for(const t of visibleTracks()){ for(const l of trackLessons(t.id)){ if(!isDone(l.id)){ cont={t,l}; break; } } if(cont) break; }
-  let h="";
-  if(cont){ h+=`<div class="card" style="padding:18px 20px;margin-bottom:20px;display:flex;align-items:center;gap:16px"><div style="width:46px;height:46px;border-radius:12px;background:var(--brand);color:#fff;display:flex;align-items:center;justify-content:center;font-size:21px;flex-shrink:0"><i class="ti ti-player-play"></i></div><div style="flex:1;min-width:0"><div class="faint" style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;font-weight:700">Pick up where you left off</div><div style="font-weight:600;font-size:16px;margin:3px 0 10px">${esc(cont.l.title)}</div><div class="bar"><i style="width:${trackPct(cont.t.id)}%"></i></div></div><button class="btn pri" style="width:auto;gap:6px" onclick="go('lesson',{tid:'${cont.t.id}',lid:'${cont.l.id}'})">Resume <i class="ti ti-arrow-right"></i></button></div>`; }
+  let resume=null;
+  try{ const lv=JSON.parse(localStorage.getItem('sw_last')||'null'); if(lv&&lv.lid){ const tt=state.tracks.find(x=>x.id===lv.tid); const ll=tt&&trackLessons(tt.id).find(x=>x.id===lv.lid); if(ll&&!isDone(ll.id)) resume={t:tt,l:ll}; } }catch(e){}
+  if(!resume){ for(const t of visibleTracks()){ for(const l of trackLessons(t.id)){ if(!isDone(l.id)){ resume={t,l}; break; } } if(resume) break; } }
+  const cta = resume ? `<button class="phero-cta" onclick="go('lesson',{tid:'${resume.t.id}',lid:'${resume.l.id}'})"><span class="pd">&#9654;</span> Resume — ${esc(resume.l.title)}</button>` : '';
+  let h = heroBanner('&#10022; The Academy', 'Learn it.<br>Own it. <span class="hl">Lead it.</span>', 'Everything your team needs to grow — leadership and the daily craft — in one place, at their own pace.', cta);
   const _vt=visibleTracks();
   const _dev=_vt.filter(t=>(t.category||'development')!=='operations');
   const _ops=_vt.filter(t=>t.category==='operations');
-  const _entry=(cat,label,desc,icon,list,tone)=>{ if(!list.length) return ''; const dc=list.filter(t=>trackDone(t.id)).length;
-    return `<div class="entrycard card" style="padding:0;overflow:hidden;cursor:pointer;margin-bottom:16px;border-left:5px solid ${tone.bar}" onclick="go('acat',{cat:'${cat}'})"><div style="display:flex;align-items:center;gap:18px;padding:20px 22px"><div style="width:56px;height:56px;border-radius:15px;background:${tone.bar};color:${tone.icon};display:flex;align-items:center;justify-content:center;font-size:27px;flex-shrink:0"><i class="ti ${icon}"></i></div><div style="flex:1;min-width:0"><div style="font-weight:800;font-size:20px;letter-spacing:-.01em;line-height:1.15">${label}</div><div class="muted" style="font-size:13.5px;margin-top:3px">${desc}</div><div style="font-size:11.5px;margin-top:9px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:${tone.ink}">${list.length} ${list.length===1?'track':'tracks'}${dc?` &middot; ${dc} certified`:''} &middot; Open &rarr;</div></div><i class="ti ti-chevron-right" style="font-size:26px;color:${tone.bar};flex-shrink:0"></i></div></div>`; };
-  h+=_entry('development','Leadership &amp; Development','Grow into and beyond your role — leadership, decisions, ownership.','ti-school',_dev,{bar:'var(--brand)',icon:'#fff',ink:'var(--brand)'});
-  h+=_entry('operations','Operations &amp; How-To','Station procedures — bake, bar, line, close, equipment.','ti-tools',_ops,{bar:'var(--accent)',icon:'#1A1A1A',ink:'var(--accent-ink)'});
-  if(!_vt.length){ h+=`<div class="muted" style="padding:8px 2px">No tracks yet.</div>`; }
+  const ICON_SCHOOL='<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#fff" stroke-width="1.8"><path d="M22 10L12 5 2 10l10 5 10-5z"/><path d="M6 12v5c0 1 2.7 2.5 6 2.5s6-1.5 6-2.5v-5"/></svg>';
+  const ICON_TOOLS='<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#3A2B00" stroke-width="1.8"><path d="M14.7 6.3a4 4 0 00-5.4 5.4l-6 6 2 2 6-6a4 4 0 005.4-5.4l-2.3 2.3-2-2 2.3-2.3z"/></svg>';
+  const _entry=(cat,label,desc,list,tone)=>{ if(!list.length) return ''; const dc=list.filter(t=>trackDone(t.id)).length;
+    return `<div class="entrycard" style="position:relative;overflow:hidden;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px;box-shadow:0 10px 26px rgba(23,37,42,.09);cursor:pointer" onclick="go('acat',{cat:'${cat}'})"><div style="position:absolute;top:0;left:0;right:0;height:5px;background:${tone.bar}"></div><div class="emedallion" style="background:${tone.med};box-shadow:0 8px 18px ${tone.sh}">${tone.icon}</div><div style="font-weight:800;font-size:18px;letter-spacing:-.01em">${label}</div><div class="muted" style="font-size:13px;margin-top:5px;line-height:1.5">${desc}</div><div style="font-weight:800;font-size:11px;letter-spacing:.06em;text-transform:uppercase;margin-top:14px;color:${tone.ink}">${list.length} ${list.length===1?'track':'tracks'}${dc?` &middot; ${dc} certified`:''} &middot; Open &rarr;</div></div>`; };
+  const dev=_entry('development','Leadership &amp; Development','Grow into and beyond your role.',_dev,{bar:'linear-gradient(90deg,var(--tealmid),var(--teallite))',med:'linear-gradient(135deg,var(--tealmid),var(--tealdark))',sh:'rgba(46,125,138,.36)',icon:ICON_SCHOOL,ink:'var(--brand)'});
+  const ops=_entry('operations','Operations &amp; How-To','The daily craft, station by station.',_ops,{bar:'linear-gradient(90deg,var(--accent-2),var(--accent))',med:'linear-gradient(135deg,var(--accent),var(--accent-2))',sh:'rgba(229,168,0,.4)',icon:ICON_TOOLS,ink:'var(--accent-ink)'});
+  if(_vt.length) h+=`<div class="entrygrid">${dev}${ops}</div>`;
+  else h+=`<div class="muted" style="padding:8px 2px">No tracks yet.</div>`;
   v.innerHTML=h;
 }
 function vAcat(v){
@@ -505,6 +525,7 @@ function vTrack(v){
 function vLesson(v){
   const t=state.tracks.find(x=>x.id===state.ctx.tid); const ls=trackLessons(t.id);
   const l=ls.find(x=>x.id===state.ctx.lid); const i=ls.findIndex(x=>x.id===l.id); const next=ls[i+1];
+  try{ if(t&&l) localStorage.setItem('sw_last', JSON.stringify({tid:t.id,lid:l.id})); }catch(e){}
   const done=isDone(l.id);
   setTitle(t.name, `Module ${l.n} · ${l.title}`);
   let main = l.video_url ? `<div class="video" style="padding:0;overflow:hidden;background:#000"><video src="${l.video_url}" controls playsinline style="width:100%;height:100%;object-fit:contain;background:#000"></video></div>` : '';
