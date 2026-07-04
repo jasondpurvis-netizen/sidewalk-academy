@@ -102,7 +102,7 @@
     .main{width:100%}
     .mtop{display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--line);position:sticky;top:0;background:rgba(255,255,255,.93);backdrop-filter:blur(8px);z-index:40}
     .mburger{width:40px;height:40px;border:1px solid var(--line2);background:var(--card);border-radius:10px;font-size:21px;display:flex;align-items:center;justify-content:center;color:var(--ink);flex-shrink:0}
-    .mtop .mlogo{max-height:46px;width:auto;object-fit:contain}
+    .mtop .mlogo{max-height:64px;max-width:64vw;width:auto;object-fit:contain}
     .mtop .mnm{font-weight:600;font-size:16px}
     .wrap,.top{padding-left:16px;padding-right:16px} .top{padding-top:16px}
     .wrap{max-width:100%!important}
@@ -356,7 +356,7 @@ async function submitAuth(){
 
 /* ---------- Access levels (permissions) ---------- */
 const ROLE_LABELS={5:'Owner',4:'GM',3:'Manager',2:'Supervisor',1:'Team member'};
-const PERM_DEFAULT={whiteboard:1,home:1,ask:1,journal:1,build:5,setup:4,team:3,onboarding:3,today:1,schedule:1,checklists:1,sales:4,saleshist:4,calendar:1,community:1,resources:1,downloads:1,settings:5,pay:5,clock:5};
+const PERM_DEFAULT={whiteboard:1,home:1,ask:1,journal:1,build:5,setup:4,team:3,onboarding:3,today:3,schedule:3,checklists:3,sales:4,saleshist:4,calendar:3,community:1,resources:1,downloads:1,settings:5,pay:5,clock:5};
 const PERM_LABELS={build:'Training (author courses)',setup:'Setup',team:'Team',onboarding:'Onboarding',schedule:'Schedule',sales:'Sales',saleshist:'Sales history import',pay:'Pay rates',settings:'Settings',today:'Daily Report',checklists:'Checklists',calendar:'Calendar',community:'Community',resources:'Resources',downloads:'Downloads'};
 function myRank(){ if(state.profile&&state.profile.role==='admin') return 5; const pos=(window._posMap&&window._posMap[(state.profile&&state.profile.name)||''])||''; if(pos==='Owner')return 5; if(pos==='GM'||pos==='General Manager')return 4; if(pos==='Manager')return 3; if(pos==='Supervisor')return 2; return 1; }
 function permOf(page){ const o=state.perms&&state.perms[page]; return (o&&+o)||PERM_DEFAULT[page]||1; }
@@ -401,6 +401,7 @@ function trackBanner(t,pct,done){ return `<div style="height:96px;background:${t
 
 async function vWhiteboard(v){
   const isAdmin=state.profile&&state.profile.role==='admin';
+  const ops = isAdmin || myRank()>=3;
   const name=state.profile?state.profile.name:''; const _f=((name||'').split(/\s+/)[0]||name);
   const hr=new Date().getHours(); const greet=hr<12?'Good morning':hr<17?'Good afternoon':'Good evening';
   const today=new Date(); const iso=isoDate(today);
@@ -430,14 +431,21 @@ async function vWhiteboard(v){
     h+=`</div>`;
   }
   if(hol) h+=`<div class="card" style="padding:13px 16px;margin-bottom:16px;background:var(--amber-soft);border-color:var(--amber)"><b style="color:var(--amber)">🎉 ${esc(hol.name)}</b> <span class="muted" style="font-size:13px">${hol.closed?'— closed today. Any perishables prepped today are waste after close.':'— banks/gov closed, expect it busier. Bump prep and staffing.'}</span></div>`;
-  if(ojrItem&&ojrItem.detail) h+=`<div class="card" style="padding:12px 16px;margin-bottom:16px;background:var(--brand-soft);border-color:var(--brand-line)"><b style="color:var(--brand)"><i class="ti ti-user-star"></i> Today's OJR: ${esc(ojrItem.detail)}</b> <span class="muted" style="font-size:13px">— in charge of the shift today.</span></div>`;
+  if(ops&&ojrItem&&ojrItem.detail) h+=`<div class="card" style="padding:12px 16px;margin-bottom:16px;background:var(--brand-soft);border-color:var(--brand-line)"><b style="color:var(--brand)"><i class="ti ti-user-star"></i> Today's OJR: ${esc(ojrItem.detail)}</b> <span class="muted" style="font-size:13px">— in charge of the shift today.</span></div>`;
   const celebs=upcomingCelebrations(7);
   if(celebs.length) h+=`<div class="card" style="padding:13px 16px;margin-bottom:16px;background:#FBF0DA;border-color:#EBD9AE"><b style="color:#B7791F"><i class="ti ti-cake"></i> Celebrations coming up</b><div style="margin-top:7px;font-size:13.5px;line-height:1.75">`+celebs.map(c=>`${c.emoji} ${celebLabel(c)}${c.days<=3?' <b style="color:#B7791F">·</b>':''}`).join('<br>')+`</div><div class="faint" style="font-size:12px;margin-top:7px">Plan a little something ahead of time.</div></div>`;
-  h+=`<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(148px,1fr));margin-bottom:18px"><div class="otile"><div class="ol"><i class="ti ti-users"></i>On today</div><div class="ov">${shifts.length}</div></div><div class="otile"><div class="ol"><i class="ti ti-checkbox"></i>To-dos</div><div class="ov">${todos.length}</div></div><div class="otile"><div class="ol"><i class="ti ti-spray"></i>Cleanings due</div><div class="ov">${dueRots.length}</div></div></div>`;
-  h+=`<div class="sec">On the floor today</div>`;
-  if(!shifts.length) h+=`<div class="card" style="padding:20px;text-align:center"><div class="faint">No one scheduled today.</div></div>`;
-  else h+=`<div class="card">`+shifts.map(s=>{ const inits=(s.person_name||'?').split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase(); return `<div class="row" style="padding:10px 15px;border-bottom:1px solid var(--line)"><span class="av">${esc(inits)}</span><div style="flex:1;min-width:0"><div style="font-weight:600;font-size:14px">${esc(s.person_name||'—')}</div><div class="faint" style="font-size:12px">${esc(s.role||'Team')}</div></div><div style="font-size:13px;font-weight:600;color:var(--brand)">${s.start_time?fmtClock(s.start_time):''}${s.end_time?'–'+fmtClock(s.end_time):''}</div></div>`; }).join('')+`</div>`;
-  h+=`<div class="sec">Jump in</div><div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">`+[['today','Daily Report','ti-clipboard-list'],['schedule','Schedule','ti-calendar-week'],['home','Academy','ti-school'],['community','Community','ti-messages']].map(t=>`<div class="card" style="padding:16px;cursor:pointer;text-align:center" onclick="go('${t[0]}')"><div style="width:44px;height:44px;margin:0 auto 9px;border-radius:12px;background:var(--brand-soft);color:var(--brand);display:flex;align-items:center;justify-content:center;font-size:22px"><i class="ti ${t[2]}"></i></div><div style="font-weight:600;font-size:14px">${t[1]}</div></div>`).join('')+`</div>`;
+  if(ops) h+=`<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(148px,1fr));margin-bottom:18px"><div class="otile"><div class="ol"><i class="ti ti-users"></i>On today</div><div class="ov">${shifts.length}</div></div><div class="otile"><div class="ol"><i class="ti ti-checkbox"></i>To-dos</div><div class="ov">${todos.length}</div></div><div class="otile"><div class="ol"><i class="ti ti-spray"></i>Cleanings due</div><div class="ov">${dueRots.length}</div></div></div>`;
+  if(ops){
+    h+=`<div class="sec">On the floor today</div>`;
+    if(!shifts.length) h+=`<div class="card" style="padding:20px;text-align:center"><div class="faint">No one scheduled today.</div></div>`;
+    else h+=`<div class="card">`+shifts.map(s=>{ const inits=(s.person_name||'?').split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase(); return `<div class="row" style="padding:10px 15px;border-bottom:1px solid var(--line)"><span class="av">${esc(inits)}</span><div style="flex:1;min-width:0"><div style="font-weight:600;font-size:14px">${esc(s.person_name||'—')}</div><div class="faint" style="font-size:12px">${esc(s.role||'Team')}</div></div><div style="font-size:13px;font-weight:600;color:var(--brand)">${s.start_time?fmtClock(s.start_time):''}${s.end_time?'–'+fmtClock(s.end_time):''}</div></div>`; }).join('')+`</div>`;
+  } else {
+    let _c=null; for(const t of visibleTracks()){ for(const l of trackLessons(t.id)){ if(!isDone(l.id)){ _c={t,l}; break; } } if(_c) break; }
+    if(_c){ h+=`<div class="sec">Continue your training</div><div class="card" style="padding:18px 20px;display:flex;align-items:center;gap:16px;margin-bottom:6px"><div style="width:46px;height:46px;border-radius:12px;background:var(--brand);color:#fff;display:flex;align-items:center;justify-content:center;font-size:21px;flex-shrink:0"><i class="ti ti-player-play"></i></div><div style="flex:1;min-width:0"><div class="faint" style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;font-weight:700">${esc(_c.t.name)}</div><div style="font-weight:600;font-size:16px;margin:3px 0 10px">${esc(_c.l.title)}</div><div class="bar"><i style="width:${trackPct(_c.t.id)}%"></i></div></div><button class="btn pri" style="width:auto;gap:6px" onclick="go('lesson',{tid:'${_c.t.id}',lid:'${_c.l.id}'})">Resume <i class="ti ti-arrow-right"></i></button></div>`; }
+    else if(visibleTracks().length){ h+=`<div class="sec">Your training</div><div class="card" style="padding:22px;text-align:center"><div style="font-size:26px;margin-bottom:8px">🎓</div><div style="font-weight:600;margin-bottom:4px">You're all caught up</div><div class="muted" style="font-size:13.5px">Every module you've been assigned is complete. Nice work.</div></div>`; }
+  }
+  const _jump = ops ? [['today','Daily Report','ti-clipboard-list'],['schedule','Schedule','ti-calendar-week'],['home','Academy','ti-school'],['community','Community','ti-messages']] : [['home','Academy','ti-school'],['community','Community','ti-messages'],['journal','Journal','ti-notebook'],['downloads','Downloads','ti-download']];
+  h+=`<div class="sec">Jump in</div><div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">`+_jump.filter(t=>canSee(t[0])).map(t=>`<div class="card" style="padding:16px;cursor:pointer;text-align:center" onclick="go('${t[0]}')"><div style="width:44px;height:44px;margin:0 auto 9px;border-radius:12px;background:var(--brand-soft);color:var(--brand);display:flex;align-items:center;justify-content:center;font-size:22px"><i class="ti ${t[2]}"></i></div><div style="font-weight:600;font-size:14px">${t[1]}</div></div>`).join('')+`</div>`;
   v.innerHTML=`<div class="wbframe">`+h+`</div>`;
 }
 window.toggleWhyEdit=function(){ const e=document.getElementById('whyEdit'); if(e) e.style.display = (e.style.display==='none'?'block':'none'); };
@@ -473,7 +481,7 @@ function vLesson(v){
   const l=ls.find(x=>x.id===state.ctx.lid); const i=ls.findIndex(x=>x.id===l.id); const next=ls[i+1];
   const done=isDone(l.id);
   setTitle(t.name, `Module ${l.n} · ${l.title}`);
-  let main=`<div class="video"><div><div style="font-size:32px"><i class="ti ti-player-play"></i></div><div style="font-size:13px;margin-top:6px;opacity:.9">Video coming soon</div></div></div>`;
+  let main = l.video_url ? `<div class="video" style="padding:0;overflow:hidden;background:#000"><video src="${l.video_url}" controls playsinline style="width:100%;height:100%;object-fit:contain;background:#000"></video></div>` : '';
   if(l.body && l.body.trim()) main+=`<div class="richwrap">${richBody(l.body)}</div>`;
   else if(l.subtitle) main+=`<div class="lead">${esc(l.subtitle)}</div>`;
   else main+=`<div class="card" style="padding:24px 22px;text-align:center"><div style="font-size:24px;margin-bottom:8px">📖</div><div style="font-weight:600;margin-bottom:6px">Full module text coming in</div><div class="muted" style="font-size:13px;max-width:430px;margin:0 auto;line-height:1.6">This module's written lesson is being loaded into the academy.</div></div>`;
