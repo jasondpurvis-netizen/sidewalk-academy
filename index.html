@@ -75,7 +75,8 @@
 .phero-heart{position:absolute;right:-40px;bottom:-58px;z-index:1;opacity:.10;fill:none;stroke:#fff;stroke-width:1.3;pointer-events:none}
 .emedallion{width:56px;height:56px;border-radius:16px;display:flex;align-items:center;justify-content:center;margin-bottom:15px;flex-shrink:0}
 .entrygrid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-@media(max-width:640px){.phero-title{font-size:26px}.phero{padding:24px 20px}.emedallion{width:48px;height:48px}.entrygrid{grid-template-columns:1fr}}
+#pagehero{padding:22px 28px 0;max-width:840px}
+@media(max-width:640px){.phero-title{font-size:26px}.phero{padding:24px 20px}.emedallion{width:48px;height:48px}.entrygrid{grid-template-columns:1fr}#pagehero{padding:16px 12px 0}}
   .row{display:flex;align-items:center;gap:14px}
   .pill{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:500;padding:4px 10px;border-radius:999px}
   .pill.g{background:var(--green-soft);color:var(--green)}
@@ -391,7 +392,7 @@ function renderApp(){
       <nav class="nav" id="nav"></nav>
       <div class="me"><div style="display:flex;align-items:center;gap:10px;margin-bottom:11px"><div onclick="document.getElementById('avup').click()" title="Change your photo" style="width:42px;height:42px;border-radius:50%;flex-shrink:0;cursor:pointer;overflow:hidden;background:var(--brand-soft);color:var(--brand);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;border:2px solid var(--line)">${state.profile&&state.profile.avatar_url?`<img src="${state.profile.avatar_url}" style="width:100%;height:100%;object-fit:cover"/>`:esc(((state.profile&&state.profile.name)||'?').charAt(0).toUpperCase())}</div><div style="min-width:0"><div class="who">${esc(state.profile?state.profile.name:"")}</div><div class="em">${esc(state.user.email)}</div></div></div><input type="file" id="avup" accept="image/*" style="display:none" onchange="uploadAvatar(this)"/>${realAdmin?`<button class="btn" style="margin-bottom:8px;font-size:13px;gap:6px" onclick="togglePreviewLIT()"><i class="ti ti-eye"></i> ${state.previewLIT?'Exit preview':'Preview as Leader in Training'}</button>`:''}<button class="btn" id="out">Sign out</button></div>
     </aside>
-    <main class="main">${state.previewLIT?`<div style="background:var(--brand);color:#fff;padding:9px 16px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:9px"><i class="ti ti-eye"></i> Previewing as a Leader in Training — this is what they see. <span onclick="togglePreviewLIT()" style="margin-left:auto;text-decoration:underline;cursor:pointer">Exit preview</span></div>`:''}<div class="mtop"><button class="mburger" onclick="toggleNav(true)" aria-label="Open menu"><i class="ti ti-menu-2"></i></button>${state.settings&&state.settings.logo_url?`<img class="mlogo" onclick="go('whiteboard')" style="cursor:pointer" src="${state.settings.logo_url}" alt="${esc((state.settings&&state.settings.academy_name)||'Academy')}"/>`:`<span class="mnm" onclick="go('whiteboard')" style="cursor:pointer">${esc((state.settings&&state.settings.academy_name)||'Academy')}</span>`}</div><div class="top"><span class="topicon" id="topicon"><i class="ti ti-point"></i></span><div style="min-width:0"><h1 id="ttl"></h1><div class="sub" id="tsub"></div></div></div><div class="wrap" id="view"></div></main>
+    <main class="main">${state.previewLIT?`<div style="background:var(--brand);color:#fff;padding:9px 16px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:9px"><i class="ti ti-eye"></i> Previewing as a Leader in Training — this is what they see. <span onclick="togglePreviewLIT()" style="margin-left:auto;text-decoration:underline;cursor:pointer">Exit preview</span></div>`:''}<div class="mtop"><button class="mburger" onclick="toggleNav(true)" aria-label="Open menu"><i class="ti ti-menu-2"></i></button>${state.settings&&state.settings.logo_url?`<img class="mlogo" onclick="go('whiteboard')" style="cursor:pointer" src="${state.settings.logo_url}" alt="${esc((state.settings&&state.settings.academy_name)||'Academy')}"/>`:`<span class="mnm" onclick="go('whiteboard')" style="cursor:pointer">${esc((state.settings&&state.settings.academy_name)||'Academy')}</span>`}</div><div id="pagehero"></div><div class="wrap" id="view"></div></main>
     <div class="navscrim" id="scrim" onclick="toggleNav(false)"></div>
   </div>`;
   document.getElementById("nav").innerHTML = nav.map(([g,items])=>{ const gl=g?`<div class="navgroup">${esc(g)}</div>`:''; return gl+items.map(([p,l,i])=>`<a style="${p==='settings'?'margin-top:auto':''}" class="${state.page===p||(state.page==='lesson'||state.page==='track'||state.page==='acat')&&p==='home'?'active':''}" onclick="go('${p}');toggleNav(false)"><i class="ti ${i}" aria-hidden="true"></i>${l}</a>`).join(''); }).join("");
@@ -401,7 +402,19 @@ function renderApp(){
   const v=document.getElementById("view");
   ({whiteboard:vWhiteboard, home:vHome, acat:vAcat, track:vTrack, lesson:vLesson, summary:vSummary, team:vTeam, journal:vJournal, community:vCommunity, feedback:vFeedback, downloads:vDownloads, settings:vSettings, resources:vResources, ask:vAsk, build:vBuild, today:vToday, schedule:vSchedule, onboarding:vOnboarding, calendar:vCalendar, sales:vSales, checklists:vChecklists, setup:vSetup, pay:vPay, clock:vClock, saleshist:vSalesHist}[state.page]||vHome)(v);
 }
-function setTitle(t,s){ document.getElementById("ttl").textContent=t; document.getElementById("tsub").textContent=s||""; }
+const PAGE_HERO={
+  schedule:'&#10022; Plan the week', today:'&#10022; Every shift', team:'&#10022; Your people', onboarding:'&#10022; New hires',
+  community:'&#10022; The team', resources:'&#10022; On hand', downloads:'&#10022; Take it with you', checklists:'&#10022; Open &amp; close',
+  sales:'&#10022; The numbers', saleshist:'&#10022; The numbers', setup:'&#10022; Get set up', ask:'&#10022; Ask me anything',
+  journal:'&#10022; Your notes', build:'&#10022; Course builder', calendar:'&#10022; The month', settings:'&#10022; Settings',
+  pay:'&#10022; Private', clock:'&#10022; Time clock', summary:'&#10022; Your progress', feedback:'&#10022; Feedback'
+};
+const HEROICON={home:'ti-school',acat:'ti-school',whiteboard:'ti-layout-dashboard',track:'ti-book-2',lesson:'ti-book-2'};
+function setTitle(t,s){
+  const ph=document.getElementById('pagehero'); if(!ph) return;
+  if(PAGE_HERO[state.page]){ ph.innerHTML=heroBanner(PAGE_HERO[state.page], esc(t||''), s?esc(s):'', ''); }
+  else { ph.innerHTML=`<div class="top"><span class="topicon"><i class="ti ${HEROICON[state.page]||'ti-point'}"></i></span><div style="min-width:0"><h1 id="ttl">${esc(t||'')}</h1><div class="sub" id="tsub">${esc(s||'')}</div></div></div>`; }
+}
 window.toggleNav=function(open){ const s=document.querySelector('.side'); const sc=document.getElementById('scrim'); if(!s)return; s.classList.toggle('open',open); if(sc)sc.classList.toggle('open',open); };
 window.togglePreviewLIT=function(){ if(state.previewLIT){ if(state._realRole!==undefined && state.profile) state.profile.role=state._realRole; state._realRole=undefined; state.previewLIT=false; } else { if(state.profile){ state._realRole=state.profile.role; state.profile.role='team'; } state.previewLIT=true; } state.page='whiteboard'; state.ctx={}; renderApp(); };
 window.uploadAvatar=async function(inp){ const f=inp.files&&inp.files[0]; if(!f){return;} if(!f.type.startsWith('image')){ alert('Please choose an image.'); inp.value=''; return; } if(f.size>10*1024*1024){ alert('Please pick an image under 10 MB.'); inp.value=''; return; } const url=await uploadMedia(f); inp.value=''; if(!url)return; const r=await sb.from('profiles').update({avatar_url:url}).eq('id',state.user.id); if(r&&r.error){ alert('Could not save your photo — a quick database permission is needed. Error: '+r.error.message); return; } if(state.profile) state.profile.avatar_url=url; state.community=null; renderApp(); };
@@ -476,14 +489,26 @@ window.toggleWhyEdit=function(){ const e=document.getElementById('whyEdit'); if(
 window.saveMV=async function(){ const m=(document.getElementById('wbmission')||{}).value||''; const vv=(document.getElementById('wbvision')||{}).value||''; for(const [k,val] of [['mission',m.trim()],['vision',vv.trim()]]){ await sb.from('day_items').delete().eq('kind',k); if(val) await sb.from('day_items').insert({kind:k,detail:val,title:k,created_by:state.user.id}); } go('whiteboard'); };
 function heroTile(){ return `<svg class="phero-svg" width="100%" height="100%" viewBox="0 0 400 200" preserveAspectRatio="none"><defs><pattern id="swtile" width="40" height="40" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path d="M20 0 L40 20 L20 40 L0 20 Z" fill="none" stroke="#EAF7FA" stroke-width="1.1"/><circle cx="20" cy="20" r="2.2" fill="#EAF7FA"/><path d="M20 6 L20 34 M6 20 L34 20" stroke="#EAF7FA" stroke-width=".7"/></pattern></defs><rect width="400" height="200" fill="url(#swtile)" opacity=".13"/></svg><svg class="phero-heart" viewBox="0 0 24 24" width="230" height="230"><path d="M12 21s-7-4.5-9.5-8.5C.7 9.6 2 6 5.2 6c2 0 3.2 1.2 3.9 2.2C9.6 7.2 10.8 6 12.8 6 16 6 17.3 9.6 15.5 12.5 13 16.5 12 21 12 21z"/></svg>`; }
 function heroBanner(eyebrow,titleHTML,sub,ctaHTML){ return `<div class="phero">${heroTile()}<div class="phero-in"><div class="phero-eyebrow">${eyebrow}</div><div class="phero-title">${titleHTML}</div>${sub?`<div class="phero-sub">${sub}</div>`:''}${ctaHTML||''}</div></div>`; }
+function smartResume(){
+  const vt=visibleTracks();
+  const started=t=>trackLessons(t.id).some(x=>isDone(x.id));
+  // 1) mid-module: the last lesson they actually opened, if unfinished
+  let lv=null; try{ lv=JSON.parse(localStorage.getItem('sw_last')||'null'); }catch(e){}
+  if(lv&&lv.lid){ const tt=state.tracks.find(x=>x.id===lv.tid); const ll=tt&&trackLessons(tt.id).find(x=>x.id===lv.lid); if(ll&&!isDone(ll.id)&&vt.some(x=>x.id===tt.id)) return {t:tt,l:ll,verb:'Resume'}; }
+  // 2) something the owner assigned to them that isn't finished
+  const uid=state.user&&state.user.id;
+  const mine=(state.assignments||[]).filter(a=>a.user_id===uid).map(a=>a.track_id);
+  for(const tid of mine){ const tt=vt.find(x=>x.id===tid); if(!tt) continue; for(const l of trackLessons(tid)){ if(!isDone(l.id)) return {t:tt,l,verb:started(tt)?'Continue':'Start'}; } }
+  // 3) otherwise the natural next module
+  for(const t of vt){ for(const l of trackLessons(t.id)){ if(!isDone(l.id)) return {t,l,verb:started(t)?'Continue':'Start'}; } }
+  return null;
+}
 function vHome(v){
   const name=state.profile?state.profile.name:"";
   const _first=((name||'').split(/\s+/)[0]||name); setTitle(`Welcome back, ${_first.charAt(0).toUpperCase()+_first.slice(1)}`, "Your training");
-  let resume=null;
-  try{ const lv=JSON.parse(localStorage.getItem('sw_last')||'null'); if(lv&&lv.lid){ const tt=state.tracks.find(x=>x.id===lv.tid); const ll=tt&&trackLessons(tt.id).find(x=>x.id===lv.lid); if(ll&&!isDone(ll.id)) resume={t:tt,l:ll}; } }catch(e){}
-  if(!resume){ for(const t of visibleTracks()){ for(const l of trackLessons(t.id)){ if(!isDone(l.id)){ resume={t,l}; break; } } if(resume) break; } }
-  const cta = resume ? `<button class="phero-cta" onclick="go('lesson',{tid:'${resume.t.id}',lid:'${resume.l.id}'})"><span class="pd">&#9654;</span> Resume — ${esc(resume.l.title)}</button>` : '';
-  let h = heroBanner('&#10022; The Academy', 'Learn it.<br>Own it. <span class="hl">Lead it.</span>', 'Everything your team needs to grow — leadership and the daily craft — in one place, at their own pace.', cta);
+  const rz=smartResume();
+  const cta = rz ? `<button class="phero-cta" onclick="go('lesson',{tid:'${rz.t.id}',lid:'${rz.l.id}'})"><span class="pd">&#9654;</span> ${rz.verb} — ${esc(rz.l.title)}</button>` : '';
+  let h = heroBanner('&#10022; The Academy', 'Learn it.<br>Lead it. <span class="hl">Own it.</span>', 'Everything your team needs to grow — from leading people to running every station — in one place, at their own pace.', cta);
   const _vt=visibleTracks();
   const _dev=_vt.filter(t=>(t.category||'development')!=='operations');
   const _ops=_vt.filter(t=>t.category==='operations');
