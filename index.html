@@ -11,6 +11,7 @@
   :root{
     --ink:#1A1A1A; --muted:#6B6B6B; --faint:#9A9A9A;
     --brand:#4A9CAD; --brand-soft:#EAF4F6; --brand-line:#CDE6EB;
+    --accent:#C9D92E; --accent-soft:#F7FAD9; --accent-line:#E2EC9C; --accent-ink:#5E6B0A;
     --bg:#FFFFFF; --card:#FFFFFF; --line:#ECEEEF; --line2:#E0E4E6;
     --green:#1D7A5A; --green-soft:#E4F2EC; --amber:#A9701A; --amber-soft:#F8EEDC;
   }
@@ -59,6 +60,8 @@
   .top .sub{color:var(--muted);font-size:14px}
   .wrap{padding:18px 28px 50px;max-width:840px}
   .card{background:var(--card);border:1px solid var(--line);border-radius:12px}
+.entrycard{transition:transform .13s ease, box-shadow .13s ease}
+.entrycard:hover{transform:translateY(-2px);box-shadow:0 12px 28px rgba(16,24,40,.10)}
   .row{display:flex;align-items:center;gap:14px}
   .pill{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:500;padding:4px 10px;border-radius:999px}
   .pill.g{background:var(--green-soft);color:var(--green)}
@@ -439,7 +442,7 @@ async function vWhiteboard(v){
   if(hol) h+=`<div class="card" style="padding:13px 16px;margin-bottom:16px;background:var(--amber-soft);border-color:var(--amber)"><b style="color:var(--amber)">🎉 ${esc(hol.name)}</b> <span class="muted" style="font-size:13px">${hol.closed?'— closed today. Any perishables prepped today are waste after close.':'— banks/gov closed, expect it busier. Bump prep and staffing.'}</span></div>`;
   if(ops&&ojrItem&&ojrItem.detail) h+=`<div class="card" style="padding:12px 16px;margin-bottom:16px;background:var(--brand-soft);border-color:var(--brand-line)"><b style="color:var(--brand)"><i class="ti ti-user-star"></i> Today's OJR: ${esc(ojrItem.detail)}</b> <span class="muted" style="font-size:13px">— in charge of the shift today.</span></div>`;
   const celebs=upcomingCelebrations(7);
-  if(celebs.length) h+=`<div class="card" style="padding:13px 16px;margin-bottom:16px;background:#FBF0DA;border-color:#EBD9AE"><b style="color:#B7791F"><i class="ti ti-cake"></i> Celebrations coming up</b><div style="margin-top:7px;font-size:13.5px;line-height:1.75">`+celebs.map(c=>`${c.emoji} ${celebLabel(c)}${c.days<=3?' <b style="color:#B7791F">·</b>':''}`).join('<br>')+`</div><div class="faint" style="font-size:12px;margin-top:7px">Plan a little something ahead of time.</div></div>`;
+  if(celebs.length) h+=`<div class="card" style="padding:13px 16px;margin-bottom:16px;background:#FCEBF1;border-color:#F3C6D7"><b style="color:#C43D66"><i class="ti ti-cake"></i> Celebrations coming up</b><div style="margin-top:7px;font-size:13.5px;line-height:1.75">`+celebs.map(c=>`${c.emoji} ${celebLabel(c)}${c.days<=3?' <b style="color:#C43D66">·</b>':''}`).join('<br>')+`</div><div class="faint" style="font-size:12px;margin-top:7px">Plan a little something ahead of time.</div></div>`;
   if(ops) h+=`<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(148px,1fr));margin-bottom:18px"><div class="otile"><div class="ol"><i class="ti ti-users"></i>On today</div><div class="ov">${shifts.length}</div></div><div class="otile"><div class="ol"><i class="ti ti-checkbox"></i>To-dos</div><div class="ov">${todos.length}</div></div><div class="otile"><div class="ol"><i class="ti ti-spray"></i>Cleanings due</div><div class="ov">${dueRots.length}</div></div></div>`;
   if(ops){
     h+=`<div class="sec">On the floor today</div>`;
@@ -467,10 +470,10 @@ function vHome(v){
   const _vt=visibleTracks();
   const _dev=_vt.filter(t=>(t.category||'development')!=='operations');
   const _ops=_vt.filter(t=>t.category==='operations');
-  const _entry=(cat,label,desc,icon,list)=>{ if(!list.length) return ''; const dc=list.filter(t=>trackDone(t.id)).length;
-    return `<div class="card" style="padding:0;overflow:hidden;cursor:pointer;margin-bottom:16px" onclick="go('acat',{cat:'${cat}'})"><div style="display:flex;align-items:center;gap:18px;padding:22px 22px"><div style="width:54px;height:54px;border-radius:14px;background:var(--brand);color:#fff;display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0"><i class="ti ${icon}"></i></div><div style="flex:1;min-width:0"><div style="font-weight:800;font-size:20px;letter-spacing:-.01em;line-height:1.15">${label}</div><div class="muted" style="font-size:13.5px;margin-top:3px">${desc}</div><div class="faint" style="font-size:11.5px;margin-top:8px;font-weight:700;text-transform:uppercase;letter-spacing:.05em">${list.length} ${list.length===1?'track':'tracks'}${dc?` &middot; ${dc} certified`:''} &middot; Open &rarr;</div></div><i class="ti ti-chevron-right" style="font-size:26px;color:var(--faint);flex-shrink:0"></i></div></div>`; };
-  h+=_entry('development','Leadership &amp; Development','Grow into and beyond your role — leadership, decisions, ownership.','ti-school',_dev);
-  h+=_entry('operations','Operations &amp; How-To','Station procedures — bake, bar, line, close, equipment.','ti-tools',_ops);
+  const _entry=(cat,label,desc,icon,list,tone)=>{ if(!list.length) return ''; const dc=list.filter(t=>trackDone(t.id)).length;
+    return `<div class="entrycard card" style="padding:0;overflow:hidden;cursor:pointer;margin-bottom:16px;border-left:5px solid ${tone.bar}" onclick="go('acat',{cat:'${cat}'})"><div style="display:flex;align-items:center;gap:18px;padding:20px 22px"><div style="width:56px;height:56px;border-radius:15px;background:${tone.bar};color:${tone.icon};display:flex;align-items:center;justify-content:center;font-size:27px;flex-shrink:0"><i class="ti ${icon}"></i></div><div style="flex:1;min-width:0"><div style="font-weight:800;font-size:20px;letter-spacing:-.01em;line-height:1.15">${label}</div><div class="muted" style="font-size:13.5px;margin-top:3px">${desc}</div><div style="font-size:11.5px;margin-top:9px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:${tone.ink}">${list.length} ${list.length===1?'track':'tracks'}${dc?` &middot; ${dc} certified`:''} &middot; Open &rarr;</div></div><i class="ti ti-chevron-right" style="font-size:26px;color:${tone.bar};flex-shrink:0"></i></div></div>`; };
+  h+=_entry('development','Leadership &amp; Development','Grow into and beyond your role — leadership, decisions, ownership.','ti-school',_dev,{bar:'var(--brand)',icon:'#fff',ink:'var(--brand)'});
+  h+=_entry('operations','Operations &amp; How-To','Station procedures — bake, bar, line, close, equipment.','ti-tools',_ops,{bar:'var(--accent)',icon:'#1A1A1A',ink:'var(--accent-ink)'});
   if(!_vt.length){ h+=`<div class="muted" style="padding:8px 2px">No tracks yet.</div>`; }
   v.innerHTML=h;
 }
@@ -508,7 +511,7 @@ function vLesson(v){
   if(l.body && l.body.trim()) main+=`<div class="richwrap">${richBody(l.body)}</div>`;
   else if(l.subtitle) main+=`<div class="lead">${esc(l.subtitle)}</div>`;
   else main+=`<div class="card" style="padding:24px 22px;text-align:center"><div style="font-size:24px;margin-bottom:8px">📖</div><div style="font-weight:600;margin-bottom:6px">Full module text coming in</div><div class="muted" style="font-size:13px;max-width:430px;margin:0 auto;line-height:1.6">This module's written lesson is being loaded into the academy.</div></div>`;
-  main+=`<div class="card" style="padding:18px 20px;margin-top:24px"><div style="font-weight:600;margin-bottom:4px">📓 Your reflection</div><div class="muted" style="font-size:13px;margin-bottom:10px">Answer this module's questions here. It saves to your journal for your next conversation.</div><textarea id="jr" onblur="saveJournal('${l.id}')" style="width:100%;min-height:130px;padding:12px 13px;border:1px solid var(--line2);border-radius:9px;font-size:14px;font-family:inherit;line-height:1.65;color:var(--ink);background:var(--card)" placeholder="Write your thoughts...">${esc(state.responses[l.id]||'')}</textarea><div class="row" style="margin-top:9px"><button class="btn pri" style="width:auto" onclick="saveJournal('${l.id}')">Save reflection</button><span class="muted" id="jrmsg" style="font-size:12px"></span></div></div>`;
+  if((t.category||'development')!=='operations') main+=`<div class="card" style="padding:18px 20px;margin-top:24px"><div style="font-weight:600;margin-bottom:4px">📓 Your reflection</div><div class="muted" style="font-size:13px;margin-bottom:10px">Answer this module's questions here. It saves to your journal for your next conversation.</div><textarea id="jr" onblur="saveJournal('${l.id}')" style="width:100%;min-height:130px;padding:12px 13px;border:1px solid var(--line2);border-radius:9px;font-size:14px;font-family:inherit;line-height:1.65;color:var(--ink);background:var(--card)" placeholder="Write your thoughts...">${esc(state.responses[l.id]||'')}</textarea><div class="row" style="margin-top:9px"><button class="btn pri" style="width:auto" onclick="saveJournal('${l.id}')">Save reflection</button><span class="muted" id="jrmsg" style="font-size:12px"></span></div></div>`;
   main+=`<div class="row" style="margin-top:20px;flex-wrap:wrap;gap:8px">${done?`<button class="btn" onclick="undo('${l.id}')"><span class="pill g" style="padding:0">✓</span> Completed — undo</button>`:`<button class="btn pri" style="width:auto" onclick="markDone('${t.id}','${l.id}')"><i class="ti ti-circle-check"></i> Mark complete</button>`}<button class="btn" id="sharebtn" style="width:auto" onclick="shareLesson('${t.id}','${l.id}')"><i class="ti ti-share"></i> Share</button><button class="btn" style="width:auto" onclick="printLesson('${l.id}')"><i class="ti ti-printer"></i> Print</button>${next?`<button class="btn ${done?'pri':''}" id="nextbtn" style="width:auto;margin-left:auto" onclick="go('lesson',{tid:'${t.id}',lid:'${next.id}'})">Next: ${esc(next.title)} <i class="ti ti-arrow-right"></i></button>`:`<button class="btn ${done?'pri':''}" id="nextbtn" style="width:auto;margin-left:auto" onclick="go('track',{tid:'${t.id}'})">Finish course <i class="ti ti-circle-check"></i></button>`}</div>`;
   const dls=[];
   if(l.download_url) dls.push({name:l.download_name||'Workbook', url:l.download_url});
