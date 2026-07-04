@@ -483,7 +483,7 @@ async function vWhiteboard(v){
     else if(visibleTracks().length){ h+=`<div class="sec">Your training</div><div class="card" style="padding:22px;text-align:center"><div style="font-size:26px;margin-bottom:8px">🎓</div><div style="font-weight:600;margin-bottom:4px">You're all caught up</div><div class="muted" style="font-size:13.5px">Every module you've been assigned is complete. Nice work.</div></div>`; }
   }
   const _jump = ops ? [['today','Daily Report','ti-clipboard-list'],['schedule','Schedule','ti-calendar-week'],['home','Academy','ti-school'],['community','Community','ti-messages']] : [['home','Academy','ti-school'],['community','Community','ti-messages'],['journal','Journal','ti-notebook'],['downloads','Downloads','ti-download']];
-  h+=`<div class="sec">Jump in</div><div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">`+_jump.filter(t=>canSee(t[0])).map(t=>`<div class="card" style="padding:16px;cursor:pointer;text-align:center" onclick="go('${t[0]}')"><div style="width:44px;height:44px;margin:0 auto 9px;border-radius:12px;background:var(--brand-soft);color:var(--brand);display:flex;align-items:center;justify-content:center;font-size:22px"><i class="ti ${t[2]}"></i></div><div style="font-weight:600;font-size:14px">${t[1]}</div></div>`).join('')+`</div>`;
+  h+=`<div class="sec">Jump in</div><div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">`+_jump.filter(t=>canSee(t[0])).map((t,i)=>{ const gold=i%2===1; const g=gold?'linear-gradient(135deg,var(--accent),var(--accent-2))':'linear-gradient(135deg,var(--tealmid),var(--tealdark))'; const ic=gold?'#3A2B00':'#fff'; const sh=gold?'rgba(229,168,0,.38)':'rgba(46,125,138,.34)'; return `<div class="entrycard card" style="padding:18px 16px;cursor:pointer;text-align:center" onclick="go('${t[0]}')"><div style="width:50px;height:50px;margin:0 auto 11px;border-radius:14px;background:${g};color:${ic};display:flex;align-items:center;justify-content:center;font-size:24px;box-shadow:0 8px 18px ${sh}"><i class="ti ${t[2]}"></i></div><div style="font-weight:700;font-size:14.5px">${t[1]}</div></div>`; }).join('')+`</div>`;
   v.innerHTML=`<div class="wbframe">`+h+`</div>`;
 }
 window.toggleWhyEdit=function(){ const e=document.getElementById('whyEdit'); if(e) e.style.display = (e.style.display==='none'?'block':'none'); };
@@ -621,7 +621,7 @@ async function vCommunity(v){
   const ch = state.ctx.ch || 'announcements';
   const tag = (state.ctx.tag||'').toLowerCase();
   setTitle("Community", tag?('Posts tagged '+tag):"Talk it through together");
-  const LAUNCH_CHANNELS=['announcements','fol']; const canCh=c=> isAdmin || LAUNCH_CHANNELS.includes(c);
+  const LAUNCH_CHANNELS=['announcements','fol','ideas']; const canCh=c=> isAdmin || LAUNCH_CHANNELS.includes(c);
   if(!canCh(ch)){ go('community',{ch:'announcements'}); return; }
   const visible = CHANNELS.filter(c=> (c[0]!=='leadership'||isAdmin) && canCh(c[0]));
   if(!state.community){ v.innerHTML=`<div class="muted">Loading…</div>`; const [p,c,m,rx,rd,pf]=await Promise.all([ sb.from('posts').select('*').order('created_at',{ascending:false}), sb.from('comments').select('*').order('created_at'), sb.from('channel_modes').select('*'), sb.from('reactions').select('*'), sb.from('channel_reads').select('*').eq('user_id',state.user.id), sb.from('profiles').select('id,name,avatar_url') ]); state.community={posts:p.data||[],comments:c.data||[],modes:m.data||[],reactions:rx.data||[],reads:rd.data||[],profiles:pf.data||[]}; }
