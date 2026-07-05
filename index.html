@@ -592,24 +592,29 @@ async function vCostSmart(v){
 // Turn the Cost-Smart per-hour target into a coverage matrix the scheduler understands.
 // Matrix blocks carry an n[] array indexed Mon=0..Sun=6; our aggregates are keyed by JS weekday (Sun=0..Sat=6), so map i -> (i+1)%7.
 window.csTargetMatrix=async function(){
-  const [rs,rc]=await Promise.all([
+  const [rs,rp,rc]=await Promise.all([
     sb.from('day_items').select('on_date,detail').eq('kind','hourly'),
+    sb.from('day_items').select('on_date,detail').eq('kind','punch'),
     sb.from('day_items').select('*').eq('kind','csconfig').limit(1)
   ]);
   let cfg={}; try{ if(rc.data&&rc.data[0]) cfg=JSON.parse(rc.data[0].detail||'{}'); }catch(e){}
-  const sAgg={}, sDays={}, tAgg={}, tDays={};
+  const parseHM=s=>{ if(!s||String(s).length<16) return null; const h=+String(s).slice(11,13), m=+String(s).slice(14,16); if(isNaN(h)||isNaN(m))return null; return h*60+m; };
+  const toLoc=s=>{ const m=parseHM(s); return m==null?null:((((m-420)%1440)+1440)%1440); }; // punches are UTC; shop runs America/Phoenix = UTC-7
+  const sAgg={}, sDays={}, tAgg={}, tDays={}, lAgg={}, lDays={};
   (rs.data||[]).forEach(row=>{ let d; try{d=JSON.parse(row.detail||'{}')}catch(e){return;} const dw=new Date(row.on_date+'T12:00:00').getDay(); (sDays[dw]=sDays[dw]||new Set()).add(row.on_date); const A=(sAgg[dw]=sAgg[dw]||{}); const bh=d.byHour||{}; for(const hh in bh){ A[+hh]=(A[+hh]||0)+(+bh[hh]||0); } if(d.byHourTxns){ (tDays[dw]=tDays[dw]||new Set()).add(row.on_date); const T=(tAgg[dw]=tAgg[dw]||{}); for(const hh in d.byHourTxns){ T[+hh]=(T[+hh]||0)+(+d.byHourTxns[hh]||0); } } });
+  (rp.data||[]).forEach(row=>{ let d; try{d=JSON.parse(row.detail||'{}')}catch(e){return;} const dw=new Date(row.on_date+'T12:00:00').getDay(); const A=(lAgg[dw]=lAgg[dw]||{}); let any2=false; (d.sessions||[]).forEach(s=>{ const a=toLoc(s.in),b=toLoc(s.out); if(a==null||b==null)return; let bb=b; if(bb<a)bb+=1440; for(let H=0;H<24;H++){ const hs=H*60,he=hs+60; const ov=Math.max(0,Math.min(bb,he)-Math.max(a,hs)); if(ov>0){A[H]=(A[H]||0)+ov/60; any2=true;} } }); if(any2)(lDays[dw]=lDays[dw]||new Set()).add(row.on_date); });
   const avgWage=+cfg.avgWage||15, minCov=+cfg.minCov||2, minClose=+cfg.minClose||3;
   const mode=['pct','tplh'].includes(cfg.mode)?cfg.mode:'splh', pctTarget=+cfg.pctTarget||25, splhTarget=+cfg.splhTarget||40, tplhTarget=+cfg.tplhTarget||6;
   const perDow={}; let any=false;
   for(let jsw=0; jsw<7; jsw++){
-    const sd=sDays[jsw]?sDays[jsw].size:0; if(!sd) continue; const td=tDays[jsw]?tDays[jsw].size:0;
-    const avgS={}, avgT={}, openH=[];
-    for(let H=0;H<24;H++){ const s=((sAgg[jsw]||{})[H]||0)/sd; avgS[H]=s; if(s>2) openH.push(H); avgT[H]=td?((tAgg[jsw]||{})[H]||0)/td:0; }
+    const sd=sDays[jsw]?sDays[jsw].size:0; if(!sd) continue; const td=tDays[jsw]?tDays[jsw].size:0; const ld=lDays[jsw]?lDays[jsw].size:0;
+    const avgS={}, avgT={}, avgL={}, openH=[];
+    for(let H=0;H<24;H++){ const s=((sAgg[jsw]||{})[H]||0)/sd; avgS[H]=s; if(s>2) openH.push(H); avgT[H]=td?((tAgg[jsw]||{})[H]||0)/td:0; avgL[H]=ld?((lAgg[jsw]||{})[H]||0)/ld:0; }
     if(!openH.length) continue;
     const needMetric=(s,t)=> mode==='pct'?Math.round((pctTarget/100*s)/avgWage) : mode==='tplh'?Math.round((t||0)/tplhTarget) : Math.round(s/splhTarget);
     const floorFor=H=> (H>=openH[openH.length-2])?Math.max(minCov,minClose):minCov;
-    const D={}; openH.forEach(H=>{ D[H]=Math.max(1, needMetric(avgS[H],avgT[H]), floorFor(H)); any=true; }); perDow[jsw]=D;
+    const HARDCAP=8; // never build more than you've actually staffed that hour — this tool only trims, it doesn't inflate peaks off raw sales math
+    const D={}; openH.forEach(H=>{ const cap= ld? Math.max(1,Math.round(avgL[H])) : HARDCAP; let n=Math.min(needMetric(avgS[H],avgT[H]), cap, HARDCAP); n=Math.max(n, floorFor(H)); D[H]=n; any=true; }); perDow[jsw]=D;
   }
   if(!any) return null;
   const p2=x=>String(x).padStart(2,'0');
