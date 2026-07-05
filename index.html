@@ -1446,7 +1446,7 @@ async function schBoard(v){
     loadProfiles()
   ]);
   const ojrByDay={}; (rojr.data||[]).forEach(o=>{ if(o.on_date) ojrByDay[o.on_date]=o.detail; });
-  let covRules={requireLeader:true,shiftLen:8,minLen:4,maxLen:8,targetPct:'',burdenPct:'',matrix:{blocks:[]},days:{},roleReqs:[],blackouts:[]}; try{ const rc=await sb.from('day_items').select('detail').eq('kind','covrules').maybeSingle(); const cd=JSON.parse((rc.data&&rc.data.detail)||'{}'); covRules={requireLeader:cd.requireLeader!==false, shiftLen:+(cd.shiftLen)||8, minLen:+(cd.minLen)||4, maxLen:+(cd.maxLen)||8, targetPct:cd.targetPct||'', burdenPct:+(cd.burdenPct)||0, matrix:cd.matrix||{blocks:[]}, days:cd.days||{}, roleReqs:Array.isArray(cd.roleReqs)?cd.roleReqs:[], blackouts:Array.isArray(cd.blackouts)?cd.blackouts:[]}; }catch(e){}
+  let covRules={requireLeader:true,shiftLen:8,minLen:4,maxLen:8,targetPct:'',burdenPct:'',matrix:{blocks:[]},days:{},roleReqs:[],blackouts:[]}; try{ const rc=await sb.from('day_items').select('detail').eq('kind','covrules').order('id',{ascending:false}).limit(1).maybeSingle(); const cd=JSON.parse((rc.data&&rc.data.detail)||'{}'); covRules={requireLeader:cd.requireLeader!==false, shiftLen:+(cd.shiftLen)||8, minLen:+(cd.minLen)||4, maxLen:+(cd.maxLen)||8, targetPct:cd.targetPct||'', burdenPct:+(cd.burdenPct)||0, matrix:cd.matrix||{blocks:[]}, days:cd.days||{}, roleReqs:Array.isArray(cd.roleReqs)?cd.roleReqs:[], blackouts:Array.isArray(cd.blackouts)?cd.blackouts:[]}; }catch(e){}
   const covTarget=di=>{ const M=covRules.matrix; if(M&&M.blocks&&M.blocks.length){ let mx=0; M.blocks.forEach(b=>{ const n=+((b.n||[])[di]||0); if(n>mx)mx=n; }); return mx||null; } const c=covRules.days[di]; return c&&c.people?+c.people:null; };
   const offMap={}; (rto.data||[]).forEach(t=>{ isoDays.forEach(iso=>{ if(iso>=t.start_date && iso<=(t.end_date||t.start_date)){ (offMap[t.person_name]=offMap[t.person_name]||{})[iso]=t.reason||'Time off'; } }); });
   const shifts=rsh.data||[]; window._shifts={}; shifts.forEach(s=>window._shifts[s.id]=s); const _pm={}; (rpf.data||[]).forEach(p=>_pm[p.name]=p); const team=rosterNames().map(n=>({name:n,id:(_pm[n]||{}).id||null})); window._team=team;
@@ -1616,7 +1616,7 @@ window.autoDraft=async function(opts){
   const base=opts.week?wkDate(opts.week):(state.ctx.wk?wkDate(state.ctx.wk):weekStart(new Date()));
   const ws=weekStart(base); const isoDays=[...Array(7)].map((_,i)=>{ const d=new Date(ws); d.setDate(d.getDate()+i); return isoDate(d); });
   // Coverage rules (owner-set): store hours + people/openers/closers per day
-  const rcov=await sb.from('day_items').select('detail').eq('kind','covrules').maybeSingle();
+  const rcov=await sb.from('day_items').select('detail').eq('kind','covrules').order('id',{ascending:false}).limit(1).maybeSingle();
   let cov={days:{},shiftLen:8,matrix:null,minLen:4,maxLen:8,roleReqs:[],blackouts:[]}; let requireLeaderCoverage=true; try{ const cd=JSON.parse((rcov.data&&rcov.data.detail)||'{}'); cov={days:cd.days||{}, shiftLen:+(cd.shiftLen)||8, matrix:(cd.matrix&&cd.matrix.blocks&&cd.matrix.blocks.length)?cd.matrix:null, minLen:+(cd.minLen)||4, maxLen:+(cd.maxLen)||8, targetPct:+(cd.targetPct)||0, burdenPct:+(cd.burdenPct)||0, roleReqs:Array.isArray(cd.roleReqs)?cd.roleReqs:[], blackouts:Array.isArray(cd.blackouts)?cd.blackouts:[]}; if(cd.requireLeader===false) requireLeaderCoverage=false; }catch(e){}
   if(opts.matrix&&opts.matrix.blocks&&opts.matrix.blocks.length){ cov.matrix=opts.matrix; cov._csTarget=true; } // Cost-Smart override: coverage curve comes from your target, everything else (floors, leaders, blackouts, availability) still applies
   const anyRules=(cov.matrix&&cov.matrix.blocks&&cov.matrix.blocks.length)||Object.keys(cov.days).some(d=>cov.days[d]&&+cov.days[d].people>0);
@@ -1984,7 +1984,7 @@ async function schLogbook(v){
     sb.from('day_sales').select('*').eq('on_date',d0).maybeSingle(),
     sb.from('log_entries').select('*').eq('on_date',d0).order('created_at',{ascending:false}),
     sb.from('day_items').select('*').eq('kind','daylog').eq('on_date',d0).maybeSingle(),
-    sb.from('day_items').select('detail').eq('kind','covrules').maybeSingle(),
+    sb.from('day_items').select('detail').eq('kind','covrules').order('id',{ascending:false}).limit(1).maybeSingle(),
     sb.from('day_items').select('detail').eq('kind','actual').eq('on_date',d0).maybeSingle()
   ]);
   await loadPositions();
@@ -2020,7 +2020,7 @@ async function schReports(v){
   const base=state.ctx.wk?wkDate(state.ctx.wk):weekStart(new Date());
   const start=weekStart(base); const days=[...Array(7)].map((_,i)=>{const d=new Date(start);d.setDate(d.getDate()+i);return isoDate(d);});
   const lyDays=days.map(iso=>{ const d=new Date(iso+'T00:00'); d.setDate(d.getDate()-364); return isoDate(d); });
-  const [rsh,rpay,rsal,rcov,ract,rlys,rlya,rpun]=await Promise.all([ sb.from('shifts').select('*').gte('on_date',days[0]).lte('on_date',days[6]), sb.from('pay_rates').select('*'), sb.from('day_sales').select('*').gte('on_date',days[0]).lte('on_date',days[6]), sb.from('day_items').select('detail').eq('kind','covrules').maybeSingle(), sb.from('day_items').select('on_date,detail').eq('kind','actual').gte('on_date',days[0]).lte('on_date',days[6]), sb.from('day_sales').select('on_date,sales').gte('on_date',lyDays[0]).lte('on_date',lyDays[6]), sb.from('day_items').select('on_date,detail').eq('kind','actual').gte('on_date',lyDays[0]).lte('on_date',lyDays[6]), sb.from('day_items').select('title,detail').eq('kind','punch').gte('on_date',days[0]).lte('on_date',days[6]) ]);
+  const [rsh,rpay,rsal,rcov,ract,rlys,rlya,rpun]=await Promise.all([ sb.from('shifts').select('*').gte('on_date',days[0]).lte('on_date',days[6]), sb.from('pay_rates').select('*'), sb.from('day_sales').select('*').gte('on_date',days[0]).lte('on_date',days[6]), sb.from('day_items').select('detail').eq('kind','covrules').order('id',{ascending:false}).limit(1).maybeSingle(), sb.from('day_items').select('on_date,detail').eq('kind','actual').gte('on_date',days[0]).lte('on_date',days[6]), sb.from('day_sales').select('on_date,sales').gte('on_date',lyDays[0]).lte('on_date',lyDays[6]), sb.from('day_items').select('on_date,detail').eq('kind','actual').gte('on_date',lyDays[0]).lte('on_date',lyDays[6]), sb.from('day_items').select('title,detail').eq('kind','punch').gte('on_date',days[0]).lte('on_date',days[6]) ]);
   const punchedHrs={}; (rpun.data||[]).forEach(x=>{ let d={}; try{d=JSON.parse(x.detail||'{}');}catch(e){} (d.sessions||[]).forEach(s=>{ if(s.in&&s.out){ const ms=new Date(s.out)-new Date(s.in); if(ms>0) punchedHrs[x.title]=(punchedHrs[x.title]||0)+ms/3600000; } }); });
   const lyMap={}; (rlys.data||[]).forEach(d=>lyMap[d.on_date]=Number(d.sales)||0); (rlya.data||[]).forEach(x=>{ try{ const a=Number(JSON.parse(x.detail||'{}').amount)||0; if(a) lyMap[x.on_date]=a; }catch(e){} }); const lyTotal=lyDays.reduce((a,iso)=>a+(lyMap[iso]||0),0);
   let target=0,burden=0; try{ const cd=JSON.parse((rcov.data&&rcov.data.detail)||'{}'); target=+cd.targetPct||0; burden=+cd.burdenPct||0; }catch(e){} const bMul=1+(burden/100);
@@ -2247,7 +2247,7 @@ async function vSetup(v){
     sb.from('availability').select('person_name').limit(1),
     sb.from('day_items').select('title,detail').eq('kind','profile'),
     sb.from('pay_rates').select('person_name').limit(1),
-    sb.from('day_items').select('detail').eq('kind','covrules').maybeSingle(),
+    sb.from('day_items').select('detail').eq('kind','covrules').order('id',{ascending:false}).limit(1).maybeSingle(),
     sb.from('shifts').select('id').limit(1)
   ]);
   await loadPositions(); await loadArchived();
@@ -2275,7 +2275,7 @@ async function vSetup(v){
   h+=steps.map((s,i)=>{ const next=i===firstOpen; return `<div class="card" style="padding:14px 16px;margin-bottom:10px;display:flex;gap:13px;align-items:center;border-left:4px solid ${s.ok?'#1B7B3F':(next?'var(--brand)':'var(--line2)')}"><div style="width:30px;height:30px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;background:${s.ok?'#1B7B3F':'var(--brand-soft)'};color:${s.ok?'#fff':'var(--brand)'}">${s.ok?'✓':(i+1)}</div><div style="flex:1;min-width:0"><div style="font-weight:700;font-size:14.5px">${s.t}${next?' <span class="pill" style="background:var(--brand-soft);color:var(--brand);font-size:10px;font-weight:800;padding:1px 7px;margin-left:4px">START HERE</span>':''}</div><div class="faint" style="font-size:12.5px;margin-top:2px">${s.d}</div></div>${s.inline==='labor'?`<div class="row" style="gap:6px;align-items:center;flex:none"><input id="setupGoal" type="number" min="0" max="100" step="0.5" value="${cov.targetPct||''}" placeholder="28" style="width:58px;text-align:center;padding:8px;border:1px solid var(--line2);border-radius:8px;background:var(--card);color:var(--ink);font-family:inherit"/><span class="faint">%</span><button class="btn pri" style="width:auto" onclick="setupSaveGoal()">Save</button></div>`:`<button class="btn${s.ok?'':' pri'}" style="width:auto;flex:none" onclick="${s.go}">${s.cta}</button>`}</div>`; }).join('');
   v.innerHTML=h;
 }
-window.setupSaveGoal=async function(){ const val=+((document.getElementById('setupGoal')||{}).value)||0; const r=await sb.from('day_items').select('detail').eq('kind','covrules').maybeSingle(); let cd={}; try{cd=JSON.parse((r.data&&r.data.detail)||'{}');}catch(e){} cd.targetPct=val>0?val:''; await sb.from('day_items').delete().eq('kind','covrules'); await sb.from('day_items').insert({kind:'covrules',title:'coverage',on_date:null,detail:JSON.stringify(cd),created_by:state.user.id}); go('setup'); };
+window.setupSaveGoal=async function(){ const val=+((document.getElementById('setupGoal')||{}).value)||0; const r=await sb.from('day_items').select('detail').eq('kind','covrules').order('id',{ascending:false}).limit(1).maybeSingle(); let cd={}; try{cd=JSON.parse((r.data&&r.data.detail)||'{}');}catch(e){} cd.targetPct=val>0?val:''; await sb.from('day_items').delete().eq('kind','covrules'); await sb.from('day_items').insert({kind:'covrules',title:'coverage',on_date:null,detail:JSON.stringify(cd),created_by:state.user.id}); go('setup'); };
 
 async function vTeam(v){
   if(!canSee(state.page)){ go('home'); return; }
