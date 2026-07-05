@@ -1245,9 +1245,14 @@ window.autoDraft=async function(){
   let tmpl=[]; let twStart=null;
   for(let back=1; back<=3 && !tmpl.length; back++){ const ps=new Date(ws); ps.setDate(ps.getDate()-7*back); const pe=new Date(ps); pe.setDate(pe.getDate()+6); const r=await sb.from('shifts').select('*').gte('on_date',isoDate(ps)).lte('on_date',isoDate(pe)); if((r.data||[]).length){ tmpl=r.data; twStart=isoDate(ps); } }
   if(!tmpl.length && !anyRules){ alert('Auto-draft needs either your Coverage rules set (on the Schedule page) or one past week of shifts to learn from. Set your coverage rules, or build a week first.'); return; }
+  // Name the exact week so the scheduler always knows what they're building.
+  const _MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const _dlbl=iso=>{ const d=new Date(iso+'T00:00'); return _MON[d.getMonth()]+' '+d.getDate(); };
+  const wkLbl=_dlbl(isoDays[0])+' – '+_dlbl(isoDays[6])+', '+isoDays[6].slice(0,4);
   // existing shifts this week?
   const cur=await sb.from('shifts').select('id').gte('on_date',isoDays[0]).lte('on_date',isoDays[6]);
-  if((cur.data||[]).length){ if(!confirm('This week already has '+cur.data.length+' shifts. Replace them with a fresh auto-draft?')) return; await sb.from('shifts').delete().gte('on_date',isoDays[0]).lte('on_date',isoDays[6]); }
+  if((cur.data||[]).length){ if(!confirm('Build the week of '+wkLbl+'?\n\nThis week already has '+cur.data.length+' shifts — building will replace all of them with a fresh draft.')) return; await sb.from('shifts').delete().gte('on_date',isoDays[0]).lte('on_date',isoDays[6]); }
+  else { if(!confirm('Build a draft schedule for the week of '+wkLbl+'?')) return; }
   // inputs
   const [rav,rto,rpay,rsal]=await Promise.all([ sb.from('availability').select('person_name,weekday,can_work,note'), sb.from('time_off').select('*').eq('status','approved'), sb.from('pay_rates').select('*'), sb.from('day_sales').select('*').gte('on_date',isoDays[0]).lte('on_date',isoDays[6]) ]);
   await loadPositions(); await loadProfiles(); await loadArchived();
