@@ -1055,7 +1055,7 @@ async function vSchedule(v){
   const body=document.getElementById('schbody');
   ({overview:schOverview, whoson:schWhoson, schedule:schBoard, team:schTeam, availability:schAvail, timeoff:schTimeoff, pool:schPool, logbook:schLogbook, reports:schReports}[useTab]||schOverview)(body);
 }
-window.schGo=function(t){ state.ctx.stab=t; vSchedule(document.getElementById('view')); };
+window.schGo=function(t){ state.ctx.stab=t; try{ localStorage.setItem('sw_nav',JSON.stringify({p:state.page,c:state.ctx})); }catch(e){} vSchedule(document.getElementById('view')); };
 /* ---------- Positions: single source of truth (stored as day_items kind='pos') ---------- */
 const POS_ORDER=['OJR','Owner','GM','Manager','Supervisor','Trainer','Trainee','Team Member','Unassigned'];
 const POS_COL={OJR:'#DC2626',Owner:'#7C3AED',GM:'#6D28D9',Manager:'#2563EB',Supervisor:'#0D9488',Trainer:'#0891B2',Trainee:'#D97706','Team Member':'#64748B',Unassigned:'#94A3B8'};
@@ -1247,7 +1247,10 @@ window.addShift=async function(){ const nm=val('shname'); const on=document.getE
 window.delShift=async function(id){ await sb.from('shifts').delete().eq('id',id); vSchedule(document.getElementById('view')); };
 // Click an empty schedule cell -> type start/end right there -> saves a shift for that person/day
 window.quickAdd=function(cell){ if(!cell||cell.querySelector('.qadd'))return; cell.innerHTML=`<div class="qadd" onclick="event.stopPropagation()" style="display:flex;flex-direction:column;gap:3px;padding:1px"><input type="time" class="qaS" value="08:00" style="font-size:11px;padding:2px 3px;border:1px solid var(--line2);border-radius:5px;font-family:inherit;background:var(--card);color:var(--ink)"/><input type="time" class="qaE" value="14:00" style="font-size:11px;padding:2px 3px;border:1px solid var(--line2);border-radius:5px;font-family:inherit;background:var(--card);color:var(--ink)"/><div style="display:flex;gap:3px"><button onclick="quickAddSave(this)" style="flex:1;font-size:10px;padding:3px;border:none;border-radius:5px;background:var(--brand);color:#fff;cursor:pointer;font-weight:700">Add</button><button onclick="vSchedule(document.getElementById('view'))" style="font-size:10px;padding:3px 5px;border:1px solid var(--line2);border-radius:5px;background:var(--card);color:var(--muted);cursor:pointer">&times;</button></div></div>`; const f=cell.querySelector('.qaS'); if(f)f.focus(); };
-window.quickAddSave=async function(btn){ const cell=btn.closest('.daycell'); const box=btn.closest('.qadd'); if(!cell||!box)return; const name=cell.dataset.nm, iso=cell.dataset.iso; const s=box.querySelector('.qaS').value, e=box.querySelector('.qaE').value; if(!s||!e){ alert('Pick a start and end time.'); return; } if(e<=s){ alert('End time needs to be after the start time.'); return; } await sb.from('shifts').insert({person_name:name, role:posOf(name), on_date:iso, start_time:s, end_time:e, kind:'shift', user_id:(profileOf(name)||{}).id||null}); vSchedule(document.getElementById('view')); };
+window.quickAddSave=async function(btn){ const cell=btn.closest('.daycell'); const box=btn.closest('.qadd'); if(!cell||!box)return; const name=cell.dataset.nm, iso=cell.dataset.iso; const s=box.querySelector('.qaS').value, e=box.querySelector('.qaE').value; if(!s||!e){ alert('Pick a start and end time.'); return; } if(e<=s){ alert('End time needs to be after the start time.'); return; } await sb.from('shifts').insert({person_name:name, role:posOf(name), on_date:iso, start_time:s, end_time:e, kind:'shift', user_id:(profileOf(name)||{}).id||null});
+  // If this new shift covers an OPEN slot that day, clear the open slot so the "needs filling" flag goes away
+  try{ const op=await sb.from('shifts').select('id,start_time,end_time').eq('on_date',iso).eq('person_name','__OPEN__'); const cov=(op.data||[]).filter(o=>(o.start_time||'')>=s && (o.end_time||'99:99')<=e); if(cov.length) await sb.from('shifts').delete().in('id',cov.map(o=>o.id)); }catch(e2){}
+  vSchedule(document.getElementById('view')); };
 window.editShift=function(id){
   const s=(window._shifts||{})[id]; if(!s)return; const ojr=false;
   let m=document.getElementById('shedit'); if(m)m.remove();
