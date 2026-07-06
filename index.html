@@ -1730,7 +1730,8 @@ window.autoDraft=async function(opts){
   // Time-of-day lean per slot (drives prefer-early / prefer-late): early = starts in the first third of the day's span, late = ends in the last third
   Object.keys(daySlots).forEach(dw=>{ const arr=daySlots[dw]; if(!arr.length) return; let mn=Infinity,mx=-Infinity; arr.forEach(sl=>{ const a=parseClock(sl.start),b=parseClock(sl.end); if(a!=null&&a<mn)mn=a; if(b!=null&&b>mx)mx=b; }); const span=mx-mn; if(!(span>0)) return; const third=span/3; arr.forEach(sl=>{ const a=parseClock(sl.start),b=parseClock(sl.end); sl._earlyLean=(a!=null&&a<=mn+third+1e-9); sl._lateLean=(b!=null&&b>=mx-third-1e-9); }); });
   // longest shifts first (so anchors + full shifts go to top priority), then busiest day
-  const orderSlots=slots.slice().sort((a,b)=> (hrsOf(b)-hrsOf(a)) || ((_dem[b.dow]||0)-(_dem[a.dow]||0)) || a.dow-b.dow || (a.start||'').localeCompare(b.start||''));
+  // Fill the BUSIEST days first (so weekend peaks claim their people before a slow weekday uses them up), then longest-shift-first within each day (anchors full-timers to the long shifts). Fixes: at a low shift-minimum, short peak shifts used to sort last and go open once the roster hit its day/hour caps.
+  const orderSlots=slots.slice().sort((a,b)=> ((_dem[b.dow]||0)-(_dem[a.dow]||0)) || (hrsOf(b)-hrsOf(a)) || a.dow-b.dow || (a.start||'').localeCompare(b.start||''));
   const reqStOf=sl=>sl._needSkill||(sl.station&&!isRankLabel(sl.station)?sl.station:'');
   const eligForSlot=(n,sl,iso,hrs,ignoreLen)=>{ const needLeader=!!sl._leadReq; return canCover(n)&&(!needLeader||(sl._leadReq==='opening'?canOpen(n):canClose(n)))&&(!sl._needSkill||hasSkill(n,sl._needSkill))&&(!sl._minLevel||lvlOf(n,reqStOf(sl))>=sl._minLevel)&&eligible(n,sl,iso,hrs,ignoreLen); };
   const placeSlot=(sl)=>{ if(sl._done) return; const iso=isoDays[sl.dow]; const hrs=hrsOf(sl); const needLeader=!!sl._leadReq; const reqSt=reqStOf(sl);
