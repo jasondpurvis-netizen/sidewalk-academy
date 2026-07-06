@@ -384,7 +384,7 @@ function canSee(page){ return myRank()>=permOf(page); }
 function renderApp(){
   const isAdmin = state.profile && state.profile.role==="admin";
   const realAdmin = state.previewLIT ? (state._realRole==='admin') : isAdmin;
-  const NAV_ALL=[["",[["whiteboard","Whiteboard","ti-layout-dashboard"]]],["Academy",[["home","Academy","ti-school"],["build","Training","ti-tools"],["ask","Ask","ti-bulb"],["journal","Journal","ti-notebook"]]],["Every day",[["today","Daily Report","ti-clipboard-list"],["schedule","Schedule","ti-calendar-week"],["checklists","Checklists","ti-checklist"],["rm","Fix-it list","ti-tool"],["lists","Lists","ti-list-details"],["team","Team","ti-users"],["onboarding","Onboarding","ti-user-plus"],["calendar","Calendar","ti-calendar-month"]]],["Numbers",[["sales","Sales","ti-chart-line"],["saleshist","Sales history","ti-history"]]],["Shared",[["community","Community","ti-messages"],["resources","Resources","ti-files"],["downloads","Downloads","ti-download"]]],["",[["setup","Setup","ti-list-check"],["settings","Settings","ti-settings"]]]];
+  const NAV_ALL=[["",[["whiteboard","Whiteboard","ti-layout-dashboard"]]],["Academy",[["home","Academy","ti-school"],["build","Training","ti-tools"],["ask","Ask","ti-bulb"],["journal","Journal","ti-notebook"]]],["Every day",[["today","Daily Report","ti-clipboard-list"],["schedule","Schedule","ti-calendar-week"],["team","Team","ti-users"],["onboarding","Onboarding","ti-user-plus"],["calendar","Calendar","ti-calendar-month"]]],["Lists",[["rm","Fix-it list","ti-tool"],["lists","Lists","ti-list-details"]]],["Numbers",[["sales","Sales","ti-chart-line"],["saleshist","Sales history","ti-history"]]],["Shared",[["community","Community","ti-messages"],["resources","Resources","ti-files"],["downloads","Downloads","ti-download"]]],["",[["setup","Setup","ti-list-check"],["settings","Settings","ti-settings"]]]];
   const nav = NAV_ALL.map(([g,items])=>[g, items.filter(([p])=>canSee(p))]).filter(([g,items])=>items.length);
   root.innerHTML = `<div class="app">
     <aside class="side">
@@ -1336,10 +1336,10 @@ async function vToday(v){
     sb.from('day_items').select('*').gt('on_date',iso).order('on_date').limit(40),
     loadDates(), loadArchived()
   ]);
-  const items=ri.data||[], rots=rr.data||[], notes=rn.data||[], upcoming=ru.data||[];
+  const items=ri.data||[], rots=rr.data||[], notes=rn.data||[], upcoming=(ru.data||[]).filter(u=>['order','note','people','training','task'].includes(u.kind));
   const dueRots=rots.filter(r=>{ if(!r.last_done) return true; const d=new Date(r.last_done); d.setDate(d.getDate()+(r.cadence_days||7)); return d.toISOString().slice(0,10)<=iso; });
   const ojrItem=items.find(i=>i.kind==='ojr');
-  const boardItems=items.filter(i=>!['ojr','mission','vision','pos','pool','archived','pdates','profile','covrules','stations'].includes(i.kind));
+  const boardItems=items.filter(i=>['order','note','people','training','task'].includes(i.kind)); // only real board items — never internal/feature rows (csconfig, list, fixit, etc.)
   const open=boardItems.filter(i=>!i.done);
   const parts=[];
   if(dueRots.length) parts.push(dueRots.length+' cleaning'+(dueRots.length>1?'s':'')+' due');
@@ -1420,7 +1420,7 @@ function _daysUntil(d){ const t=new Date(); t.setHours(0,0,0,0); return Math.rou
 function upcomingCelebrations(within){ within=within||7; const m=window._pdates||{}; const out=[];
   Object.keys(m).forEach(name=>{ if(isArchived(name))return; const p=m[name]||{};
     if(p.bday){ const a=p.bday.split('-').map(Number); if(a.length===2){ const d=_nextOccur(a[0],a[1]); const du=_daysUntil(d); if(du>=0&&du<=within) out.push({name,type:'Birthday',emoji:'🎂',date:d,days:du}); } }
-    if(p.hired){ const a=p.hired.split('-').map(Number); if(a.length===3){ const d=_nextOccur(a[1],a[2]); const du=_daysUntil(d); const years=d.getFullYear()-a[0]; if(du>=0&&du<=within&&years>=1) out.push({name,type:'Work anniversary',emoji:'🎉',date:d,days:du,years}); } }
+    if(p.hired){ const a=p.hired.split('-').map(Number); if(a.length===3){ let bad=false; const dob=(profileOf(name)||{}).dob; if(dob&&dob.length>=4&&a[0]<=(+dob.slice(0,4))+12) bad=true; /* "hired" before ~age 13 = it's really their birthdate in the hire field */ if(p.bday){ const b=p.bday.split('-').map(Number); if(b.length===2&&b[0]===a[1]&&b[1]===a[2]) bad=true; } /* hire date == birthday → bad data */ const d=_nextOccur(a[1],a[2]); const du=_daysUntil(d); const years=d.getFullYear()-a[0]; if(!bad&&du>=0&&du<=within&&years>=1&&years<=60) out.push({name,type:'Work anniversary',emoji:'🎉',date:d,days:du,years}); } }
   });
   return out.sort((a,b)=>a.days-b.days);
 }
@@ -2421,7 +2421,7 @@ async function vCalendar(v){
   if(state.calCache && state.calCache.ym===ym){ data=state.calCache.data; }
   else { v.innerHTML='<div class="muted">Loading…</div>'; const r=await sb.from('day_items').select('*').gte('on_date',first).lte('on_date',last).order('created_at'); data=r.data||[]; state.calCache={ym,data}; }
   const CAL_HIDE=new Set(['pos','ojr','mission','vision','pool','archived','pdates','profile','covrules','stations','daylog','cltmpl','clrun','actual','punch','hourly']);
-  const byd={}; (data||[]).forEach(it=>{ if(CAL_HIDE.has(it.kind))return; (byd[it.on_date]=byd[it.on_date]||[]).push(it); });
+  const byd={}; (data||[]).forEach(it=>{ if(!CAL_KINDS[it.kind])return; (byd[it.on_date]=byd[it.on_date]||[]).push(it); }); // whitelist: only real calendar kinds show — never internal rows like csconfig
   const hol={}; usHolidays(y).forEach(x=>hol[x.date]=x);
   const todayIso=isoDate(new Date()); const sel=state.ctx.day||(ym===todayIso.slice(0,7)?todayIso:first);
   let h=`<div class="sched-bar"><div class="sched-nav"><button class="iconbtn" aria-label="Previous month" onclick="calMonth(-1)"><i class="ti ti-chevron-left"></i></button><button class="iconbtn" aria-label="Next month" onclick="calMonth(1)"><i class="ti ti-chevron-right"></i></button><button class="btn" style="width:auto" onclick="calMonth(0)">This month</button></div><div style="font-size:18px;font-weight:600">${new Date(y,m-1,1).toLocaleDateString(undefined,{month:'long',year:'numeric'})}</div></div>`;
