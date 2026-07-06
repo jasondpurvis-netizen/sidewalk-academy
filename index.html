@@ -1427,7 +1427,7 @@ window.setPos=async function(name,pos){ await sb.from('day_items').delete().eq('
 function posSelect(name,cur){ return `<select onchange="setPos('${esc(name).replace(/'/g,"\\'")}',this.value);var d=this.parentNode.querySelector('.posdot');if(d)d.style.background=window.POSCOL(this.value)" style="padding:7px 9px;border:1px solid var(--line2);border-radius:8px;background:var(--card);color:var(--ink);font-family:inherit;font-size:13px">${POS_PICK.map(o=>`<option value="${o}"${o===cur?' selected':''}>${o}</option>`).join('')}</select>`; }
 async function schBoard(v){
   const isAdmin=myRank()>=3; /* schedule building tools = Manager and up; supervisors/team get a read-only published view */
-  v.innerHTML='<div class="muted">Loading…</div>';
+  if(!v.querySelector('.board')) v.innerHTML='<div class="muted">Loading…</div>'; // keep the current week's grid on screen while the new one loads — no blank flash on week-switch
   if(!state.ctx.wk){ try{ const _sw=localStorage.getItem('sched_wk'); if(_sw) state.ctx.wk=_sw; }catch(e){} }
   const base = state.ctx.wk ? wkDate(state.ctx.wk) : weekStart(new Date());
   const start=weekStart(base); const days=[...Array(7)].map((_,i)=>{ const d=new Date(start); d.setDate(d.getDate()+i); return d; });
@@ -2427,9 +2427,16 @@ function _addStationPill(v){ const list=document.getElementById('stationList'); 
 window.addStation=function(){ const inp=document.getElementById('stationNew'); const v=(inp.value||'').trim(); if(!v)return; if([...document.querySelectorAll('#stationList [data-st]')].some(e=>(e.getAttribute('data-st')||'').toLowerCase()===v.toLowerCase())){ inp.value=''; return; } _addStationPill(v); inp.value=''; inp.focus(); };
 window.saveStations=async function(){ const arr=[...document.querySelectorAll('#stationList [data-st]')].map(e=>e.getAttribute('data-st')).filter(Boolean); await sb.from('day_items').delete().eq('kind','stations'); if(arr.length) await sb.from('day_items').insert({kind:'stations',title:'stations',on_date:null,detail:JSON.stringify(arr),created_by:state.user.id}); state.settings.stations=arr; const m=document.getElementById('stmsg'); if(m)m.textContent='Saved ✓'; };
 window.savePerms=async function(){ const perms={}; document.querySelectorAll('.permSel').forEach(s=>{ perms[s.getAttribute('data-pg')]=+s.value; }); const tv=document.getElementById('teamViewSel'); if(tv) perms._teamView=tv.value; await sb.from('day_items').delete().eq('kind','perms'); await sb.from('day_items').insert({kind:'perms',title:'perms',on_date:null,detail:JSON.stringify(perms),created_by:state.user.id}); state.perms=perms; const m=document.getElementById('permsg'); if(m)m.textContent='Saved ✓ — updates as you move around'; };
-function _inviteText(code){ const nm=(state.settings&&state.settings.academy_name)||'our team'; return 'Join '+nm+' — tap to sign up: '+location.origin+'/?join='+encodeURIComponent(code)+'  (join code: '+code+')'; }
+function _inviteText(code){ const nm=(state.settings&&state.settings.academy_name)||'our team'; const url=location.origin+'/?join='+encodeURIComponent(code); return "You're invited to join "+nm+"!\n\n"
+  +"This is our team app — it's where you'll find your schedule, your training, and team messages, all in one place.\n\n"
+  +"Getting set up takes about a minute:\n"
+  +"1. Tap this link: "+url+"\n"
+  +"2. Enter your name, your email, and a password to create your login.\n"
+  +"3. That's it — you're in. Your schedule and training will be waiting for you.\n\n"
+  +"If the link doesn't open, go to "+location.origin+" and enter this join code: "+code+"\n\n"
+  +"Welcome to the team!"; }
 window.copyInvite=function(code){ const t=_inviteText(code); const done=function(){ const m=document.getElementById('setmsg'); if(m){ m.textContent='Invite copied — paste it into a text or email.'; setTimeout(function(){m.textContent='';},3000);} }; if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(t).then(done,function(){ prompt('Copy this invite:', t); }); } else { prompt('Copy this invite:', t); } };
-window.shareInvite=function(code){ const t=_inviteText(code); if(navigator.share){ navigator.share({title:'Sidewalk Academy', text:t}).catch(function(){}); } else { location.href='mailto:?subject='+encodeURIComponent('Join the Sidewalk Academy team')+'&body='+encodeURIComponent(t); } };
+window.shareInvite=function(code){ const t=_inviteText(code); const nm=(state.settings&&state.settings.academy_name)||'the team'; if(navigator.share){ navigator.share({title:nm, text:t}).catch(function(){}); } else { location.href='mailto:?subject='+encodeURIComponent('Join '+nm)+'&body='+encodeURIComponent(t); } };
 window.saveSettings=async function(){
   const name=(document.getElementById('setname').value||'').trim();
   const color=document.getElementById('setcolor').value;
