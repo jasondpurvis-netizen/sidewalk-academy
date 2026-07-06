@@ -1825,9 +1825,10 @@ window.autoDraft=async function(opts){
   // Peak blackout windows: nobody may clock OUT mid-rush. A shift ending inside a window gets pushed to the window's end (stay through the rush); a split hand-off gets cut to just before it.
   const _blk=(cov.blackouts||[]).map(b=>({s:parseClock(b.start),e:parseClock(b.end),days:(Array.isArray(b.days)&&b.days.length)?b.days:[0,1,2,3,4,5,6]})).filter(b=>b.s!=null&&b.e!=null&&b.e>b.s);
   const inBlk=(dw,t)=>_blk.find(b=>b.days.indexOf(dw)>=0 && t>b.s+1e-9 && t<b.e-1e-9);
-  const cleanEnd=(dw,t)=>{ const b=inBlk(dw,t); return b?b.e:t; };   // a shift ending mid-rush stays through it
-  const cleanStart=(dw,t)=>{ const b=inBlk(dw,t); return b?b.s:t; }; // a shift starting mid-rush starts just before it (in place before the chaos)
-  const cleanMid=(dw,t)=>{ const b=inBlk(dw,t); return b?b.s:t; };
+  // Push a boundary out of the UNION of overlapping rush windows (iterate) — escaping one window could otherwise land inside another.
+  const cleanEnd=(dw,t)=>{ let b,g=0; while((b=inBlk(dw,t))&&g++<20) t=b.e; return t; };   // a shift ending mid-rush stays through it
+  const cleanStart=(dw,t)=>{ let b,g=0; while((b=inBlk(dw,t))&&g++<20) t=b.s; return t; }; // a shift starting mid-rush starts just before it (in place before the chaos)
+  const cleanMid=(dw,t)=>{ return inBlk(dw,t)?cleanStart(dw,t):t; };
   // Build a day's shifts FROM YOUR MATRIX by HORIZONTAL LAYERING: each demand level = one shift spanning the whole time it's needed, so the opener works a full shift (open→close) instead of a stub, and peak surges become short mid shifts. Splits any shift over max length; extends any under min length.
   const genMatrix=dw=>{ const M=cov.matrix; if(!M||!M.blocks||!M.blocks.length) return null; const rows=M.blocks.map(b=>({s:parseClock(b.s),e:parseClock(b.e),need:+((b.n||[])[dw]||0)})).filter(b=>b.s!=null&&b.e!=null&&b.e>b.s).sort((a,b)=>a.s-b.s); if(!rows.length) return null; const peak=Math.max.apply(null,rows.map(r=>r.need)); if(peak<=0) return null; const dayStart=rows[0].s, dayEnd=rows[rows.length-1].e; const out=[]; for(let L=1;L<=peak;L++){ let segS=null,segE=null; rows.forEach(r=>{ if(r.need>=L){ if(segS==null)segS=r.s; segE=r.e; } }); if(segS==null) continue; let s=segS; if(floorH!=null&&s<floorH)s=floorH; const e=segE, span=e-s; if(span<=mMax+1+1e-9){ out.push({s,e}); } else { const pieces=Math.ceil(span/mMax), plen=span/pieces; for(let i=0;i<pieces;i++) out.push({s:s+i*plen, e:(i===pieces-1)?e:s+(i+1)*plen}); } }
     // Stagger: no two people START together (≥15 min apart), and no two LEAVE together except the closers — avoids pile-ups at the door (congregating, chaos, harder to lead)
