@@ -1022,6 +1022,7 @@ async function vCommunity(v){
   const canCh=id=>{ const cc=allCh.find(x=>x.id===id); if(!cc||cc.hidden) return false; return isAdmin || cc.memberVisible; };
   if(!canCh(ch)){ go('community',{ch:'announcements'}); return; }
   const visible = allCh.filter(c=> !c.hidden && (isAdmin || c.memberVisible));
+  let _cf={}; try{ _cf=JSON.parse(localStorage.getItem('sw_chfav')||'{}'); _cf[ch]=(_cf[ch]||0)+1; localStorage.setItem('sw_chfav',JSON.stringify(_cf)); }catch(e){} visible.sort((a,b)=>(_cf[b.id]||0)-(_cf[a.id]||0)); /* your most-used channels float to the front so you don't scroll to find them */
   let posts = tag ? state.community.posts.filter(p=>(p.body||'').toLowerCase().includes(tag) && (p.channel!=='leadership'||isAdmin)) : state.community.posts.filter(p=>p.channel===ch);
   const cBy={}; state.community.comments.forEach(c=>{ (cBy[c.post_id]=cBy[c.post_id]||[]).push(c); });
   const cur = allCh.find(c=>c.id===ch)||visible[0]||allCh[0];
@@ -2286,11 +2287,12 @@ async function vSales(v){
   v.innerHTML='<div class="muted">Loading…</div>';
   const now=new Date(); const y=now.getFullYear(); const iso=d=>isoDate(d);
   const curWS=weekStart(now); const lastWS=new Date(curWS); lastWS.setDate(lastWS.getDate()-7);
-  const [rh,rsh,rpay,rcov]=await Promise.all([ sb.from('day_items').select('on_date,detail').eq('kind','hourly').gte('on_date',(y-1)+'-01-01').lte('on_date',iso(now)), sb.from('shifts').select('person_name,on_date,start_time,end_time').gte('on_date',isoDate(lastWS)).lte('on_date',iso(now)), sb.from('pay_rates').select('person_name,wage'), sb.from('day_items').select('detail').eq('kind','covrules').order('id',{ascending:false}).limit(1).maybeSingle() ]);
+  const [rh,rsh,rpay,rcov,rds]=await Promise.all([ sb.from('day_items').select('on_date,detail').eq('kind','hourly').gte('on_date',(y-1)+'-01-01').lte('on_date',iso(now)), sb.from('shifts').select('person_name,on_date,start_time,end_time').gte('on_date',isoDate(lastWS)).lte('on_date',iso(now)), sb.from('pay_rates').select('person_name,wage'), sb.from('day_items').select('detail').eq('kind','covrules').order('id',{ascending:false}).limit(1).maybeSingle(), sb.from('day_sales').select('on_date,sales').gte('on_date',(y-1)+'-01-01').lte('on_date',iso(now)) ]);
   let cov={}; try{ const cd=rcov&&rcov.data&&rcov.data.detail; cov=cd?(typeof cd==='string'?JSON.parse(cd):cd):{}; }catch(e){} const burdenMul=1+((+(cov.burdenPct)||0)/100); const goalPct=+(cov.targetPct)||0;
   const wage={}; (rpay.data||[]).forEach(p=>wage[p.person_name]=Number(p.wage)||0); const havePay=Object.keys(wage).length>0;
   const shiftsByDay={}; (rsh.data||[]).forEach(s=>{ (shiftsByDay[s.on_date]=shiftsByDay[s.on_date]||[]).push(s); });
   const map={}, byHourMap={}; (rh.data||[]).forEach(x=>{ try{ const dv=typeof x.detail==='string'?JSON.parse(x.detail||'{}'):(x.detail||{}); let t=Number(dv.total)||0; const bh=dv.byHour||null; if(!t&&bh){ t=Object.values(bh).reduce((a,b)=>a+(+b||0),0); } if(t) map[x.on_date]=t; if(bh&&Object.keys(bh).length) byHourMap[x.on_date]=bh; }catch(e){} });
+  (rds.data||[]).forEach(x=>{ const s=Math.round(+x.sales||0); if(s) map[x.on_date]=Math.max(map[x.on_date]||0, s); }); /* day_sales backstops days where the hourly POS feed came in partial/broken */
   const has=Object.keys(map).length;
   const sumRange=(s,e)=>{ let t=0; Object.keys(map).forEach(k=>{ if(k>=s&&k<=e) t+=map[k]; }); return t; };
   const todayIso=iso(now); const lyToday=iso(new Date(y-1,now.getMonth(),now.getDate()));
