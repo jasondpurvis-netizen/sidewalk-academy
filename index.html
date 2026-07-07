@@ -1649,7 +1649,7 @@ async function schBoard(v){
   const start=weekStart(base); const days=[...Array(7)].map((_,i)=>{ const d=new Date(start); d.setDate(d.getDate()+i); return d; });
   const isoDays=days.map(isoDate); const wkStart=isoDays[0];
   const lyDates=isoDays.map(iso=>{ const x=new Date(iso+'T00:00'); x.setFullYear(x.getFullYear()-1); return isoDate(x); });
-  const [rsh,rpf,rpay,rsal,rpub,rojr,rto,rhr] = await Promise.all([
+  const [rsh,rpf,rpay,rsal,rpub,rojr,rto,rhr,,,,rcov,rfc] = await Promise.all([
     sb.from('shifts').select('*').gte('on_date',isoDays[0]).lte('on_date',isoDays[6]),
     sb.from('profiles').select('*'),
     sb.from('pay_rates').select('*'),
@@ -1660,12 +1660,14 @@ async function schBoard(v){
     sb.from('day_items').select('on_date,detail').eq('kind','hourly').in('on_date',lyDates),
     loadPositions(),
     loadArchived(),
-    loadProfiles()
+    loadProfiles(),
+    sb.from('day_items').select('detail').eq('kind','covrules').order('id',{ascending:false}).limit(1).maybeSingle(),
+    sb.from('day_items').select('on_date,detail').eq('kind','fcadj').in('on_date',isoDays)
   ]);
   const ojrByDay={}; (rojr.data||[]).forEach(o=>{ if(o.on_date) ojrByDay[o.on_date]=o.detail; });
-  let covRules={requireLeader:true,shiftLen:8,minLen:4,maxLen:8,targetPct:'',burdenPct:'',matrix:{blocks:[]},days:{},roleReqs:[],blackouts:[]}; try{ const rc=await sb.from('day_items').select('detail').eq('kind','covrules').order('id',{ascending:false}).limit(1).maybeSingle(); const cd=JSON.parse((rc.data&&rc.data.detail)||'{}'); covRules={requireLeader:cd.requireLeader!==false, shiftLen:+(cd.shiftLen)||8, minLen:+(cd.minLen)||4, maxLen:+(cd.maxLen)||8, targetPct:cd.targetPct||'', burdenPct:+(cd.burdenPct)||0, matrix:cd.matrix||{blocks:[]}, days:cd.days||{}, roleReqs:Array.isArray(cd.roleReqs)?cd.roleReqs:[], blackouts:Array.isArray(cd.blackouts)?cd.blackouts:[]}; }catch(e){}
+  let covRules={requireLeader:true,shiftLen:8,minLen:4,maxLen:8,targetPct:'',burdenPct:'',matrix:{blocks:[]},days:{},roleReqs:[],blackouts:[]}; try{ const cd=JSON.parse((rcov&&rcov.data&&rcov.data.detail)||'{}'); covRules={requireLeader:cd.requireLeader!==false, shiftLen:+(cd.shiftLen)||8, minLen:+(cd.minLen)||4, maxLen:+(cd.maxLen)||8, targetPct:cd.targetPct||'', burdenPct:+(cd.burdenPct)||0, matrix:cd.matrix||{blocks:[]}, days:cd.days||{}, roleReqs:Array.isArray(cd.roleReqs)?cd.roleReqs:[], blackouts:Array.isArray(cd.blackouts)?cd.blackouts:[]}; }catch(e){}
   const covTarget=di=>{ const M=covRules.matrix; if(M&&M.blocks&&M.blocks.length){ let mx=0; M.blocks.forEach(b=>{ const n=+((b.n||[])[di]||0); if(n>mx)mx=n; }); return mx||null; } const c=covRules.days[di]; return c&&c.people?+c.people:null; };
-  let fcAdj={}; if(isAdmin){ try{ const ra=await sb.from('day_items').select('on_date,detail').eq('kind','fcadj').in('on_date',isoDays); (ra.data||[]).forEach(x=>{ try{ const d=typeof x.detail==='string'?JSON.parse(x.detail||'{}'):(x.detail||{}); if(d&&+d.amt>0) fcAdj[x.on_date]=+d.amt; }catch(e){} }); }catch(e){} }
+  let fcAdj={}; if(isAdmin && rfc){ try{ (rfc.data||[]).forEach(x=>{ try{ const d=typeof x.detail==='string'?JSON.parse(x.detail||'{}'):(x.detail||{}); if(d&&+d.amt>0) fcAdj[x.on_date]=+d.amt; }catch(e){} }); }catch(e){} }
   const offMap={}; (rto.data||[]).forEach(t=>{ isoDays.forEach(iso=>{ if(iso>=t.start_date && iso<=(t.end_date||t.start_date)){ (offMap[t.person_name]=offMap[t.person_name]||{})[iso]=t.reason||'Time off'; } }); });
   const shifts=rsh.data||[]; window._shifts={}; shifts.forEach(s=>window._shifts[s.id]=s); const _pm={}; (rpf.data||[]).forEach(p=>_pm[p.name]=p); const team=rosterNames().map(n=>({name:n,id:(_pm[n]||{}).id||null})); window._team=team;
   const wage={}; (rpay.data||[]).forEach(p=>wage[p.person_name]=Number(p.wage)||0);
