@@ -248,7 +248,7 @@ const STALL_DAYS=5;
 const DEFAULT_BRAND='#4A9CAD';
 const DEFAULT_NAME='Sidewalk Academy';
 const DEFAULT_LOGO="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%234A9CAD'/%3E%3Ctext x='50' y='71' font-family='Georgia,serif' font-style='italic' font-size='60' fill='white' text-anchor='middle'%3ES%3C/text%3E%3C/svg%3E";
-async function loadSettings(){ const { data } = await sb.from('settings').select('*').eq('id',1).maybeSingle(); const s=data||{}; state.settings = Object.assign({}, s, { academy_name: s.academy_name||DEFAULT_NAME, brand_color: s.brand_color||DEFAULT_BRAND, logo_url: s.logo_url||DEFAULT_LOGO }); try{ const rs=await sb.from('day_items').select('detail').eq('kind','stations').maybeSingle(); const arr=JSON.parse((rs.data&&rs.data.detail)||'[]'); if(Array.isArray(arr)) state.settings.stations=arr; }catch(e){} try{ const rp=await sb.from('day_items').select('detail').eq('kind','perms').maybeSingle(); state.perms=JSON.parse((rp.data&&rp.data.detail)||'{}'); }catch(e){ state.perms={}; } try{ const rg=await sb.from('day_items').select('title,detail').eq('kind','usergrant'); const gm={}; (rg.data||[]).forEach(x=>{ try{ const d=JSON.parse(x.detail||'{}'); if(x.title&&Array.isArray(d.pages)) gm[x.title]=d.pages; }catch(e){} }); state.grants=gm; }catch(e){ state.grants={}; } applyBrand(state.settings.brand_color); }
+async function loadSettings(){ const { data } = await sb.from('settings').select('*').eq('id',1).maybeSingle(); const s=data||{}; let _tn=null; if(!data && state.profile && state.profile.tenant_id){ try{ const _tr=await sb.from('tenants').select('name').maybeSingle(); _tn=_tr.data&&_tr.data.name; }catch(e){} } state.settings = Object.assign({}, s, { academy_name: s.academy_name||_tn||DEFAULT_NAME, brand_color: s.brand_color||DEFAULT_BRAND, logo_url: s.logo_url||(data?DEFAULT_LOGO:'') }); try{ const rs=await sb.from('day_items').select('detail').eq('kind','stations').maybeSingle(); const arr=JSON.parse((rs.data&&rs.data.detail)||'[]'); if(Array.isArray(arr)) state.settings.stations=arr; }catch(e){} try{ const rp=await sb.from('day_items').select('detail').eq('kind','perms').maybeSingle(); state.perms=JSON.parse((rp.data&&rp.data.detail)||'{}'); }catch(e){ state.perms={}; } try{ const rg=await sb.from('day_items').select('title,detail').eq('kind','usergrant'); const gm={}; (rg.data||[]).forEach(x=>{ try{ const d=JSON.parse(x.detail||'{}'); if(x.title&&Array.isArray(d.pages)) gm[x.title]=d.pages; }catch(e){} }); state.grants=gm; }catch(e){ state.grants={}; } applyBrand(state.settings.brand_color); }
 
 function esc(s){ return (s||"").replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c])); }
 function richBody(html){
@@ -371,7 +371,7 @@ window.createRestaurant=async function(){
   const el=document.getElementById('nrName'); const name=(el&&el.value||'').trim(); const msg=document.getElementById('nrmsg');
   if(!name){ if(msg) msg.innerHTML='<div class="msg err">Give your restaurant a name.</div>'; return; }
   const btn=document.getElementById('nrGo'); if(btn){ btn.textContent='Creating…'; btn.disabled=true; }
-  try{ const r = await sb.rpc('new_restaurant',{ p_name:name }); if(r&&r.error){ if(msg) msg.innerHTML='<div class="msg err">'+esc(r.error.message)+'</div>'; if(btn){ btn.textContent='Create my academy'; btn.disabled=false; } return; } window._pendingName=null; state.profile=null; await boot(); }catch(e){ if(msg) msg.innerHTML='<div class="msg err">'+esc(e.message)+'</div>'; if(btn){ btn.textContent='Create my academy'; btn.disabled=false; } }
+  try{ const r = await sb.rpc('new_restaurant',{ p_name:name }); if(r&&r.error){ if(msg) msg.innerHTML='<div class="msg err">'+esc(r.error.message)+'</div>'; if(btn){ btn.textContent='Create my academy'; btn.disabled=false; } return; } window._pendingName=null; state.profile=null; try{ localStorage.setItem('sw_nav', JSON.stringify({p:'setup',c:{}})); }catch(_){} await boot(); }catch(e){ if(msg) msg.innerHTML='<div class="msg err">'+esc(e.message)+'</div>'; if(btn){ btn.textContent='Create my academy'; btn.disabled=false; } }
 };
 function amsg(t,cls){ document.getElementById("amsg").innerHTML=`<div class="msg ${cls}">${esc(t)}</div>`; }
 async function submitAuth(){
@@ -2507,14 +2507,16 @@ async function schWhoson(v){
 /* ---------- Schedule Setup: one page, in order, self-checking ---------- */
 async function vSetup(v){
   if(!canSee(state.page)){ go('home'); return; }
-  setTitle('Setup','Set it up once, in order — then auto-draft does the work');
+  setTitle('Setup','Your step-by-step guide — do these in order to go live');
   v.innerHTML='<div class="muted">Loading…</div>';
-  const [rav,rprof,rpay,rcov,rsh]=await Promise.all([
+  const [rav,rprof,rpay,rcov,rsh,rds,rpo]=await Promise.all([
     sb.from('availability').select('person_name').limit(1),
     sb.from('day_items').select('title,detail').eq('kind','profile'),
     sb.from('pay_rates').select('person_name').limit(1),
     sb.from('day_items').select('detail').eq('kind','covrules').order('id',{ascending:false}).limit(1).maybeSingle(),
-    sb.from('shifts').select('id').limit(1)
+    sb.from('shifts').select('id').limit(1),
+    sb.from('day_sales').select('on_date').limit(1),
+    sb.from('posts').select('id').limit(1)
   ]);
   await loadPositions(); await loadArchived();
   const roster=rosterNames();
@@ -2524,21 +2526,37 @@ async function vSetup(v){
   let cov={}; try{ cov=JSON.parse((rcov.data&&rcov.data.detail)||'{}'); }catch(e){}
   const hasMatrix=cov.matrix&&cov.matrix.blocks&&cov.matrix.blocks.length;
   const hasReq=(Array.isArray(cov.roleReqs)&&cov.roleReqs.length)||(Array.isArray(cov.blackouts)&&cov.blackouts.length);
-  const steps=[
-    {t:'Add your team',d:'Everyone who gets scheduled has to be on your roster first.',ok:roster.length>0,go:"go('onboarding')",cta:'Add people'},
+  const lg=(state.settings&&state.settings.logo_url)||''; const hasBrand=!!(lg && lg.indexOf('data:image/svg+xml')<0);
+  const assigned=(Object.keys(state.trackAssign||{}).length>0)||roster.length>0;
+  const hasSales=!!(rds.data&&rds.data.length); const hasPosts=!!(rpo.data&&rpo.data.length);
+  const sched=[
     {t:'Set availability',d:'When each person can work. The draft never schedules outside it.',ok:!!(rav.data&&rav.data.length),go:"go('schedule',{stab:'availability'})",cta:'Set availability'},
-    {t:'Set roles & skill levels',d:'Which stations each person can work, and how strong (Learning → Expert).',ok:anyRoles,go:"go('team',{ttab:'skills'})",cta:'Open Skills grid'},
-    {t:'Set who can open & close',d:'Only trusted leaders should open or close — set it on the same Skills grid.',ok:anyRoles,go:"go('team',{ttab:'skills'})",cta:'Skills grid'},
+    {t:'Set roles & skill levels',d:'Which stations each person can work, and how strong (Learning → Expert).',ok:anyRoles,go:"go('team',{ttab:'skills'})",cta:'Skills grid'},
+    {t:'Set who can open & close',d:'Only trusted leaders should open or close — set it on the Skills grid.',ok:anyRoles,go:"go('team',{ttab:'skills'})",cta:'Skills grid'},
     {t:'Set each person’s rules',d:'Priority, max hours, max days, usual days off, and morning/closing fit.',ok:anyRules,go:"go('team',{ttab:'roster'})",cta:'Open Team'},
     {t:'Enter pay rates',d:'Powers your labor $ and labor % everywhere.',ok:!!(rpay.data&&rpay.data.length),go:"go('pay')",cta:'Add pay'},
     {t:'Build your coverage matrix',d:'How many people you need at each time of day — the draft matches this curve.',ok:hasMatrix,go:"go('schedule',{stab:'schedule'})",cta:'Build matrix'},
     {t:'Add required roles & protected windows',d:'Opening leader, a baker at 6, no clock-outs mid-rush.',ok:hasReq,go:"go('schedule',{stab:'schedule'})",cta:'Set requirements'},
-    {t:'Set your labor % goal',d:'The draft keeps you at or under your target. Set it right here.',ok:!!cov.targetPct,inline:'labor'},
+    {t:'Set your labor % goal',d:'The draft keeps you at or under your target.',ok:!!cov.targetPct,inline:'labor'},
     {t:'Run auto-draft',d:'Everything above comes together into a near-final schedule you just tweak.',ok:!!(rsh.data&&rsh.data.length),go:"go('schedule',{stab:'schedule'})",cta:'Go to Schedule'}
   ];
-  const done=steps.filter(s=>s.ok).length; let firstOpen=steps.findIndex(s=>!s.ok);
-  let h=`<div class="card" style="padding:16px 18px;margin-bottom:16px"><div style="font-weight:700;font-size:15px">You're ${done} of ${steps.length} set up</div><div style="height:8px;border-radius:5px;background:var(--line);overflow:hidden;margin-top:9px"><i style="display:block;height:100%;width:${Math.round(done/steps.length*100)}%;background:${done===steps.length?'#1B7B3F':'var(--brand)'}"></i></div><div class="faint" style="font-size:12.5px;margin-top:8px">Work top to bottom. Each step checks itself — a green check means it's done. You can come back and change anything any time.</div></div>`;
-  h+=steps.map((s,i)=>{ const next=i===firstOpen; return `<div class="card" style="padding:14px 16px;margin-bottom:10px;display:flex;gap:13px;align-items:center;border-left:4px solid ${s.ok?'#1B7B3F':(next?'var(--brand)':'var(--line2)')}"><div style="width:30px;height:30px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;background:${s.ok?'#1B7B3F':'var(--brand-soft)'};color:${s.ok?'#fff':'var(--brand)'}">${s.ok?'✓':(i+1)}</div><div style="flex:1;min-width:0"><div style="font-weight:700;font-size:14.5px">${s.t}${next?' <span class="pill" style="background:var(--brand-soft);color:var(--brand);font-size:10px;font-weight:800;padding:1px 7px;margin-left:4px">START HERE</span>':''}</div><div class="faint" style="font-size:12.5px;margin-top:2px">${s.d}</div></div>${s.inline==='labor'?`<div class="row" style="gap:6px;align-items:center;flex:none"><input id="setupGoal" type="number" min="0" max="100" step="0.5" value="${cov.targetPct||''}" placeholder="28" style="width:58px;text-align:center;padding:8px;border:1px solid var(--line2);border-radius:8px;background:var(--card);color:var(--ink);font-family:inherit"/><span class="faint">%</span><button class="btn pri" style="width:auto" onclick="setupSaveGoal()">Save</button></div>`:`<button class="btn${s.ok?'':' pri'}" style="width:auto;flex:none" onclick="${s.go}">${s.cta}</button>`}</div>`; }).join('');
+  const schedDone=sched.every(x=>x.ok);
+  const sections=[
+    {t:'Make it your own',d:'Name your academy and add your logo and colors — make it feel like your restaurant.',ok:hasBrand,go:"go('settings')",cta:'Open Settings'},
+    {t:'Add your team',d:'Add everyone who works for you so they can log in, learn, and get scheduled.',ok:roster.length>0,go:"go('onboarding')",cta:'Add people'},
+    {t:'Turn on training',d:'Your leadership courses are already loaded. Assign who takes which — or let everyone start.',ok:assigned,go:"go('build')",cta:'Open Training'},
+    {t:'Build your schedule',d:'The big one. Set availability, skills, rules and coverage — then auto-draft writes the schedule for you.',sub:true,ok:schedDone},
+    {t:'Connect your sales',d:'Link your POS so labor % and the forecast run on real numbers.',ok:hasSales,go:"go('sales')",cta:'Open Sales'},
+    {t:'Start the conversation',d:'Post a welcome in Community so your team has one place to talk.',ok:hasPosts,go:"go('community')",cta:'Open Community'}
+  ];
+  const secDone=sections.filter(s=>s.ok).length; const firstOpenSec=sections.findIndex(s=>!s.ok);
+  let h=`<div class="card" style="padding:16px 18px;margin-bottom:18px;background:var(--brand-soft);border-color:var(--brand-line)"><div style="font-weight:800;font-size:16px">Welcome — let's get you live</div><div class="faint" style="font-size:12.5px;margin-top:6px;line-height:1.5">Six steps, in order. Each one checks itself — a green check means it's done. You can change anything later.</div><div style="height:9px;border-radius:5px;background:var(--line);overflow:hidden;margin-top:11px"><i style="display:block;height:100%;width:${Math.round(secDone/sections.length*100)}%;background:${secDone===sections.length?'#1B7B3F':'var(--brand)'}"></i></div><div class="faint" style="font-size:12px;margin-top:6px">${secDone} of ${sections.length} sections done</div></div>`;
+  sections.forEach((s,i)=>{ const next=i===firstOpenSec;
+    h+=`<div class="card" style="padding:0;margin-bottom:14px;overflow:hidden;border-left:5px solid ${s.ok?'#1B7B3F':(next?'var(--brand)':'var(--line)')}"><div style="display:flex;gap:13px;align-items:center;padding:15px 17px"><div style="width:38px;height:38px;border-radius:11px;flex:none;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:17px;background:${s.ok?'#1B7B3F':'var(--brand)'};color:#fff">${s.ok?'✓':(i+1)}</div><div style="flex:1;min-width:0"><div style="font-weight:800;font-size:15.5px">${s.t}${next?' <span class="pill" style="background:var(--brand-soft);color:var(--brand);font-size:10px;font-weight:800;padding:1px 7px;margin-left:4px">START HERE</span>':''}</div><div class="faint" style="font-size:12.5px;margin-top:3px;line-height:1.5">${s.d}</div></div>${s.sub?'':`<button class="btn${s.ok?'':' pri'}" style="width:auto;flex:none" onclick="${s.go}">${s.cta}</button>`}</div>`;
+    if(s.sub){ const firstOpenSub=sched.findIndex(x=>!x.ok);
+      h+=`<div style="padding:2px 15px 15px">`+sched.map((ss,j)=>{ const sn=j===firstOpenSub; return `<div style="display:flex;gap:11px;align-items:center;padding:10px 12px;margin-top:8px;background:var(--bg);border-radius:10px;border-left:3px solid ${ss.ok?'#1B7B3F':(sn?'var(--brand)':'var(--line2)')}"><div style="width:24px;height:24px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;background:${ss.ok?'#1B7B3F':'var(--card)'};color:${ss.ok?'#fff':'var(--brand)'};border:${ss.ok?'none':'1px solid var(--brand-line)'}">${ss.ok?'✓':(j+1)}</div><div style="flex:1;min-width:0"><div style="font-weight:700;font-size:13.5px">${ss.t}</div><div class="faint" style="font-size:11.5px;margin-top:1px">${ss.d}</div></div>${ss.inline==='labor'?`<div class="row" style="gap:5px;align-items:center;flex:none"><input id="setupGoal" type="number" min="0" max="100" step="0.5" value="${cov.targetPct||''}" placeholder="28" style="width:52px;text-align:center;padding:6px;border:1px solid var(--line2);border-radius:7px;background:var(--card);color:var(--ink);font-family:inherit"/><span class="faint">%</span><button class="btn pri" style="width:auto;padding:6px 12px" onclick="setupSaveGoal()">Save</button></div>`:`<button class="btn${ss.ok?'':' pri'}" style="width:auto;flex:none;padding:6px 12px;font-size:12.5px" onclick="${ss.go}">${ss.cta}</button>`}</div>`; }).join('')+`</div>`;
+    }
+  });
   v.innerHTML=h;
 }
 window.setupSaveGoal=async function(){ const val=+((document.getElementById('setupGoal')||{}).value)||0; const r=await sb.from('day_items').select('detail').eq('kind','covrules').order('id',{ascending:false}).limit(1).maybeSingle(); let cd={}; try{cd=JSON.parse((r.data&&r.data.detail)||'{}');}catch(e){} cd.targetPct=val>0?val:''; await sb.from('day_items').delete().eq('kind','covrules'); await sb.from('day_items').insert({kind:'covrules',title:'coverage',on_date:null,detail:JSON.stringify(cd),created_by:state.user.id}); go('setup'); };
