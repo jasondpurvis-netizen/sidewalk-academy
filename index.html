@@ -927,7 +927,8 @@ function vAcat(v){
 function vTrack(v){
   const t=state.tracks.find(x=>x.id===state.ctx.tid); if(!t){ go("home"); return; }
   setTitle(t.name, `${trackLessons(t.id).length} modules · earns ${t.cert}`);
-  let h=`<div class="crumb" onclick="go('home')">← Back</div><div class="card">`;
+  const _bk=t.category==='operations'?'operations':'development'; const _bl=_bk==='operations'?'Operations & How-To':'Leadership & Development';
+  let h=`<div class="crumb" onclick="go('acat',{cat:'${_bk}'})">← ${_bl}</div><div class="card">`;
   h+=trackLessons(t.id).map(l=>{ const d=isDone(l.id);
     return `<div class="lesson-row" onclick="go('lesson',{tid:'${t.id}',lid:'${l.id}'})"><div class="dot ${d?'done':''}">${d?'✓':''}</div><div style="flex:1"><div style="font-weight:500">${esc(l.title)}</div><div class="faint" style="font-size:12px">Module ${l.n}</div></div><span class="faint">›</span></div>`;
   }).join("")+`</div>`;
