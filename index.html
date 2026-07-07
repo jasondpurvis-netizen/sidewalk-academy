@@ -331,7 +331,7 @@ async function markDone(tid,lid){
 async function undo(lid){ state.progress.delete(lid); await sb.from("progress").delete().eq("user_id",state.user.id).eq("lesson_id",lid); render(); }
 
 /* ---------- nav ---------- */
-function go(page,ctx){ try{const _n=document.querySelector('.side .nav'),_s=document.querySelector('.side'); window._navScroll=(_n&&_n.scrollTop)||0; window._sideScroll=(_s&&_s.scrollTop)||0;}catch(e){} state.page=page; state.ctx=ctx||{}; try{ history.pushState({p:page,c:state.ctx},''); localStorage.setItem('sw_nav',JSON.stringify({p:page,c:state.ctx})); }catch(e){} scrollTo(0,0); render(); }
+function go(page,ctx){ try{const _n=document.querySelector('.side .nav'),_s=document.querySelector('.side'); window._navScroll=(_n&&_n.scrollTop)||0; window._sideScroll=(_s&&_s.scrollTop)||0;}catch(e){} state.page=page; state.ctx=ctx||{}; try{ if(page&&['whiteboard','lesson','track','acat','setup','settings'].indexOf(page)<0){ const fc=JSON.parse(localStorage.getItem('sw_fav')||'{}'); fc[page]=(fc[page]||0)+1; localStorage.setItem('sw_fav',JSON.stringify(fc)); } }catch(e){} try{ history.pushState({p:page,c:state.ctx},''); localStorage.setItem('sw_nav',JSON.stringify({p:page,c:state.ctx})); }catch(e){} scrollTo(0,0); render(); }
 window.addEventListener('popstate',function(e){ if(!state.user) return; if(e.state&&e.state.p){ state.page=e.state.p; state.ctx=e.state.c||{}; } else { state.page='home'; state.ctx={}; } scrollTo(0,0); render(); });
 async function signOut(){ await sb.auth.signOut(); state.user=null; state.profile=null; render(); }
 
@@ -395,8 +395,9 @@ function canSee(page){ return myRank()>=permOf(page)||hasGrant(page); }
 function renderApp(){
   const isAdmin = state.profile && state.profile.role==="admin";
   const realAdmin = state.previewLIT ? (state._realRole==='admin') : isAdmin;
-  const NAV_ALL=[["",[["whiteboard","Whiteboard","ti-layout-dashboard"]]],["Academy",[["home","Academy","ti-school"],["build","Training","ti-tools"],["ask","Ask","ti-bulb"],["journal","Journal","ti-notebook"]]],["Every day",[["today","Daily Report","ti-clipboard-list"],["schedule","Schedule","ti-calendar-week"],["team","Team","ti-users"],["onboarding","New Team Member Track","ti-user-plus"],["calendar","Calendar","ti-calendar-month"]]],["Lists",[["rm","Fix-it list","ti-tool"],["recovery","Recovery","ti-heart-handshake"],["lists","Lists","ti-list-details"]]],["Numbers",[["sales","Sales","ti-chart-line"]]],["Shared",[["community","Community","ti-messages"],["resources","Resources","ti-files"],["downloads","Downloads","ti-download"]]],["",[["setup","Setup","ti-list-check"],["settings","Settings","ti-settings"]]]];
+  const NAV_ALL=[["",[["whiteboard","Whiteboard","ti-layout-dashboard"]]],["Academy",[["home","Academy","ti-school"],["build","Training","ti-tools"],["ask","Ask","ti-bulb"],["journal","Journal","ti-notebook"]]],["Every day",[["today","Daily Report","ti-clipboard-list"],["schedule","Schedule","ti-calendar-week"],["team","Team","ti-users"],["onboarding","New Hires","ti-user-plus"],["calendar","Calendar","ti-calendar-month"]]],["Lists",[["rm","Fix-it list","ti-tool"],["recovery","Recovery","ti-heart-handshake"],["lists","Lists","ti-list-details"]]],["Numbers",[["sales","Sales","ti-chart-line"]]],["Shared",[["community","Community","ti-messages"],["resources","Resources","ti-files"],["downloads","Downloads","ti-download"]]],["",[["setup","Setup","ti-list-check"],["settings","Settings","ti-settings"]]]];
   const nav = NAV_ALL.map(([g,items])=>[g, items.filter(([p])=>canSee(p))]).filter(([g,items])=>items.length);
+  try{ const fc=JSON.parse(localStorage.getItem('sw_fav')||'{}'); const meta={}; NAV_ALL.forEach(([g,items])=>items.forEach(it=>meta[it[0]]=it)); const favs=Object.keys(fc).filter(p=>meta[p]&&canSee(p)&&fc[p]>=3&&['setup','settings','whiteboard'].indexOf(p)<0).sort((a,b)=>fc[b]-fc[a]).slice(0,4).map(p=>meta[p]); if(favs.length>=2) nav.unshift(['Favorites', favs]); }catch(e){}
   root.innerHTML = `<div class="app">
     <aside class="side">
       <div class="brand" onclick="go('whiteboard')" style="cursor:pointer${state.settings&&state.settings.logo_url?';flex-direction:column;align-items:flex-start;gap:9px;padding:20px 18px':''}">${state.settings&&state.settings.logo_url?`<img src="${state.settings.logo_url}" style="max-width:190px;max-height:64px;width:auto;height:auto;object-fit:contain;display:block" alt="logo"/><div><b>${esc((state.settings&&state.settings.academy_name)||'Academy')}</b><span>Training</span></div>`:`<div class="lg">${esc(((state.settings&&state.settings.academy_name)||'A').charAt(0).toUpperCase())}</div><div><b>${esc((state.settings&&state.settings.academy_name)||'Academy')}</b><span>Training</span></div>`}</div>
@@ -2575,7 +2576,7 @@ async function teamFormer(v){
 const ONBOARD_STEPS=['I-9 employment eligibility verified','E-Verify submitted','W-4 tax form signed','State tax form signed','Direct deposit set up','Employee handbook acknowledged','Food handler card on file','Allergen & safety briefing','Uniform & name tag issued','POS login created','Building tour & emergency exits','Shadow a full shift','Join the academy (sign in with the code)','Start the first training track'];
 async function vOnboarding(v){
   if(!canSee(state.page)){ go('home'); return; }
-  setTitle('New Team Member Track','Bring a new hire up to speed — checklist, training, and their review milestones');
+  setTitle('New Hires','Bring a new hire up to speed — checklist, training, and their review milestones');
   v.innerHTML='<div class="muted">Loading…</div>';
   const [rh,rs,rv]=await Promise.all([
     sb.from('hires').select('*').order('start_date',{ascending:false}),
