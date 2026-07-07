@@ -1444,6 +1444,7 @@ function buildTodayFocus(x){
   if(x.orders.length) rows.push({p:3,border:'#0D9488',emoji:'🛍️',title:x.orders.length+' catering order'+(x.orders.length>1?'s':'')+' today',sub:x.orders.map(o=>o.title).slice(0,2).join(' · '),act:scroll('boardSec'),btn:'View'});
   if(nonSafety.length) rows.push({p:5,border:'var(--brand)',emoji:'🔧',title:nonSafety.length+' fix-it'+(nonSafety.length>1?'s':'')+(x.rank>=3?' open':' for you'),sub:nonSafety.map(f=>f.d.what).filter(Boolean).slice(0,2).join(' · '),act:"go('rm')",btn:'Open'});
   if(x.ppl.length) rows.push({p:6,border:'#2563EB',emoji:'👋',title:x.ppl.length+' people / training note'+(x.ppl.length>1?'s':''),sub:x.ppl.map(o=>o.title).slice(0,2).join(' · '),act:scroll('boardSec'),btn:'View'});
+  if(x.revDue&&x.revDue.length) rows.push({p:6,border:'#0EA5A5',emoji:'📝',title:x.revDue.length+' new-hire review'+(x.revDue.length>1?'s':'')+' due',sub:x.revDue.map(r=>r.name+' — '+r.label).slice(0,2).join(' · '),act:"go('onboarding')",btn:'Open'});
   if(x.other.length) rows.push({p:6,border:'#64748B',emoji:'📌',title:x.other.length+' task'+(x.other.length>1?'s':'')+' on the board',sub:x.other.map(o=>o.title).slice(0,2).join(' · '),act:scroll('boardSec'),btn:'View'});
   if(x.todayCelebs.length) rows.push({p:7,border:'#E11D6B',emoji:'🎂',title:x.todayCelebs.map(c=>c.type==='Work anniversary'?c.name+"'s "+c.years+'-yr anniversary':c.name+"'s birthday").join(' · '),sub:'Make it a good one.',act:null});
   rows.sort((a,b)=>a.p-b.p);
@@ -1480,8 +1481,9 @@ async function vToday(v){
   let fixVis=[]; try{ const rmR=await sb.from('day_items').select('*').eq('kind','fixit').eq('done',false).order('created_at'); const rmAll=(rmR.data||[]).map(x=>{let d={};try{d=JSON.parse(x.detail||'{}')}catch(e){} return {id:x.id,d};}); fixVis=_rank>=3?rmAll:rmAll.filter(x=>x.d.anyone||(x.d.assignees||[]).indexOf(meName)>=0); fixVis.sort((a,b)=>(b.d.safety?1:0)-(a.d.safety?1:0)); }catch(e){}
   const hToday=usHolidays(new Date().getFullYear()).find(x=>x.date===iso);
   const isOJR=!!(ojrItem&&ojrItem.detail&&meName&&String(ojrItem.detail).toLowerCase().indexOf(meName.toLowerCase())>=0);
+  let revDue=[]; if(_rank>=3){ try{ const [rhh,rvv]=await Promise.all([ sb.from('hires').select('*'), sb.from('day_items').select('detail').eq('kind','review') ]); const rmap={}; (rvv.data||[]).forEach(x2=>{ let d={};try{d=typeof x2.detail==='string'?JSON.parse(x2.detail||'{}'):(x2.detail||{})}catch(e){} if(d.hireId!=null)(rmap[d.hireId]=rmap[d.hireId]||[]).push(d.milestone); }); (rhh.data||[]).forEach(hh=>{ if(!hh.start_date)return; reviewMilestones(hh.start_date).forEach(m=>{ const due=isoDate(new Date(_d(hh.start_date).getTime()+m.d*864e5)); if((rmap[hh.id]||[]).indexOf(m.k)<0 && due<=iso){ revDue.push({name:hh.name,label:m.l}); } }); }); }catch(e){} }
   let h='';
-  h+=buildTodayFocus({ fixVis, dueRots, orders, ppl, other, todayCelebs, hToday, ojrItem, isOJR, rank:_rank });
+  h+=buildTodayFocus({ fixVis, dueRots, orders, ppl, other, todayCelebs, hToday, ojrItem, isOJR, rank:_rank, revDue });
   h+=buildTodoCard(await loadTodoData(iso,today));
   if(dueRots.length){ h+=`<div class="sec" id="cleanSec">Cleaning / rotation due</div><div class="card">`+dueRots.map(r=>`<div class="lesson-row"><div style="font-size:16px">🧽</div><div style="flex:1;min-width:0"><div style="font-weight:500">${esc(r.title)}</div><div class="faint" style="font-size:12px">${r.area?esc(r.area)+' · ':''}every ${r.cadence_days||7} days${r.last_done?' · last done '+r.last_done:' · never logged'}</div></div><button class="btn" style="width:auto" onclick="doneRotation(${r.id})">Mark done</button></div>`).join('')+`</div>`; }
   h+=`<div class="sec" id="boardSec">On the board today</div><div class="card">`;
