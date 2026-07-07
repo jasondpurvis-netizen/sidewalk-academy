@@ -361,6 +361,18 @@ function renderAuth(){
   document.getElementById("go").onclick=submitAuth;
   document.getElementById("pass").onkeydown=e=>{ if(e.key==="Enter") submitAuth(); };
 }
+function renderNewRestaurant(){
+  root.innerHTML = `<div class="auth"><div class="box"><div class="logo">🏪</div><h1>Name your restaurant</h1><p class="sub">This creates your own private academy — your leadership courses come pre-loaded. You can rename it later.</p><div id="nrmsg"></div><label>Restaurant name</label><input id="nrName" type="text" placeholder="e.g. Main Street Diner" autocomplete="organization"/><button class="btn pri" id="nrGo">Create my academy</button><div class="toggle"><b id="nrOut">Sign out</b></div></div></div>`;
+  const i=document.getElementById('nrName'); if(i){ i.focus(); i.onkeydown=function(e){ if(e.key==='Enter') createRestaurant(); }; }
+  document.getElementById('nrGo').onclick=createRestaurant;
+  document.getElementById('nrOut').onclick=signOut;
+}
+window.createRestaurant=async function(){
+  const el=document.getElementById('nrName'); const name=(el&&el.value||'').trim(); const msg=document.getElementById('nrmsg');
+  if(!name){ if(msg) msg.innerHTML='<div class="msg err">Give your restaurant a name.</div>'; return; }
+  const btn=document.getElementById('nrGo'); if(btn){ btn.textContent='Creating…'; btn.disabled=true; }
+  try{ const r = await sb.rpc('new_restaurant',{ p_name:name }); if(r&&r.error){ if(msg) msg.innerHTML='<div class="msg err">'+esc(r.error.message)+'</div>'; if(btn){ btn.textContent='Create my academy'; btn.disabled=false; } return; } window._pendingName=null; state.profile=null; await boot(); }catch(e){ if(msg) msg.innerHTML='<div class="msg err">'+esc(e.message)+'</div>'; if(btn){ btn.textContent='Create my academy'; btn.disabled=false; } }
+};
 function amsg(t,cls){ document.getElementById("amsg").innerHTML=`<div class="msg ${cls}">${esc(t)}</div>`; }
 async function submitAuth(){
   if(state.busy) return; state.busy=true;
@@ -2739,8 +2751,9 @@ async function boot(){
   const { data:{ session } } = await sb.auth.getSession();
   if(!session){ state.user=null; state.settings={academy_name:DEFAULT_NAME,brand_color:DEFAULT_BRAND,logo_url:DEFAULT_LOGO}; try{applyBrand(DEFAULT_BRAND);}catch(e){} try{ const _jc=new URLSearchParams(location.search).get('join'); if(_jc){ state.authMode='up'; state._joinPrefill=_jc; } }catch(e){} render(); return; }
   state.user = session.user; state.busy=false;
-  await loadSettings();
   await ensureProfile();
+  if(!state.profile || !state.profile.tenant_id){ renderNewRestaurant(); return; }
+  await loadSettings();
   try{ await loadPositions(); }catch(e){}
   await loadAll();
   if(!applyHash()){
