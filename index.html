@@ -417,7 +417,7 @@ function canSee(page){ return myRank()>=permOf(page)||hasGrant(page); }
 function renderApp(){
   const isAdmin = state.profile && state.profile.role==="admin";
   const realAdmin = state.previewLIT ? (state._realRole==='admin') : isAdmin;
-  const NAV_ALL=[["",[["whiteboard","Whiteboard","ti-layout-dashboard"]]],["Academy",[["home","Academy","ti-school"],["build","Build","ti-tools"],["ask","Ask","ti-bulb"],["journal","Journal","ti-notebook"]]],["Every day",[["today","Daily Report","ti-clipboard-list"],["schedule","Schedule","ti-calendar-week"],["team","Team","ti-users"],["onboarding","New Hires","ti-user-plus"],["calendar","Calendar","ti-calendar-month"]]],["Lists",[["rm","Fix-it list","ti-tool"],["recovery","Recovery","ti-heart-handshake"],["lists","Lists","ti-list-details"]]],["Numbers",[["sales","Sales","ti-chart-line"]]],["Shared",[["community","Community","ti-messages"],["resources","Resources","ti-files"],["downloads","Downloads","ti-download"]]],["",[["setup","Setup","ti-list-check"],["settings","Settings","ti-settings"]]]];
+  const NAV_ALL=[["",[["today","Today","ti-sun"]]],["Academy",[["home","Academy","ti-school"],["build","Build","ti-tools"],["ask","Ask","ti-bulb"],["journal","Journal","ti-notebook"]]],["Every day",[["schedule","Schedule","ti-calendar-week"],["team","Team","ti-users"],["onboarding","New Hires","ti-user-plus"],["calendar","Calendar","ti-calendar-month"]]],["Lists",[["rm","Fix-it list","ti-tool"],["recovery","Recovery","ti-heart-handshake"],["lists","Lists","ti-list-details"]]],["Numbers",[["sales","Sales","ti-chart-line"]]],["Shared",[["community","Community","ti-messages"],["resources","Resources","ti-files"],["downloads","Downloads","ti-download"]]],["",[["setup","Setup","ti-list-check"],["settings","Settings","ti-settings"]]]];
   let nav = NAV_ALL.map(([g,items])=>[g, items.filter(([p])=>canSee(p))]).filter(([g,items])=>items.length);
   let _pins=[]; try{ _pins=JSON.parse(localStorage.getItem('sw_favpin')||'[]'); }catch(e){}
   try{ const meta={}; NAV_ALL.forEach(([g,items])=>items.forEach(it=>meta[it[0]]=it)); const pinnedFavs=_pins.filter(p=>meta[p]&&canSee(p)); if(pinnedFavs.length){ nav = nav.map(([g,items])=>[g, items.filter(([p])=>_pins.indexOf(p)<0)]).filter(([g,items])=>items.length); nav.unshift(['Favorites', pinnedFavs.map(p=>meta[p])]); } }catch(e){}
@@ -436,7 +436,7 @@ function renderApp(){
   const PI={whiteboard:'ti-layout-dashboard',home:'ti-school',summary:'ti-chart-bar',team:'ti-users',onboarding:'ti-user-plus',ask:'ti-bulb',build:'ti-tools',today:'ti-clipboard-list',schedule:'ti-calendar-week',calendar:'ti-calendar-month',community:'ti-messages',resources:'ti-files',downloads:'ti-download',settings:'ti-settings',journal:'ti-notebook',track:'ti-book-2',lesson:'ti-book-2',feedback:'ti-message-2'};
   const _ti=document.getElementById('topicon'); if(_ti)_ti.innerHTML='<i class="ti '+(PI[state.page]||'ti-point')+'"></i>';
   const v=document.getElementById("view");
-  ({whiteboard:vWhiteboard, home:vHome, acat:vAcat, track:vTrack, lesson:vLesson, summary:vSummary, team:vTeam, journal:vJournal, community:vCommunity, feedback:vFeedback, downloads:vDownloads, settings:vSettings, resources:vResources, ask:vAsk, build:vBuild, today:vToday, rm:vRM, lists:vLists, recovery:vRecovery, schedule:vSchedule, onboarding:vOnboarding, calendar:vCalendar, sales:vSales, checklists:vChecklists, setup:vSetup, pay:vPay, clock:vClock, saleshist:vSalesHist, costsmart:vCostSmart}[state.page]||vHome)(v);
+  ({whiteboard:vToday, home:vHome, acat:vAcat, track:vTrack, lesson:vLesson, summary:vSummary, team:vTeam, journal:vJournal, community:vCommunity, feedback:vFeedback, downloads:vDownloads, settings:vSettings, resources:vResources, ask:vAsk, build:vBuild, today:vToday, rm:vRM, lists:vLists, recovery:vRecovery, schedule:vSchedule, onboarding:vOnboarding, calendar:vCalendar, sales:vSales, checklists:vChecklists, setup:vSetup, pay:vPay, clock:vClock, saleshist:vSalesHist, costsmart:vCostSmart}[state.page]||vHome)(v);
 }
 const PAGE_HERO={
   acat:'&#10022; The Academy',
@@ -520,12 +520,12 @@ async function vWhiteboard(v){
     if(_c){ h+=`<div class="sec">Continue your training</div><div class="card" style="padding:18px 20px;display:flex;align-items:center;gap:16px;margin-bottom:6px"><div style="width:46px;height:46px;border-radius:12px;background:var(--brand);color:#fff;display:flex;align-items:center;justify-content:center;font-size:21px;flex-shrink:0"><i class="ti ti-player-play"></i></div><div style="flex:1;min-width:0"><div class="faint" style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;font-weight:700">${esc(_c.t.name)}</div><div style="font-weight:600;font-size:16px;margin:3px 0 10px">${esc(_c.l.title)}</div><div class="bar"><i style="width:${trackPct(_c.t.id)}%"></i></div></div><button class="btn pri" style="width:auto;gap:6px" onclick="go('lesson',{tid:'${_c.t.id}',lid:'${_c.l.id}'})">Resume <i class="ti ti-arrow-right"></i></button></div>`; }
     else if(visibleTracks().length){ h+=`<div class="sec">Your training</div><div class="card" style="padding:22px;text-align:center"><div style="font-size:26px;margin-bottom:8px">🎓</div><div style="font-weight:600;margin-bottom:4px">You're all caught up</div><div class="muted" style="font-size:13.5px">Every module you've been assigned is complete. Nice work.</div></div>`; }
   }
-  const _jump = ops ? [['home','Academy','ti-school'],['community','Community','ti-messages'],['schedule','Schedule','ti-calendar-week'],['today','Daily Report','ti-clipboard-list']] : [['home','Academy','ti-school'],['journal','Journal','ti-notebook'],['community','Community','ti-messages'],['downloads','Downloads','ti-download']];
+  const _jump = ops ? [['home','Academy','ti-school'],['community','Community','ti-messages'],['schedule','Schedule','ti-calendar-week'],['today','Today','ti-sun']] : [['home','Academy','ti-school'],['journal','Journal','ti-notebook'],['community','Community','ti-messages'],['downloads','Downloads','ti-download']];
   h+=`<div class="sec">Jump in</div><div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">`+_jump.filter(t=>canSee(t[0])).map((t,i)=>{ const gold=i%2===1; const g=gold?'linear-gradient(135deg,var(--accent),var(--accent-2))':'linear-gradient(135deg,var(--tealmid),var(--tealdark))'; const ic=gold?'#3A2B00':'#fff'; const sh=gold?'rgba(229,168,0,.38)':'rgba(46,125,138,.34)'; return `<div class="entrycard card" style="padding:18px 16px;cursor:pointer;text-align:center" onclick="go('${t[0]}')"><div style="width:50px;height:50px;margin:0 auto 11px;border-radius:14px;background:${g};color:${ic};display:flex;align-items:center;justify-content:center;font-size:24px;box-shadow:0 8px 18px ${sh}"><i class="ti ${t[2]}"></i></div><div style="font-weight:700;font-size:14.5px">${t[1]}</div></div>`; }).join('')+`</div>`;
   v.innerHTML=`<div class="wbframe">`+h+`</div>`;
 }
 window.toggleWhyEdit=function(){ const e=document.getElementById('whyEdit'); if(e) e.style.display = (e.style.display==='none'?'block':'none'); };
-window.refreshView=async function(){ const v=document.getElementById('view'); if(!v)return; const fn=({whiteboard:vWhiteboard,today:vToday})[state.page]; if(fn){ await fn(v); } else { render(); } };
+window.refreshView=async function(){ const v=document.getElementById('view'); if(!v)return; const fn=({whiteboard:vToday,today:vToday})[state.page]; if(fn){ await fn(v); } else { render(); } };
 window.addTodo=async function(){ const el=document.getElementById('todoinput'); if(!el)return; const v=(el.value||'').trim(); if(!v)return; el.value=''; await sb.from('day_items').insert({kind:'todo',on_date:isoDate(new Date()),detail:v,done:false,created_by:state.user.id}); await refreshView(); const ne=document.getElementById('todoinput'); if(ne)ne.focus(); };
 window.toggleTodo=async function(id,done){ await sb.from('day_items').update({done:!!done, on_date:isoDate(new Date())}).eq('id',id); await refreshView(); };
 window.delTodo=async function(id){ await sb.from('day_items').delete().eq('id',id); await refreshView(); };
@@ -547,7 +547,7 @@ function buildTodoCard(d){ const dueRems=d.dueRems,todoItems=d.todoItems,allRems
   const empty=(!todoItems.length&&!dueRems.length)?`<div class="faint" style="font-size:13px;padding:2px 0 4px">Nothing on the list. Add a to-do below, or set a recurring reminder.</div>`:'';
   return `<div id="todocard" class="card" style="padding:16px 18px;margin-bottom:18px"><div class="row" style="align-items:center;margin-bottom:${(todoItems.length||dueRems.length)?'11':'6'}px"><span style="font-size:11.5px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--brand)"><i class="ti ti-checkbox"></i> To-dos today</span><span style="margin-left:auto;display:inline-flex;gap:10px;align-items:center">${openCount?`<span style="font-size:12px;font-weight:700;color:var(--muted)">${openCount} open</span>`:''}<button onclick="toggleRemPanel()" class="btn" style="width:auto;padding:5px 11px;font-size:12px;gap:5px"><i class="ti ti-repeat"></i> Reminders</button></span></div>${empty}${remRows}${todoRows}<div class="row" style="gap:8px;margin-top:12px"><input id="todoinput" placeholder="Add a to-do for today…" onkeydown="if(event.key==='Enter')addTodo()" style="flex:1;min-width:0;padding:9px 12px;border:1px solid var(--line2);border-radius:9px;font-family:inherit;font-size:14px;background:var(--card);color:var(--ink)"/><button class="btn pri" style="width:auto;padding:9px 17px" onclick="addTodo()">Add</button></div>${remPanel}</div>`;
 }
-window.saveMV=async function(){ const m=(document.getElementById('wbmission')||{}).value||''; const vv=(document.getElementById('wbvision')||{}).value||''; for(const [k,val] of [['mission',m.trim()],['vision',vv.trim()]]){ await sb.from('day_items').delete().eq('kind',k); if(val) await sb.from('day_items').insert({kind:k,detail:val,title:k,created_by:state.user.id}); } go('whiteboard'); };
+window.saveMV=async function(){ const m=(document.getElementById('wbmission')||{}).value||''; const vv=(document.getElementById('wbvision')||{}).value||''; for(const [k,val] of [['mission',m.trim()],['vision',vv.trim()]]){ await sb.from('day_items').delete().eq('kind',k); if(val) await sb.from('day_items').insert({kind:k,detail:val,title:k,created_by:state.user.id}); } go('today'); };
 async function vCostSmart(v){
   const today=new Date();
   setTitle('Cost-Smart Schedule','Staff to your real demand, hour by hour');
@@ -1495,16 +1495,20 @@ function buildTodayFocus(x){
 async function vToday(v){
   const isAdmin=state.profile&&state.profile.role==='admin';
   const today=new Date(); const iso=today.toISOString().slice(0,10);
-  setTitle('Daily Report', today.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'}));
+  const _gN=((state.profile&&state.profile.name)||'').split(/\s+/)[0]||''; const _gH=today.getHours();
+  setTitle((_gH<12?'Good morning':_gH<17?'Good afternoon':'Good evening')+(_gN?', '+_gN:''), today.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'}));
   v.innerHTML='<div class="muted">Loading…</div>';
-  const [ri,rr,rn,ru] = await Promise.all([
+  const [ri,rr,rn,ru,rsh,rmv] = await Promise.all([
     sb.from('day_items').select('*').eq('on_date',iso).order('created_at'),
     sb.from('rotations').select('*').order('title'),
     sb.from('shift_notes').select('*').order('created_at',{ascending:false}).limit(8),
     sb.from('day_items').select('*').gt('on_date',iso).order('on_date').limit(40),
+    sb.from('shifts').select('*').eq('on_date',iso),
+    sb.from('day_items').select('*').in('kind',['mission','vision']),
     loadDates(), loadArchived()
   ]);
   const items=ri.data||[], rots=rr.data||[], notes=rn.data||[], upcoming=(ru.data||[]).filter(u=>['order','note','people','training','task'].includes(u.kind));
+  const shifts=(rsh.data||[]).sort((a,b)=>(a.start_time||'').localeCompare(b.start_time||'')); const mv={}; (rmv.data||[]).forEach(x=>mv[x.kind]=x); const mtext=(mv.mission&&mv.mission.detail)||'', vtext=(mv.vision&&mv.vision.detail)||''; const ops=(state.profile&&state.profile.role==='admin')||(typeof myRank==='function'&&myRank()>=3)||(typeof hasGrant==='function'&&hasGrant('schedule'));
   const dueRots=rots.filter(r=>{ if(!r.last_done) return true; const d=new Date(r.last_done); d.setDate(d.getDate()+(r.cadence_days||7)); return d.toISOString().slice(0,10)<=iso; });
   const ojrItem=items.find(i=>i.kind==='ojr');
   const boardItems=items.filter(i=>['order','note','people','training','task'].includes(i.kind)); // only real board items — never internal/feature rows (csconfig, list, fixit, etc.)
@@ -1517,12 +1521,23 @@ async function vToday(v){
   const todayCelebs=upcomingCelebrations(0);
   const meName=(state.profile&&state.profile.name)||'';
   const _rank=(typeof myRank==='function')?myRank():1;
+  if(!ops){
+    let hL='';
+    if(mtext||vtext){ hL+=`<div class="card" style="padding:15px 17px;margin-bottom:16px;background:var(--brand-soft);border-color:var(--brand-line)">${mtext?`<div style="font-size:10.5px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--brand);margin-bottom:4px">Our mission</div><div style="font-size:16px;font-weight:700;line-height:1.4;margin-bottom:${vtext?'12px':'0'}">${esc(mtext)}</div>`:''}${vtext?`<div style="font-size:10.5px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--brand);margin-bottom:4px">Our vision</div><div style="font-size:16px;font-weight:700;line-height:1.4">${esc(vtext)}</div>`:''}</div>`; }
+    if(state.progress && state.progress.size===0){ hL+=`<div class="card" style="padding:18px 20px;margin-bottom:16px"><div style="font-weight:700;font-size:16px;margin-bottom:5px">👋 Welcome to ${esc((state.settings&&state.settings.academy_name)||'the Academy')}</div><div class="muted" style="font-size:13.5px;line-height:1.62">Your space to grow as a leader. Start with <b>Foundations of Leadership</b> below.</div></div>`; }
+    let _cL=null; for(const t of visibleTracks()){ for(const l of trackLessons(t.id)){ if(!isDone(l.id)){ _cL={t,l}; break; } } if(_cL) break; }
+    if(_cL){ hL+=`<div class="sec">Continue your training</div><div class="card" style="padding:18px 20px;display:flex;align-items:center;gap:16px"><div style="width:46px;height:46px;border-radius:12px;background:var(--brand);color:#fff;display:flex;align-items:center;justify-content:center;font-size:21px;flex-shrink:0"><i class="ti ti-player-play"></i></div><div style="flex:1;min-width:0"><div class="faint" style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;font-weight:700">${esc(_cL.t.name)}</div><div style="font-weight:600;font-size:16px;margin:3px 0 10px">${esc(_cL.l.title)}</div><div class="bar"><i style="width:${trackPct(_cL.t.id)}%"></i></div></div><button class="btn pri" style="width:auto;gap:6px" onclick="go('lesson',{tid:'${_cL.t.id}',lid:'${_cL.l.id}'})">Resume <i class="ti ti-arrow-right"></i></button></div>`; }
+    else if(visibleTracks().length){ hL+=`<div class="sec">Your training</div><div class="card" style="padding:22px;text-align:center"><div style="font-size:26px;margin-bottom:8px">🎓</div><div style="font-weight:600;margin-bottom:4px">You're all caught up</div><div class="muted" style="font-size:13.5px">Every module you've been assigned is complete. Nice work.</div></div>`; }
+    v.innerHTML=hL; return;
+  }
   let fixVis=[]; try{ const rmR=await sb.from('day_items').select('*').eq('kind','fixit').eq('done',false).order('created_at'); const rmAll=(rmR.data||[]).map(x=>{let d={};try{d=JSON.parse(x.detail||'{}')}catch(e){} return {id:x.id,d};}); fixVis=_rank>=3?rmAll:rmAll.filter(x=>x.d.anyone||(x.d.assignees||[]).indexOf(meName)>=0); fixVis.sort((a,b)=>(b.d.safety?1:0)-(a.d.safety?1:0)); }catch(e){}
   const hToday=usHolidays(new Date().getFullYear()).find(x=>x.date===iso);
   const isOJR=!!(ojrItem&&ojrItem.detail&&meName&&String(ojrItem.detail).toLowerCase().indexOf(meName.toLowerCase())>=0);
   let revDue=[]; if(_rank>=3){ try{ const [rhh,rvv]=await Promise.all([ sb.from('hires').select('*'), sb.from('day_items').select('detail').eq('kind','review') ]); const rmap={}; (rvv.data||[]).forEach(x2=>{ let d={};try{d=typeof x2.detail==='string'?JSON.parse(x2.detail||'{}'):(x2.detail||{})}catch(e){} if(d.hireId!=null)(rmap[d.hireId]=rmap[d.hireId]||[]).push(d.milestone); }); (rhh.data||[]).forEach(hh=>{ if(!hh.start_date)return; reviewMilestones(hh.start_date).forEach(m=>{ const due=isoDate(new Date(_d(hh.start_date).getTime()+m.d*864e5)); if((rmap[hh.id]||[]).indexOf(m.k)<0 && due<=iso){ revDue.push({name:hh.name,label:m.l}); } }); }); }catch(e){} }
   let h='';
+  if(isAdmin || mtext || vtext){ h+=`<div class="card" style="padding:14px 16px;margin-bottom:14px;background:var(--brand-soft);border-color:var(--brand-line)"><div class="row" style="align-items:center"><span style="font-size:10.5px;font-weight:800;letter-spacing:.13em;text-transform:uppercase;color:var(--brand)">✦ Our Why</span>${isAdmin?`<button class="btn" style="width:auto;margin-left:auto;padding:4px 10px;font-size:12px" onclick="var e=document.getElementById('whyEdit');if(e)e.style.display=(e.style.display==='none'?'block':'none')"><i class="ti ti-pencil"></i> Edit</button>`:''}</div>${(mtext||vtext)?`<div style="margin-top:8px">${mtext?`<div style="font-size:14.5px;font-weight:700;line-height:1.4;margin-bottom:${vtext?'8px':'0'}">${esc(mtext)}</div>`:''}${vtext?`<div class="faint" style="font-size:13.5px;line-height:1.45">${esc(vtext)}</div>`:''}</div>`:(isAdmin?`<div class="faint" style="font-size:12.5px;margin-top:6px">Add your mission and vision — they anchor the team.</div>`:'')}${isAdmin?`<div id="whyEdit" style="display:none;margin-top:10px"><textarea id="wbmission" placeholder="Mission — why we exist" style="width:100%;min-height:46px;padding:9px;border:1px solid var(--line2);border-radius:8px;font-family:inherit;font-size:14px;color:var(--ink);background:var(--card);margin-bottom:8px">${esc(mtext)}</textarea><textarea id="wbvision" placeholder="Vision — where we're going" style="width:100%;min-height:46px;padding:9px;border:1px solid var(--line2);border-radius:8px;font-family:inherit;font-size:14px;color:var(--ink);background:var(--card)">${esc(vtext)}</textarea><div class="row" style="margin-top:8px"><button class="btn pri" style="width:auto;margin-left:auto" onclick="saveMV()">Save</button></div></div>`:''}</div>`; }
   h+=buildTodayFocus({ fixVis, dueRots, orders, ppl, other, todayCelebs, hToday, ojrItem, isOJR, rank:_rank, revDue });
+  h+=`<div class="sec">On the floor today</div>`; h+= shifts.length? (`<div class="card">`+shifts.map(s=>{ const inits=(s.person_name||'?').split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase(); return `<div class="row" style="padding:10px 15px;border-bottom:1px solid var(--line)"><span class="av">${esc(inits)}</span><div style="flex:1;min-width:0"><div style="font-weight:600;font-size:14px">${esc(s.person_name||'—')}</div><div class="faint" style="font-size:12px">${esc(s.role||'Team')}</div></div><div style="font-size:13px;font-weight:600;color:var(--brand)">${s.start_time?fmtClock(s.start_time):''}${s.end_time?'–'+fmtClock(s.end_time):''}</div></div>`; }).join('')+`</div>`) : `<div class="card" style="padding:18px;text-align:center"><div class="faint">No one scheduled today.</div></div>`;
   h+=buildTodoCard(await loadTodoData(iso,today));
   if(dueRots.length){ h+=`<div class="sec" id="cleanSec">Cleaning / rotation due</div><div class="card">`+dueRots.map(r=>`<div class="lesson-row"><div style="font-size:16px">🧽</div><div style="flex:1;min-width:0"><div style="font-weight:500">${esc(r.title)}</div><div class="faint" style="font-size:12px">${r.area?esc(r.area)+' · ':''}every ${r.cadence_days||7} days${r.last_done?' · last done '+r.last_done:' · never logged'}</div></div><button class="btn" style="width:auto" onclick="doneRotation(${r.id})">Mark done</button></div>`).join('')+`</div>`; }
   h+=`<div class="sec" id="boardSec">On the board today</div><div class="card">`;
@@ -1561,11 +1576,11 @@ async function vSchedule(v){
   const stab=state.ctx.stab||'schedule';
   setTitle('Operations','Scheduling, team & the daily log — one place');
   const _w=document.querySelector('.wrap'); if(_w) _w.style.maxWidth='1180px';
-  const TABS=[['overview','Overview',1],['whoson',"Who's on",1],['schedule','Schedule',1],['team','Team',3],['availability','Availability',1],['timeoff','Time off',1],['pool','Shift pool',1],['logbook','Log book',3],['reports','Reports',3]];
+  const TABS=[['schedule','Schedule',1],['team','Team',3],['availability','Availability',1],['timeoff','Time off',1],['pool','Shift pool',1],['logbook','Log book',3],['reports','Reports',3]];
   const tabs=TABS.filter(t=>myRank()>=t[2]); const allowed=new Set(tabs.map(t=>t[0])); const useTab=allowed.has(stab)?stab:'overview';
   v.innerHTML=`<div class="schtabs">`+tabs.map(t=>`<button class="schtab${useTab===t[0]?' on':''}" onclick="schGo('${t[0]}')">${t[1]}</button>`).join('')+`</div><div id="schbody"><div class="muted">Loading…</div></div>`;
   const body=document.getElementById('schbody');
-  ({overview:schOverview, whoson:schWhoson, schedule:schBoard, team:schTeam, availability:schAvail, timeoff:schTimeoff, pool:schPool, logbook:schLogbook, reports:schReports}[useTab]||schOverview)(body);
+  ({schedule:schBoard, team:schTeam, availability:schAvail, timeoff:schTimeoff, pool:schPool, logbook:schLogbook, reports:schReports}[useTab]||schBoard)(body);
 }
 window.schGo=function(t){ state.ctx.stab=t; try{ localStorage.setItem('sw_nav',JSON.stringify({p:state.page,c:state.ctx})); }catch(e){} vSchedule(document.getElementById('view')); };
 window.startSchedTour=function(){
@@ -2817,7 +2832,7 @@ async function boot(){
   try{ await loadPositions(); }catch(e){}
   await loadAll();
   if(!applyHash()){
-    let np='whiteboard',nc={};
+    let np='today',nc={};
     try{ const n=JSON.parse(localStorage.getItem('sw_nav')||'null'); if(n&&n.p){ np=n.p; nc=n.c||{}; } }catch(e){}
     if((np==='lesson'||np==='track') && !(nc.tid && state.tracks.find(t=>t.id===nc.tid))){ np='home'; nc={}; }
     state.page=np; state.ctx=nc;
