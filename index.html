@@ -347,15 +347,15 @@ function renderAuth(){
   const logo = s.logo_url?`<img src="${s.logo_url}" style="max-width:230px;max-height:76px;width:auto;height:auto;object-fit:contain;margin:0 auto 16px;display:block"/>`:`<div class="logo">${esc((s.academy_name||'A').charAt(0).toUpperCase())}</div>`;
   root.innerHTML = `<div class="auth"><div class="box">
     ${logo}
-    <h1>${m==="in"?"Welcome back":"Join your team"}</h1>
-    <p class="sub">${esc(s.academy_name||'Academy')}</p>
+    <h1>${m==="in"?"Welcome back":"Create your account"}</h1>
+    <p class="sub">${m==="in"?esc(s.academy_name||'Academy'):"First set up your login — you’ll pick your restaurant next."}</p>
     <div id="amsg"></div>
     ${m==="up"?`<label>Your name</label><input id="nm" type="text" placeholder="First name" autocomplete="given-name"/>`:``}
     <label>Email</label><input id="email" type="email" placeholder="you@email.com" autocomplete="email"/>
     <label>Password</label><input id="pass" type="password" placeholder="••••••••" autocomplete="${m==="in"?"current-password":"new-password"}"/>
-    ${m==="up"?`<label>Join code</label><input id="jc" type="text" value="${esc(state._joinPrefill||'')}" placeholder="Ask your manager" autocomplete="off"/>`:``}
+    ${(m==="up"&&state._joinPrefill)?`<label>Join code</label><input id="jc" type="text" value="${esc(state._joinPrefill||'')}" placeholder="Ask your manager" autocomplete="off"/>`:``}
     <button class="btn pri" id="go">${m==="in"?"Sign in":"Create account"}</button>
-    <div class="toggle">${m==="in"?"New here? <b id='tg'>Join your team</b>":"Have an account? <b id='tg'>Sign in</b>"}</div>
+    <div class="toggle">${m==="in"?"New here? <b id='tg'>Create an account</b>":"Have an account? <b id='tg'>Sign in</b>"}</div>
   </div></div>`;
   document.getElementById("tg").onclick=()=>{ state.authMode=m==="in"?"up":"in"; renderAuth(); };
   document.getElementById("go").onclick=submitAuth;
