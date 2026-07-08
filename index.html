@@ -248,7 +248,7 @@ const STALL_DAYS=5;
 const DEFAULT_BRAND='#4A9CAD';
 const DEFAULT_NAME='Sidewalk Academy';
 const DEFAULT_LOGO="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%234A9CAD'/%3E%3Ctext x='50' y='71' font-family='Georgia,serif' font-style='italic' font-size='60' fill='white' text-anchor='middle'%3ES%3C/text%3E%3C/svg%3E";
-async function loadSettings(){ const { data } = await sb.from('settings').select('*').eq('id',1).maybeSingle(); const s=data||{}; let _tn=null,_tjc=null; if(state.profile && state.profile.tenant_id){ try{ const _tr=await sb.from('tenants').select('name,join_code').maybeSingle(); if(_tr.data){ _tn=_tr.data.name; _tjc=_tr.data.join_code; } }catch(e){} } state.settings = Object.assign({}, s, { academy_name: s.academy_name||_tn||DEFAULT_NAME, brand_color: s.brand_color||DEFAULT_BRAND, logo_url: s.logo_url||(data?DEFAULT_LOGO:''), join_code: _tjc||s.join_code||'' }); try{ const rs=await sb.from('day_items').select('detail').eq('kind','stations').maybeSingle(); const arr=JSON.parse((rs.data&&rs.data.detail)||'[]'); if(Array.isArray(arr)) state.settings.stations=arr; }catch(e){} try{ const rp=await sb.from('day_items').select('detail').eq('kind','perms').maybeSingle(); state.perms=JSON.parse((rp.data&&rp.data.detail)||'{}'); }catch(e){ state.perms={}; } try{ const rg=await sb.from('day_items').select('title,detail').eq('kind','usergrant'); const gm={}; (rg.data||[]).forEach(x=>{ try{ const d=JSON.parse(x.detail||'{}'); if(x.title&&Array.isArray(d.pages)) gm[x.title]=d.pages; }catch(e){} }); state.grants=gm; }catch(e){ state.grants={}; } applyBrand(state.settings.brand_color); }
+async function loadSettings(){ const { data } = await sb.from('settings').select('*').eq('id',1).maybeSingle(); const s=data||{}; let _tn=null,_tjc=null,_tan=null,_tbc=null,_tlg=null; const _isSW=!!(state.profile && state.profile.tenant_id==='11111111-1111-1111-1111-111111111111'); if(state.profile && state.profile.tenant_id){ try{ const _tr=await sb.from('tenants').select('name,join_code,academy_name,brand_color,logo_url').maybeSingle(); if(_tr.data){ _tn=_tr.data.name; _tjc=_tr.data.join_code; _tan=_tr.data.academy_name; _tbc=_tr.data.brand_color; _tlg=_tr.data.logo_url; } }catch(e){} } state.settings = Object.assign({}, s, { academy_name: _tan||_tn||(_isSW?s.academy_name:null)||DEFAULT_NAME, brand_color: _tbc||(_isSW?s.brand_color:null)||DEFAULT_BRAND, logo_url: (_tlg!=null&&_tlg!=='')?_tlg:(_isSW?(s.logo_url||(data?DEFAULT_LOGO:'')):''), join_code: _tjc||s.join_code||'' }); try{ const rs=await sb.from('day_items').select('detail').eq('kind','stations').maybeSingle(); const arr=JSON.parse((rs.data&&rs.data.detail)||'[]'); if(Array.isArray(arr)) state.settings.stations=arr; }catch(e){} try{ const rp=await sb.from('day_items').select('detail').eq('kind','perms').maybeSingle(); state.perms=JSON.parse((rp.data&&rp.data.detail)||'{}'); }catch(e){ state.perms={}; } try{ const rg=await sb.from('day_items').select('title,detail').eq('kind','usergrant'); const gm={}; (rg.data||[]).forEach(x=>{ try{ const d=JSON.parse(x.detail||'{}'); if(x.title&&Array.isArray(d.pages)) gm[x.title]=d.pages; }catch(e){} }); state.grants=gm; }catch(e){ state.grants={}; } applyBrand(state.settings.brand_color); }
 
 function esc(s){ return (s||"").replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c])); }
 function richBody(html){
@@ -2813,8 +2813,12 @@ window.saveSettings=async function(){
   const f=document.getElementById('setlogo').files[0];
   if(f){ try{ logo_url=await fileToLogo(f); }catch(e){ if(msg) msg.textContent='Could not read that image — try a PNG or JPG.'; } }
   const join_code=val('setjoin');
-  await sb.from('settings').update({academy_name:name, brand_color:color, logo_url, join_code, updated_at:new Date().toISOString()}).eq('id',1);
-  try{ if(state.profile&&state.profile.tenant_id) await sb.from('tenants').update({join_code}).eq('id',state.profile.tenant_id); }catch(e){}
+  if(state.profile && state.profile.tenant_id){
+    const r=await sb.from('tenants').update({academy_name:name, brand_color:color, logo_url, join_code}).eq('id',state.profile.tenant_id);
+    if(r&&r.error){ if(msg)msg.textContent='Could not save: '+r.error.message; return; }
+  } else {
+    await sb.from('settings').update({academy_name:name, brand_color:color, logo_url, join_code, updated_at:new Date().toISOString()}).eq('id',1);
+  }
   state.settings={...state.settings, academy_name:name, brand_color:color, logo_url, join_code};
   applyBrand(color);
   if(msg)msg.textContent='Saved ✓';
