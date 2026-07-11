@@ -86,7 +86,9 @@
   .bar > i{display:block;height:100%;background:var(--brand);border-radius:999px}
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}
   .muted{color:var(--muted)} .faint{color:var(--faint)}
-  .sec{font-size:15px;font-weight:800;color:var(--ink);margin:32px 0 13px;letter-spacing:.01em;border-left:4px solid var(--brand);padding-left:12px;line-height:1.25}
+  .sec{font-size:10.5px;font-weight:800;color:var(--brand);margin:26px 0 12px;letter-spacing:.16em;text-transform:uppercase;line-height:1.3}
+  .sec::before{content:"\2726  "}
+  .sec span{text-transform:none;letter-spacing:normal;font-weight:400}
   .lesson-row{display:flex;align-items:center;gap:12px;padding:13px 16px;border-bottom:1px solid var(--line);cursor:pointer}
   .lesson-row:last-child{border-bottom:none}
   .lesson-row:hover{background:var(--bg)}
@@ -2346,7 +2348,7 @@ async function schLogbook(v){
   const forecast=rsal.data?Number(rsal.data.sales)||0:0; let actual=0; try{ actual=ractRow&&ractRow.data?Number(JSON.parse(ractRow.data.detail||'{}').amount)||0:0; }catch(e){} const useSales=actual||forecast; const pct=(useSales&&cost)?cost/useSales*100:null; const varP=(forecast&&actual)?((actual-forecast)/forecast*100):null;
   let meta={score:0,summary:''}; try{ if(rmeta.data) meta=Object.assign(meta,JSON.parse(rmeta.data.detail||'{}')); }catch(e){}
   window._logScoreVal=meta.score||0;
-  const dt=_d(d0); const SCORES=[[1,'Rough','#B32D2D'],[2,'OK','#B7791F'],[3,'Good','#2563EB'],[4,'Great','#1B7B3F']];
+  const dt=_d(d0); const SCORES=[[1,'Hard','#B32D2D'],[2,'OK','#B7791F'],[3,'Good','#2563EB'],[4,'Great','#1B7B3F']];
   let h=`<div class="sched-bar"><div class="sched-nav"><button class="iconbtn" onclick="logDay(-1)"><i class="ti ti-chevron-left"></i></button><button class="iconbtn" onclick="logDay(1)"><i class="ti ti-chevron-right"></i></button><button class="btn" style="width:auto" onclick="logDay(0)">Today</button></div><div style="font-size:18px;font-weight:600">${dt.toLocaleDateString(undefined,{weekday:'long',month:'short',day:'numeric'})}</div></div>`;
   const cell=(l,vv,c)=>`<div style="flex:1;min-width:88px;text-align:center"><div class="faint" style="font-size:11px;text-transform:uppercase;letter-spacing:.03em">${l}</div><div style="font-size:20px;font-weight:800;color:${c||'var(--ink)'}">${vv}</div></div>`;
   const actCell=`<div style="flex:1;min-width:96px;text-align:center"><div class="faint" style="font-size:11px;text-transform:uppercase;letter-spacing:.03em">Actual</div><div style="font-size:20px;font-weight:800">${isAdmin?`<input type="number" id="logActual" value="${actual||''}" placeholder="0" oninput="logSetActual('${d0}',this.value)" style="width:96px;text-align:center;font-size:19px;font-weight:800;border:1px solid var(--line2);border-radius:8px;padding:3px 6px;background:var(--card);color:var(--ink)"/>`:(actual?money(actual):'—')}</div>${varP!=null?`<div style="font-size:11px;font-weight:800;color:${varP>=0?'#1B7B3F':'#B32D2D'}">${varP>=0?'▲':'▼'} ${Math.abs(varP).toFixed(0)}% vs forecast</div>`:''}</div>`;
