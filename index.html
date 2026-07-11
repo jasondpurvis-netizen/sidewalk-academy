@@ -256,10 +256,13 @@ function esc(s){ return (s||"").replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;","
 function richBody(html){
   try{
     const d=new DOMParser().parseFromString(html,'text/html');
-    const root=d.body.querySelector('div')||d.body;
-    [...root.querySelectorAll('div')].forEach(dv=>{ if(/Up Next/i.test(dv.textContent) && dv.textContent.length<240) dv.remove(); });
+    [...d.body.querySelectorAll('div')].forEach(dv=>{ if(/Up Next/i.test(dv.textContent) && dv.textContent.length<240) dv.remove(); });
     [...d.body.querySelectorAll('*')].forEach(el=>{ if(el.children.length===0){ const t=(el.textContent||'').trim(); if(t.length<130 && /(·|•)\s*(Module\s*\d+|Example)\s*(·|•)/i.test(t)) el.remove(); } });
-    return (d.body.querySelector('div')||d.body).outerHTML;
+    const kids=[...d.body.children];
+    // A single wrapper <div> (Hazel / new builder lessons): return it as-is.
+    // Otherwise the body is a flat sequence of blocks — return ALL of it, not just the first, so nothing gets dropped.
+    if(kids.length===1 && kids[0].tagName==='DIV') return kids[0].outerHTML;
+    return d.body.innerHTML;
   }catch(e){ return html; }
 }
 
@@ -1330,7 +1333,9 @@ function sopFmt(txt, category){
   const cardBlk=`<div style="background:${DARK};color:#fff;padding:24px 28px;margin:8px 0 4px;border-radius:8px"><p style="font-size:11px;letter-spacing:2.5px;text-transform:uppercase;color:${B};font-weight:800;margin:0 0 10px">Take With You · SOP Card</p><p style="font-size:17px;line-height:1.5;color:#fff;margin:0 0 6px;font-weight:700">Print the ${title?esc(title):'task'} card and post it at the station.</p><p style="font-size:14px;line-height:1.6;color:#fff;opacity:.9;margin:0">A short checklist with a &ldquo;Done by&rdquo; line, so the order stays visible every time.</p></div>`;
   let res=H+bodyOut+cardBlk;
   res=res.replace(/\b(our|your|the|a)\s+shop\b/gi,(mm,a)=>a+' restaurant');
-  return res;
+  // Wrap in ONE container div. The lesson renderer (richBody) only keeps the first top-level <div>,
+  // so an unwrapped, flat body would show only its first block (the time pill) and drop the rest.
+  return `<div style="max-width:760px;margin:0 auto;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:var(--ink);line-height:1.7">${res}</div>`;
 }
 // Fallback structure when the AI is unreachable — still gives a clean, editable SOP.
 function sopFallback(title,notes){
