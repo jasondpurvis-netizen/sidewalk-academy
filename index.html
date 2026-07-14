@@ -352,22 +352,47 @@ function render(){ state.user ? renderApp() : renderAuth(); }
 function renderAuth(){
   const m=state.authMode; const s=state.settings||{};
   const logo = s.logo_url?`<img src="${s.logo_url}" style="max-width:230px;max-height:76px;width:auto;height:auto;object-fit:contain;margin:0 auto 16px;display:block"/>`:`<div class="logo">${esc((s.academy_name||'A').charAt(0).toUpperCase())}</div>`;
+  const head = m==="in"?"Welcome back":(m==="reset"?"Reset your password":"Create your account");
+  const sub = m==="in"?esc(s.academy_name||'Academy'):(m==="reset"?"Enter your email and we'll send you a link to set a new password.":"First set up your login — you'll pick your restaurant next.");
   root.innerHTML = `<div class="auth"><div class="box">
     ${logo}
-    <h1>${m==="in"?"Welcome back":"Create your account"}</h1>
-    <p class="sub">${m==="in"?esc(s.academy_name||'Academy'):"First set up your login — you’ll pick your restaurant next."}</p>
+    <h1>${head}</h1>
+    <p class="sub">${sub}</p>
     <div id="amsg"></div>
     ${m==="up"?`<label>Your name</label><input id="nm" type="text" placeholder="First name" autocomplete="given-name"/>`:``}
     <label>Email</label><input id="email" type="email" placeholder="you@email.com" autocomplete="email"/>
-    <label>Password</label><input id="pass" type="password" placeholder="••••••••" autocomplete="${m==="in"?"current-password":"new-password"}"/>
+    ${m==="reset"?``:`<label>Password</label><input id="pass" type="password" placeholder="••••••••" autocomplete="${m==="in"?"current-password":"new-password"}"/>`}
     ${(m==="up"&&state._joinPrefill)?`<label>Join code</label><input id="jc" type="text" value="${esc(state._joinPrefill||'')}" placeholder="Ask your manager" autocomplete="off"/>`:``}
-    <button class="btn pri" id="go">${m==="in"?"Sign in":"Create account"}</button>
-    <div class="toggle">${m==="in"?"New here? <b id='tg'>Create an account</b>":"Have an account? <b id='tg'>Sign in</b>"}</div>
+    <button class="btn pri" id="go">${m==="in"?"Sign in":(m==="reset"?"Send reset link":"Create account")}</button>
+    ${m==="in"?`<div style="text-align:center;margin-top:12px"><b id="fp" style="color:var(--brand);cursor:pointer;font-size:13px;font-weight:600">Forgot password?</b></div>`:``}
+    <div class="toggle">${m==="in"?"New here? <b id='tg'>Create an account</b>":(m==="reset"?"<b id='tg'>&larr; Back to sign in</b>":"Have an account? <b id='tg'>Sign in</b>")}</div>
   </div></div>`;
-  document.getElementById("tg").onclick=()=>{ state.authMode=m==="in"?"up":"in"; renderAuth(); };
-  document.getElementById("go").onclick=submitAuth;
-  document.getElementById("pass").onkeydown=e=>{ if(e.key==="Enter") submitAuth(); };
+  document.getElementById("tg").onclick=()=>{ state.authMode=(m==="in")?"up":"in"; renderAuth(); };
+  document.getElementById("go").onclick=(m==="reset")?sendReset:submitAuth;
+  const fp=document.getElementById("fp"); if(fp) fp.onclick=()=>{ state.authMode="reset"; renderAuth(); setTimeout(function(){ const e=document.getElementById("email"); if(e)e.focus(); },30); };
+  const passEl=document.getElementById("pass"); if(passEl) passEl.onkeydown=e=>{ if(e.key==="Enter") submitAuth(); };
+  const emEl=document.getElementById("email"); if(emEl && m==="reset") emEl.onkeydown=e=>{ if(e.key==="Enter") sendReset(); };
 }
+async function sendReset(){
+  const email=((document.getElementById("email")||{}).value||'').trim();
+  if(!email){ amsg("Enter your email first.","err"); return; }
+  const btn=document.getElementById("go"); if(btn){ btn.textContent="Sending…"; btn.disabled=true; }
+  try{ const { error }=await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin+location.pathname }); if(error){ amsg(error.message,"err"); } else { amsg("Check your email — we sent a link to set a new password. Give it a minute, and check spam/junk if you don't see it.","ok"); } }catch(e){ amsg((e&&e.message)||String(e),"err"); }
+  if(btn){ btn.textContent="Send reset link"; btn.disabled=false; }
+}
+function renderSetPassword(){
+  const s=state.settings||{}; const logo = s.logo_url?`<img src="${s.logo_url}" style="max-width:230px;max-height:76px;width:auto;height:auto;object-fit:contain;margin:0 auto 16px;display:block"/>`:`<div class="logo">${esc((s.academy_name||'A').charAt(0).toUpperCase())}</div>`;
+  root.innerHTML = `<div class="auth"><div class="box">${logo}<h1>Set a new password</h1><p class="sub">Almost there — pick a new password for your account.</p><div id="amsg"></div><label>New password</label><input id="np1" type="password" placeholder="••••••••" autocomplete="new-password"/><label>Confirm new password</label><input id="np2" type="password" placeholder="••••••••" autocomplete="new-password"/><button class="btn pri" id="npgo">Save new password</button></div></div>`;
+  document.getElementById("npgo").onclick=doSetPassword;
+  document.getElementById("np2").onkeydown=e=>{ if(e.key==="Enter") doSetPassword(); };
+}
+window.doSetPassword=async function(){
+  const p1=((document.getElementById("np1")||{}).value)||''; const p2=((document.getElementById("np2")||{}).value)||'';
+  if(p1.length<6){ amsg("Use at least 6 characters.","err"); return; }
+  if(p1!==p2){ amsg("The two passwords don't match.","err"); return; }
+  const btn=document.getElementById("npgo"); if(btn){ btn.textContent="Saving…"; btn.disabled=true; }
+  try{ const { error }=await sb.auth.updateUser({ password:p1 }); if(error){ amsg(error.message,"err"); if(btn){ btn.textContent="Save new password"; btn.disabled=false; } return; } state.recovery=false; try{ history.replaceState(null,'',location.pathname); }catch(e){} await boot(); }catch(e){ amsg((e&&e.message)||String(e),"err"); if(btn){ btn.textContent="Save new password"; btn.disabled=false; } }
+};
 function renderNewRestaurant(){
   root.innerHTML = `<div class="auth"><div class="box"><div class="logo">🏪</div><h1>Welcome</h1><p class="sub">Are you setting up a restaurant, or joining one that already exists?</p><div id="nrmsg"></div><div style="border:1px solid var(--line2);border-radius:12px;padding:16px;margin-bottom:14px;text-align:left"><div style="font-weight:800;font-size:15px">Set up my restaurant</div><div class="muted" style="font-size:12.5px;margin:3px 0 12px;line-height:1.5">For the owner or manager. This creates your restaurant and its academy.</div><label>Restaurant name</label><input id="nrName" type="text" placeholder="e.g. Main Street Diner" autocomplete="organization"/><button class="btn pri" id="nrGo" style="margin-top:8px">Create my restaurant</button></div><div style="text-align:center;font-size:12px;color:var(--muted);margin:2px 0 14px;font-weight:800;letter-spacing:.05em">— OR —</div><div style="border:1px solid var(--line2);border-radius:12px;padding:16px;text-align:left"><div style="font-weight:800;font-size:15px">Join my team</div><div class="muted" style="font-size:12.5px;margin:3px 0 12px;line-height:1.5">For team members. Enter the join code your manager gave you.</div><label>Join code</label><input id="nrJoin" type="text" placeholder="Ask your manager for it" autocomplete="off"/><button class="btn" id="nrJoinGo" style="margin-top:8px">Join my team</button></div><div class="toggle" style="margin-top:16px"><b id="nrOut">Sign out</b></div></div></div>`;
   const i=document.getElementById('nrName'); if(i){ i.focus(); i.onkeydown=function(e){ if(e.key==='Enter') createRestaurant(); }; }
@@ -2994,6 +3019,7 @@ window.renderPaywall=renderPaywall;
 
 async function boot(){
   const { data:{ session } } = await sb.auth.getSession();
+  if(state.recovery || (location.hash||'').indexOf('type=recovery')>=0){ state.recovery=true; renderSetPassword(); return; }
   if(!session){ state.user=null; state.settings={academy_name:DEFAULT_NAME,brand_color:DEFAULT_BRAND,logo_url:DEFAULT_LOGO}; try{applyBrand(DEFAULT_BRAND);}catch(e){} try{ const _jc=new URLSearchParams(location.search).get('join'); if(_jc){ state.authMode='up'; state._joinPrefill=_jc; } }catch(e){} render(); return; }
   state.user = session.user; state.busy=false;
   await ensureProfile();
@@ -3025,6 +3051,7 @@ window.shareLesson=function(tid,lid){ const url=location.origin+location.pathnam
 window.printLesson=function(lid){ let L=null,T=null; state.tracks.forEach(t=>(state.lessons[t.id]||[]).forEach(l=>{ if(l.id===lid){L=l;T=t;} })); if(!L)return; const name=(state.settings&&state.settings.academy_name)||'Academy'; const brand=(state.settings&&state.settings.brand_color)||'#4A9CAD'; const body=L.body&&L.body.trim()?richBody(L.body):('<p>'+esc(L.subtitle||'')+'</p>'); const w=window.open('','_blank'); if(!w)return; w.document.write(`<!doctype html><html><head><meta charset=utf-8><title>${esc(L.title)}</title><style>@page{margin:.7in}body{font-family:Helvetica,Arial,sans-serif;color:#1a1a1a;max-width:720px;margin:0 auto;line-height:1.65}h1{font-size:24px;margin:0 0 6px}.ey{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:${brand};font-weight:700}.hd{border-bottom:3px solid ${brand};padding-bottom:8px;margin-bottom:18px}blockquote{border-left:3px solid ${brand};margin:0 0 14px;padding:8px 16px;background:#f3f8f9;font-style:italic}.pbar{position:fixed;top:10px;right:10px}.pbar button{padding:8px 16px;border:1px solid ${brand};background:${brand};color:#fff;border-radius:6px;cursor:pointer}@media print{.pbar{display:none}}</style></head><body><div class=pbar><button onclick="window.print()">Print</button></div><div class=hd><div class=ey>${esc(name)} · ${esc(T.name)}</div></div><h1>${esc(L.title)}</h1>${L.subtitle?'<p style="font-style:italic;color:#666">'+esc(L.subtitle)+'</p>':''}${body}</body></html>`); w.document.close(); setTimeout(()=>{try{w.focus();w.print();}catch(e){}},400); };
 window.printSopCard=function(lid){ let L=null,T=null; state.tracks.forEach(t=>(state.lessons[t.id]||[]).forEach(l=>{ if(l.id===lid){L=l;T=t;} })); if(!L)return; const brand=(state.settings&&state.settings.brand_color)||'#4A9CAD'; const name=(state.settings&&state.settings.academy_name)||'Academy'; const tmp=document.createElement('div'); tmp.innerHTML=L.body||''; const h1=tmp.querySelector('h1'); const title=(h1?h1.textContent:L.title)||L.title; const blocks=[]; let cur=null; const EXC=['why it matters','in practice','rundown','what good looks like','what this lesson installs','take with you','the miss','the move']; tmp.querySelectorAll('h2, ul, ol').forEach(el=>{ if(el.tagName==='H2'){ const low=el.textContent.trim().toLowerCase(); cur=EXC.some(x=>low.indexOf(x)>=0)?null:{label:el.textContent.trim(),items:[]}; if(cur)blocks.push(cur); } else if(cur){ el.querySelectorAll(':scope > li').forEach(li=>cur.items.push(li.textContent.trim())); } }); const secHtml=blocks.filter(b=>b.items.length).map(b=>`<div class=lbl>${esc(b.label)}</div>`+b.items.map(it=>`<div class=ck>&#9744; ${esc(it)}</div>`).join('')).join(''); const w=window.open('','_blank'); if(!w)return; w.document.write(`<!doctype html><html><head><meta charset=utf-8><title>${esc(title)} — SOP Card</title><style>@page{margin:.5in}body{font-family:Helvetica,Arial,sans-serif;color:#111;max-width:420px;margin:0 auto}.hd{background:${brand};color:#fff;padding:16px 20px}.cat{font-size:10px;letter-spacing:2px;text-transform:uppercase;opacity:.9;font-weight:700;margin:0 0 4px}.ttl{font-size:23px;font-weight:800;margin:0;line-height:1.1}.bd{padding:16px 20px;border:1.5px solid #111;border-top:none}.lbl{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:${brand};font-weight:800;margin:15px 0 6px}.lbl:first-child{margin-top:0}.ck{font-size:13px;line-height:1.85}.sign{font-size:13px;margin-top:16px;border-top:1px solid #111;padding-top:10px}.ft{font-size:9px;color:#999;letter-spacing:.5px;margin-top:14px;text-align:center}.pbar{position:fixed;top:10px;right:10px}.pbar button{padding:8px 14px;border:0;background:${brand};color:#fff;border-radius:6px;cursor:pointer}@media print{.pbar{display:none}}</style></head><body><div class=pbar><button onclick="window.print()">Print</button></div><div class=hd><p class=cat>${esc(T.name)}</p><p class=ttl>${esc(title)}</p></div><div class=bd>${secHtml||'<div class=ck style="color:#888">This lesson has no step-by-step list yet &mdash; add numbered steps to the lesson and this card fills in automatically.</div>'}<div class=sign>Done by: __________________&nbsp;&nbsp;Date: __________</div><div class=ft>${esc(name)} &middot; Post it at the station</div></div></body></html>`); w.document.close(); setTimeout(()=>{try{w.focus();w.print();}catch(e){}},400); };
 window.go=go; window.markDone=markDone; window.undo=undo;
+try{ sb.auth.onAuthStateChange(function(ev){ if(ev==='PASSWORD_RECOVERY'){ state.recovery=true; renderSetPassword(); } }); }catch(e){}
 boot();
 </script>
 </body>
