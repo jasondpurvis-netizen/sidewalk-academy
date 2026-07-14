@@ -242,6 +242,8 @@
 <script>
 const SUPABASE_URL = "https://wjqcnxnwjqmuzrandgea.supabase.co";
 const SUPABASE_KEY = "sb_publishable_DQZclfAnv_MYQJLGcOdzdw_g4vMCiSC";
+const __RECOVERY_HASH = (typeof location!=='undefined' && location.hash) ? location.hash : '';
+const __RECOVERY_SEARCH = (typeof location!=='undefined' && location.search) ? location.search : '';
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const root = document.getElementById("root");
@@ -3019,7 +3021,11 @@ window.renderPaywall=renderPaywall;
 
 async function boot(){
   const { data:{ session } } = await sb.auth.getSession();
-  if(state.recovery || (location.hash||'').indexOf('type=recovery')>=0){ state.recovery=true; renderSetPassword(); return; }
+  { const _rh=(__RECOVERY_HASH||location.hash||''); const _hp=new URLSearchParams(_rh.replace(/^#/,'')); const _qp=new URLSearchParams(__RECOVERY_SEARCH||location.search||'');
+    if(_hp.get('error')||_qp.get('error')){ try{history.replaceState(null,'',location.pathname);}catch(e){} state.user=null; state.settings={academy_name:DEFAULT_NAME,brand_color:DEFAULT_BRAND,logo_url:DEFAULT_LOGO}; try{applyBrand(DEFAULT_BRAND);}catch(e){} state.authMode='reset'; render(); setTimeout(function(){ try{ amsg('That reset link had expired or was already used. Enter your email and we\'ll send a fresh one.','err'); }catch(e){} },60); return; }
+    const _at=_hp.get('access_token'), _rt=_hp.get('refresh_token'), _tp=_hp.get('type'), _code=_qp.get('code');
+    if((_tp==='recovery' && _at) || state.recovery){ if(_at){ try{ await sb.auth.setSession({access_token:_at, refresh_token:_rt||''}); }catch(e){} } state.recovery=true; try{history.replaceState(null,'',location.pathname);}catch(e){} renderSetPassword(); return; }
+    if(_code){ try{ const _ex=await sb.auth.exchangeCodeForSession(_code); if(_ex && !_ex.error){ state.recovery=true; try{history.replaceState(null,'',location.pathname);}catch(e){} renderSetPassword(); return; } }catch(e){} } }
   if(!session){ state.user=null; state.settings={academy_name:DEFAULT_NAME,brand_color:DEFAULT_BRAND,logo_url:DEFAULT_LOGO}; try{applyBrand(DEFAULT_BRAND);}catch(e){} try{ const _jc=new URLSearchParams(location.search).get('join'); if(_jc){ state.authMode='up'; state._joinPrefill=_jc; } }catch(e){} render(); return; }
   state.user = session.user; state.busy=false;
   await ensureProfile();
