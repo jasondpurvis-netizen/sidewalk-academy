@@ -405,7 +405,13 @@ window.doSetPassword=async function(){
     if(!(sess&&sess.data&&sess.data.session)){ amsg("Your reset link has expired. Go back and request a new one — it only takes a second.","err"); restore(); return; }
     const { error }=await sb.auth.updateUser({ password:p1 });
     if(error){ amsg(error.message,"err"); restore(); return; }
-    state.recovery=false; try{ history.replaceState(null,'',location.pathname); }catch(e){} await boot();
+    // Password changed. Clear the recovery session and drop straight to the sign-in screen
+    // (don't rely on boot()/session state — on iOS the recovery session doesn't persist and the screen would hang).
+    state.recovery=false; state.user=null;
+    try{ history.replaceState(null,'',location.pathname); }catch(e){}
+    try{ await sb.auth.signOut({ scope:'local' }); }catch(e){}
+    state.authMode='in'; render();
+    setTimeout(function(){ try{ amsg("Password updated. Sign in with your new password.","ok"); }catch(e){} },60);
   }catch(e){ amsg((e&&e.message)||String(e),"err"); restore(); }
 };
 function renderNewRestaurant(){
