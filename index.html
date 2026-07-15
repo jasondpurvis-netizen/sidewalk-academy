@@ -244,7 +244,7 @@ const SUPABASE_URL = "https://wjqcnxnwjqmuzrandgea.supabase.co";
 const SUPABASE_KEY = "sb_publishable_DQZclfAnv_MYQJLGcOdzdw_g4vMCiSC";
 const __RECOVERY_HASH = (typeof location!=='undefined' && location.hash) ? location.hash : '';
 const __RECOVERY_SEARCH = (typeof location!=='undefined' && location.search) ? location.search : '';
-const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { detectSessionInUrl: false, flowType: 'implicit', persistSession: true, autoRefreshToken: true } });
 
 const root = document.getElementById("root");
 let state = { user:null, profile:null, tracks:[], lessons:{}, progress:new Set(), responses:{}, settings:{}, glossary:[], assignments:[], page:"home", ctx:{}, authMode:"in", busy:false };
@@ -393,7 +393,20 @@ window.doSetPassword=async function(){
   if(p1.length<6){ amsg("Use at least 6 characters.","err"); return; }
   if(p1!==p2){ amsg("The two passwords don't match.","err"); return; }
   const btn=document.getElementById("npgo"); if(btn){ btn.textContent="Saving…"; btn.disabled=true; }
-  try{ const { error }=await sb.auth.updateUser({ password:p1 }); if(error){ amsg(error.message,"err"); if(btn){ btn.textContent="Save new password"; btn.disabled=false; } return; } state.recovery=false; try{ history.replaceState(null,'',location.pathname); }catch(e){} await boot(); }catch(e){ amsg((e&&e.message)||String(e),"err"); if(btn){ btn.textContent="Save new password"; btn.disabled=false; } }
+  const restore=function(){ if(btn){ btn.textContent="Save new password"; btn.disabled=false; } };
+  try{
+    // Make sure we actually have the recovery session before updating — re-establish it from the link's tokens if needed (fixes iOS/Gmail cases where it didn't stick).
+    let sess=await sb.auth.getSession();
+    if(!(sess&&sess.data&&sess.data.session)){
+      const _hp=new URLSearchParams((__RECOVERY_HASH||'').replace(/^#/,''));
+      const _at=_hp.get('access_token'), _rt=_hp.get('refresh_token');
+      if(_at){ try{ await sb.auth.setSession({ access_token:_at, refresh_token:_rt||'' }); }catch(e){} sess=await sb.auth.getSession(); }
+    }
+    if(!(sess&&sess.data&&sess.data.session)){ amsg("Your reset link has expired. Go back and request a new one — it only takes a second.","err"); restore(); return; }
+    const { error }=await sb.auth.updateUser({ password:p1 });
+    if(error){ amsg(error.message,"err"); restore(); return; }
+    state.recovery=false; try{ history.replaceState(null,'',location.pathname); }catch(e){} await boot();
+  }catch(e){ amsg((e&&e.message)||String(e),"err"); restore(); }
 };
 function renderNewRestaurant(){
   root.innerHTML = `<div class="auth"><div class="box"><div class="logo">🏪</div><h1>Welcome</h1><p class="sub">Are you setting up a restaurant, or joining one that already exists?</p><div id="nrmsg"></div><div style="border:1px solid var(--line2);border-radius:12px;padding:16px;margin-bottom:14px;text-align:left"><div style="font-weight:800;font-size:15px">Set up my restaurant</div><div class="muted" style="font-size:12.5px;margin:3px 0 12px;line-height:1.5">For the owner or manager. This creates your restaurant and its academy.</div><label>Restaurant name</label><input id="nrName" type="text" placeholder="e.g. Main Street Diner" autocomplete="organization"/><button class="btn pri" id="nrGo" style="margin-top:8px">Create my restaurant</button></div><div style="text-align:center;font-size:12px;color:var(--muted);margin:2px 0 14px;font-weight:800;letter-spacing:.05em">— OR —</div><div style="border:1px solid var(--line2);border-radius:12px;padding:16px;text-align:left"><div style="font-weight:800;font-size:15px">Join my team</div><div class="muted" style="font-size:12.5px;margin:3px 0 12px;line-height:1.5">For team members. Enter the join code your manager gave you.</div><label>Join code</label><input id="nrJoin" type="text" placeholder="Ask your manager for it" autocomplete="off"/><button class="btn" id="nrJoinGo" style="margin-top:8px">Join my team</button></div><div class="toggle" style="margin-top:16px"><b id="nrOut">Sign out</b></div></div></div>`;
