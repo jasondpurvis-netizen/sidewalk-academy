@@ -714,11 +714,15 @@ window.csForecast=async function(weekStartISO){
   for(let i=0;i<7;i++){
     const dtMs=ws+i*MS; const jsw=new Date(dtMs).getDay(); const cLY=dtMs-364*MS;
     const shapeDates=dates.filter(k=>{ const kd=D(k); return kd.getDay()===jsw && Math.abs(kd.getTime()-cLY)<=10*MS; });
+    const rc=dates.filter(k=>D(k).getDay()===jsw && D(k).getTime()<ws).sort().slice(-10); const recentBase=trimAvg(rc);
     let base=trimAvg(shapeDates), usedLY=true;
-    if(!base){ const rc=dates.filter(k=>D(k).getDay()===jsw && D(k).getTime()<ws).sort().slice(-8); base=trimAvg(rc); usedLY=false; }
+    // a thin last-year sample (often the store's earliest, sparsest data) is unreliable, so fall back to the recent same-weekday average
+    if(!base || base.n<2){ if(recentBase){ base=recentBase; usedLY=false; } }
     if(!base){ perJsw[jsw]=null; continue; }
     const scale=usedLY?(yoy*nudge):nudge;
     const s={},t={}; for(let H=0;H<24;H++){ s[H]=base.s[H]*scale; t[H]=base.t[H]*scale; }
+    // plausibility guard: keep any day within 0.5x to 2x of the recent same-weekday norm, so one freak day cannot throw it
+    if(recentBase){ let rt=0,ft=0; for(let H=0;H<24;H++){ rt+=recentBase.s[H]||0; ft+=s[H]||0; } if(rt>0&&ft>0){ const lo=rt*0.5, hi=rt*2; let k=1; if(ft<lo)k=lo/ft; else if(ft>hi)k=hi/ft; if(k!==1){ for(let H=0;H<24;H++){ s[H]*=k; t[H]*=k; } } } }
     perJsw[jsw]={s,t,usedLY,shapeN:base.n};
   }
   return {perJsw, basis:{yoy,nudge,haveLY,recentLevel,lyLevel,weekStart:weekStartISO}};
