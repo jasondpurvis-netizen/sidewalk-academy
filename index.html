@@ -723,6 +723,38 @@ window.csForecast=async function(weekStartISO){
   }
   return {perJsw, basis:{yoy,nudge,haveLY,recentLevel,lyLevel,weekStart:weekStartISO}};
 };
+// Rolling forecast accuracy: how close the saved daily forecast has been to actual sales over the last ~9 weeks.
+// Reuses the SAME data the Log grades on (day_sales = forecast, day_items 'actual' = actual) so the numbers agree.
+window.fcAccuracy=async function(){
+  if(window._fcAcc && (Date.now()-window._fcAcc.at<300000)) return window._fcAcc.val;
+  let val=null;
+  try{
+    const today=new Date(); const end=isoDate(today);
+    const s=new Date(today); s.setDate(s.getDate()-63); const start=isoDate(s);
+    const [rf,ra]=await Promise.all([
+      sb.from('day_sales').select('on_date,sales').gte('on_date',start).lte('on_date',end),
+      sb.from('day_items').select('on_date,detail').eq('kind','actual').gte('on_date',start).lte('on_date',end)
+    ]);
+    const F={}; (rf.data||[]).forEach(d=>{ const v=Number(d.sales)||0; if(v>0) F[d.on_date]=v; });
+    const A={}; (ra.data||[]).forEach(x=>{ try{ const v=Number(JSON.parse(x.detail||'{}').amount)||0; if(v>0) A[x.on_date]=v; }catch(e){} });
+    const errs=[]; let within=0;
+    Object.keys(A).forEach(iso=>{ if(F[iso]){ const e=Math.abs(A[iso]-F[iso])/F[iso]; errs.push(e); if(e<=0.10) within++; } });
+    if(errs.length>=3){ const mape=errs.reduce((a,b)=>a+b,0)/errs.length; val={mape:Math.round(mape*100), n:errs.length, within:Math.round(within/errs.length*100)}; }
+  }catch(e){}
+  window._fcAcc={at:Date.now(), val}; return val;
+};
+// Info-dot popover: teaches the method in a few words and sets the goal (close enough for an ~80% first draft, not perfect).
+window.fcGoalInfo=async function(){
+  let acc=null; try{ acc=await fcAccuracy(); }catch(e){}
+  const accLine = acc ? `<div style="margin-top:12px;padding:10px 12px;background:var(--brand-soft);border-radius:9px;font-size:12.5px;color:var(--ink)">Lately your forecast has landed within about <b>${acc.mape}%</b> of actual (last ${acc.n} days with sales)${acc.within>=50?`, inside 10% on <b>${acc.within}%</b> of them`:''}.</div>` : '';
+  const html=`<div style="font-size:13.5px;line-height:1.65;color:var(--ink)"><div style="font-weight:800;font-size:15px;margin-bottom:8px">How the forecast works</div>We blend three things: last year's pattern for this same week, how you are running this year versus last (your last 4 weeks), and last week's trend.<div style="margin-top:10px">It will not nail every day. Big surprises happen, like a sudden 40% day, and that is fine. The goal is to get close, close enough that your first draft schedule is about <b>80%</b> right and you adjust from there.</div><div style="margin-top:10px">Type your own number on any day to override. Yours always wins.</div>${accLine}</div>`;
+  const wrap=document.createElement('div'); wrap.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+  wrap.onclick=function(e){ if(e.target===wrap) wrap.remove(); };
+  const box=document.createElement('div'); box.className='card'; box.style.cssText='max-width:420px;width:100%;padding:20px 22px';
+  box.innerHTML=html+`<div style="text-align:right;margin-top:16px"><button class="btn" style="width:auto">Got it</button></div>`;
+  wrap.appendChild(box); document.body.appendChild(wrap);
+  box.querySelector('button').onclick=function(){ wrap.remove(); };
+};
 window.csTargetMatrix=async function(weekStartISO){
   if(!weekStartISO){ const _d=weekStart(new Date()); _d.setDate(_d.getDate()+7); weekStartISO=isoDate(_d); }
   const [rs,rp,rc]=await Promise.all([
@@ -1882,8 +1914,10 @@ async function schBoard(v){
   const _wkFc=isoDays.reduce((a,iso)=>a+(fcS[iso]||0),0);
   h+=`<div class="bt bt-team" style="font-weight:400"><span class="faint" title="Expected sales for the week. Auto-figured from last year, scaled to this year's trend. Tap a number to set your own — labor % uses this until real sales come in.">Forecast<div style="font-size:9px;opacity:.7;font-weight:400">tap to adjust</div></span></div>`+isoDays.map(iso=>{ const es=fcS[iso]||0; const over=fcAdj[iso]>0; const auto=fcAuto[iso]||0; return `<div class="bt"><div style="display:flex;align-items:center;justify-content:center;gap:1px"><span class="faint" style="font-size:10px">$</span><input type="number" min="0" value="${es?Math.round(es):''}" placeholder="—" onchange="setFcAdj('${iso}',this.value,${Math.round(auto)})" onclick="this.select()" style="width:50px;font-size:11px;font-weight:600;text-align:center;padding:3px 2px;border:1px solid ${over?'var(--brand)':'var(--line2)'};border-radius:6px;background:var(--card);color:${over?'var(--brand)':'var(--muted)'}"/></div>${over?`<div style="font-size:9px;color:var(--brand);font-weight:700;cursor:pointer" onclick="resetFcAdj('${iso}')" title="Back to the forecast number">your # &middot; ↺ reset</div>`:(es?'<div class="faint" style="font-size:9px;opacity:.7">est.</div>':'')}</div>`; }).join('')+`</div></div>`;
   if(isAdmin && _wkFc){
+    let _acc=null; try{ _acc=await fcAccuracy(); }catch(e){}
     const yoyPct=fcBasis?Math.round((fcBasis.yoy-1)*100):0; const ndgPct=fcBasis?Math.round((fcBasis.nudge-1)*100):0; const haveLY=fcBasis?!!fcBasis.haveLY:false;
-    h+=`<div class="faint" style="font-size:12px;margin:8px 2px 0">Forecast this week: <b>${money(_wkFc)}</b>${covRules.targetPct?` &middot; aiming for the <b>whole week</b> at ${_tgtPct}% labor (heavy prep days and lean weekends both count toward it)`:''}. <span style="color:var(--brand);cursor:pointer;font-weight:600" onclick="var e=document.getElementById('fcMath');var s=e.style.display==='none';e.style.display=s?'block':'none';this.textContent=s?'Hide the math':'Show how this is figured';">Show how this is figured</span>${Object.keys(fcAdj).length?` &middot; <span style="color:var(--brand);cursor:pointer;font-weight:600" onclick="resetAllFcAdj('${isoDays[0]}','${isoDays[6]}')" title="Clear every number you typed this week, back to the forecast">Reset my overrides</span>`:''}</div>`;
+    h+=`<div class="faint" style="font-size:12px;margin:8px 2px 0">Forecast this week: <b>${money(_wkFc)}</b><span onclick="fcGoalInfo()" title="How the forecast works" style="cursor:pointer;display:inline-block;width:15px;height:15px;line-height:15px;text-align:center;border-radius:50%;background:var(--brand);color:#fff;font-size:10px;font-weight:800;margin-left:5px">i</span>${covRules.targetPct?` &middot; aiming for the <b>whole week</b> at ${_tgtPct}% labor (heavy prep days and lean weekends both count toward it)`:''}. <span style="color:var(--brand);cursor:pointer;font-weight:600" onclick="var e=document.getElementById('fcMath');var s=e.style.display==='none';e.style.display=s?'block':'none';this.textContent=s?'Hide the math':'Show how this is figured';">Show how this is figured</span>${Object.keys(fcAdj).length?` &middot; <span style="color:var(--brand);cursor:pointer;font-weight:600" onclick="resetAllFcAdj('${isoDays[0]}','${isoDays[6]}')" title="Clear every number you typed this week, back to the forecast">Reset my overrides</span>`:''}</div>`;
+    if(_acc){ h+=`<div class="faint" style="font-size:11.5px;margin:3px 2px 0">Tracking within about <b>${_acc.mape}%</b> of actual lately (last ${_acc.n} days${_acc.within>=50?`, inside 10% on ${_acc.within}% of them`:''}).</div>`; }
     let em='';
     if(haveLY){ em+=`<div style="font-size:12.5px;line-height:1.7;color:var(--ink)">We start with <b>last year, this same week</b> — hour by hour, day by day (dropping any freak day so one snow day or festival doesn't skew it). Then two adjustments:<br>&bull; You're running <b>${yoyPct>=0?'+':''}${yoyPct}%</b> vs a year ago (your last 4 weeks against the same 4 weeks last year), so we scale last year by that.<br>&bull; Last week came in <b>${Math.abs(ndgPct)<1?'right on trend':(ndgPct>0?'+'+ndgPct+'% hot':ndgPct+'% soft')}</b>, so we ${Math.abs(ndgPct)<1?'hold steady':'nudge '+(ndgPct>0?'up':'down')+' a touch'}.</div>`; }
     else { em+=`<div style="font-size:12.5px;line-height:1.7;color:var(--ink)">You don't have last year's numbers for this week yet, so we use your <b>recent same-weekday average</b> (the last several of each weekday), ${Math.abs(ndgPct)<1?'held with':(ndgPct>0?'nudged up '+ndgPct+'% with':'nudged down '+Math.abs(ndgPct)+'% with')} last week's trend. <b style="color:var(--brand);cursor:pointer" onclick="go('saleshist')">Import last year's hourly sales</b> and this sharpens up.</div>`; }
