@@ -737,10 +737,11 @@ window.fcAccuracy=async function(){
     const s=new Date(today); s.setDate(s.getDate()-63); const start=isoDate(s);
     const [rf,ra]=await Promise.all([
       sb.from('day_sales').select('on_date,sales').gte('on_date',start).lte('on_date',end),
-      sb.from('day_items').select('on_date,detail').eq('kind','actual').gte('on_date',start).lte('on_date',end)
+      sb.from('day_items').select('on_date,detail').eq('kind','hourly').gte('on_date',start).lte('on_date',end)
     ]);
     const F={}; (rf.data||[]).forEach(d=>{ const v=Number(d.sales)||0; if(v>0) F[d.on_date]=v; });
-    const A={}; (ra.data||[]).forEach(x=>{ try{ const v=Number(JSON.parse(x.detail||'{}').amount)||0; if(v>0) A[x.on_date]=v; }catch(e){} });
+    // actual = the real POS sales that day (sum of the hourly feed)
+    const A={}; (ra.data||[]).forEach(x=>{ try{ const d=typeof x.detail==='string'?JSON.parse(x.detail||'{}'):(x.detail||{}); let tot=+d.total||0; if(!tot){ const bh=d.byHour||{}; for(const k in bh) tot+=(+bh[k]||0); } if(tot>0) A[x.on_date]=tot; }catch(e){} });
     const errs=[]; let within=0;
     Object.keys(A).forEach(iso=>{ if(F[iso]){ const e=Math.abs(A[iso]-F[iso])/F[iso]; errs.push(e); if(e<=0.10) within++; } });
     if(errs.length>=3){ const mape=errs.reduce((a,b)=>a+b,0)/errs.length; val={mape:Math.round(mape*100), n:errs.length, within:Math.round(within/errs.length*100)}; }
@@ -1763,7 +1764,15 @@ window.openArchive=function(name,editId){
   document.body.appendChild(m); m.addEventListener('click',e=>{if(e.target===m)m.remove();});
 };
 window.doArchive=async function(name,editId){ const reason=(document.getElementById('arReason')||{}).value||''; const rehire=(document.getElementById('arRehire')||{}).value||''; const notes=((document.getElementById('arNotes')||{}).value||'').trim(); const prev=(editId!=null&&window._archMap&&window._archMap[editId])?window._archMap[editId].d:{}; const detail=JSON.stringify(Object.assign({},prev,{reason,rehire,notes,date:prev.date||isoDate(new Date())})); if(editId!=null){ await sb.from('day_items').update({detail}).eq('id',editId); } else { await sb.from('day_items').insert({kind:'archived',title:name,on_date:null,detail,created_by:state.user.id}); if(window._archived)window._archived.add(name); } const m=document.getElementById('archm'); if(m)m.remove(); state.ctx.obtab='former'; state.ctx.ttab='former'; _reRenderPeople(); };
-window.restorePerson=async function(name){ await sb.from('day_items').delete().eq('kind','archived').eq('title',name); if(window._archived)window._archived.delete(name); _reRenderPeople(); };
+window.restorePerson=async function(name){
+  if(!confirm('Bring '+name+' back to your active roster?\n\nThey move off the Former list and onto your team. Their leaving notes will be removed.')) return;
+  // preserve their old position (if any was saved in the archive) so we can put them back where they belong
+  let pos=''; try{ const ar=await sb.from('day_items').select('detail').eq('kind','archived').eq('title',name).maybeSingle(); if(ar.data&&ar.data.detail){ const d=JSON.parse(ar.data.detail||'{}'); if(d.pos)pos=d.pos; } }catch(e){}
+  await sb.from('day_items').delete().eq('kind','archived').eq('title',name); if(window._archived)window._archived.delete(name);
+  // make sure they actually appear somewhere: if there is no position record for them, give them one so they show on the roster instead of vanishing
+  try{ const rp=await sb.from('day_items').select('id').eq('kind','pos').eq('title',name).maybeSingle(); if(!rp.data){ const p=pos||'Team Member'; await sb.from('day_items').insert({kind:'pos',title:name,detail:p,on_date:null,created_by:state.user.id}); if(window._posMap)window._posMap[name]=p; } }catch(e){}
+  _reRenderPeople();
+};
 function _reRenderPeople(){ const v=document.getElementById('view'); if(state.page==='schedule') vSchedule(v); else if(state.page==='onboarding') vOnboarding(v); else vTeam(v); }
 window.openProfile=function(name){
   const p=profileOf(name); const pos=posOf(name);
