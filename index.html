@@ -496,7 +496,7 @@ const PAGE_HERO={
   schedule:'&#10022; Plan the week', today:'&#10022; Every shift', rm:'&#10022; Keep it running', team:'&#10022; Your people', onboarding:'&#10022; New hires',
   community:'&#10022; The team', resources:'&#10022; On hand', downloads:'&#10022; Take it with you', checklists:'&#10022; Open &amp; close', onboarding:'&#10022; New team members',
   sales:'&#10022; The numbers', saleshist:'&#10022; The numbers', costsmart:'&#10022; Right-size the labor', setup:'&#10022; Get set up', ask:'&#10022; Ask me anything',
-  journal:'&#10022; Your notes', build:'&#10022; Course builder', calendar:'&#10022; The month', settings:'&#10022; Settings',
+  journal:'&#10022; Your notes', build:'&#10022; Course builder', calendar:'&#10022; The month', settings:'&#10022; Settings', logbook:'&#10022; Close the day',
   pay:'&#10022; Private', clock:'&#10022; Time clock', summary:'&#10022; Your progress', feedback:'&#10022; Feedback'
 };
 const HEROICON={home:'ti-school',acat:'ti-school',whiteboard:'ti-layout-dashboard',track:'ti-book-2',lesson:'ti-book-2'};
@@ -601,10 +601,10 @@ function buildTodoCard(d){ const dueRems=d.dueRems,todoItems=d.todoItems,allRems
   return `<div id="todocard" style="border:1px solid #C0DD97;border-left:5px solid #639922;background:#F3F8EA;border-radius:12px;padding:15px 17px;margin-bottom:18px"><div class="row" style="align-items:center;margin-bottom:${(todoItems.length||dueRems.length)?'11':'6'}px"><span style="display:inline-flex;align-items:center;gap:7px;font-size:14.5px;font-weight:800;color:#27500A"><i class="ti ti-checkbox" style="font-size:17px;color:#3B6D11"></i>To-dos today</span><span style="margin-left:auto;display:inline-flex;gap:10px;align-items:center">${openCount?`<span style="font-size:12px;font-weight:700;color:var(--muted)">${openCount} open</span>`:''}<button onclick="toggleRemPanel()" class="btn" style="width:auto;padding:5px 11px;font-size:12px;gap:5px"><i class="ti ti-repeat"></i> Reminders</button></span></div>${empty}${remRows}${todoRows}<div class="row" style="gap:8px;margin-top:12px"><input id="todoinput" placeholder="Add a to-do for today…" onkeydown="if(event.key==='Enter')addTodo()" style="flex:1;min-width:0;padding:9px 12px;border:1px solid var(--line2);border-radius:9px;font-family:inherit;font-size:14px;background:var(--card);color:var(--ink)"/><button class="btn pri" style="width:auto;padding:9px 17px" onclick="addTodo()">Add</button></div>${remPanel}</div>`;
 }
 // The why, shown once at the start of each person's day. Seen every open it becomes wallpaper; seen once, at the top of a shift, it lands.
-window.showWhyMoment=function(mtext,vtext){
+window.showWhyMoment=function(mtext,vtext,force){
   if(!mtext&&!vtext) return;
   var k,today;
-  try{ k='sw_why_seen_'+((state.user&&state.user.id)||'anon'); today=isoDate(new Date()); if(localStorage.getItem(k)===today) return; }catch(e){ return; }
+  try{ k='sw_why_seen_'+((state.user&&state.user.id)||'anon'); today=isoDate(new Date()); if(!force && localStorage.getItem(k)===today) return; }catch(e){ if(!force) return; }
   if(document.getElementById('whyMoment')) return;
   var dstr=new Date().toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'});
   var lab='font-size:11px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:var(--accent);margin-bottom:10px';
@@ -616,15 +616,14 @@ window.showWhyMoment=function(mtext,vtext){
   var _tile='<svg class="phero-svg" width="100%" height="100%" viewBox="0 0 '+_vw+' '+_vh+'" preserveAspectRatio="none"><defs><pattern id="swtilewhy" width="40" height="40" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path d="M20 0 L40 20 L20 40 L0 20 Z" fill="none" stroke="#EAF7FA" stroke-width="1.1"/><circle cx="20" cy="20" r="2.2" fill="#EAF7FA"/><path d="M20 6 L20 34 M6 20 L34 20" stroke="#EAF7FA" stroke-width=".7"/></pattern></defs><rect width="'+_vw+'" height="'+_vh+'" fill="url(#swtilewhy)" opacity=".13"/></svg>'
     +'<svg class="phero-heart" viewBox="0 0 24 24" width="300" height="300"><path d="M12 21s-7-4.5-9.5-8.5C.7 9.6 2 6 5.2 6c2 0 3.2 1.2 3.9 2.2C9.6 7.2 10.8 6 12.8 6 16 6 17.3 9.6 15.5 12.5 13 16.5 12 21 12 21z"/></svg>';
   m.innerHTML=_tile
-    +'<div style="position:relative;z-index:2;height:100%;display:flex;flex-direction:column;align-items:center;padding:36px 28px 30px;overflow:auto;box-sizing:border-box">'
-    +'<div style="width:100%;max-width:620px"><div style="font-size:11px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:var(--accent);margin-bottom:7px">&#10022; Every shift</div><div style="color:#DCEEF1;font-size:14.5px">'+esc(dstr)+'</div></div>'
-    +'<div style="flex:1;display:flex;flex-direction:column;justify-content:center;width:100%;max-width:620px;padding:28px 0">'
+    +'<div style="position:relative;z-index:2;min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 28px;overflow:auto;box-sizing:border-box">'
+    +'<div style="width:100%;max-width:600px">'
+    +'<div style="font-size:11px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:var(--accent);margin-bottom:7px">&#10022; Every shift</div><div style="color:#DCEEF1;font-size:14.5px;margin-bottom:40px">'+esc(dstr)+'</div>'
     +(mtext?'<div style="'+lab+'">Mission</div><div style="'+stmt+'">'+esc(mtext)+'</div>':'')
-    +((mtext&&vtext)?'<div style="height:1px;background:rgba(255,255,255,.3);margin:28px 0"></div>':'')
+    +((mtext&&vtext)?'<div style="height:1px;background:rgba(255,255,255,.3);margin:30px 0"></div>':'')
     +(vtext?'<div style="'+lab+'">Vision</div><div style="'+stmt+'">'+esc(vtext)+'</div>':'')
-    +'</div>'
-    +'<button id="whyGo" style="width:100%;max-width:620px;border:none;background:var(--accent);color:#3A2B00;font-weight:800;border-radius:999px;padding:14px;font-size:14px;font-family:inherit;cursor:pointer;box-shadow:0 6px 16px rgba(244,196,60,.42)">Start my shift</button>'
-    +'</div>';
+    +'<button id="whyGo" style="width:100%;margin-top:44px;border:none;background:var(--accent);color:#3A2B00;font-weight:800;border-radius:999px;padding:14px;font-size:14px;font-family:inherit;cursor:pointer;box-shadow:0 6px 16px rgba(244,196,60,.42)">Start my shift</button>'
+    +'</div></div>';
   document.body.appendChild(m);
   try{ localStorage.setItem(k,today); }catch(e){}
   m.querySelector('#whyGo').onclick=function(){ var e=document.getElementById('whyMoment'); if(e)e.remove(); };
@@ -1674,7 +1673,8 @@ async function vToday(v){
   let h='';
   // The why now opens each person's day as its own moment (showWhyMoment), so it isn't permanent furniture here.
   // Owners keep a quiet one-line handle so they can still edit it.
-  if((mtext||vtext) && isAdmin){ h+=`<div class="row" style="align-items:center;gap:10px;margin-bottom:16px"><span style="font-size:10.5px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:var(--brand);flex:none">✦ Our why</span><span class="faint" style="font-size:13px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(mtext||vtext)}</span><button class="btn" style="width:auto;padding:4px 11px;font-size:12px;flex:none" onclick="toggleWhyEdit()"><i class="ti ti-pencil"></i> Edit</button></div>`; }
+  if((mtext||vtext) && isAdmin){ try{ window._whyTexts={m:mtext,v:vtext}; }catch(e){}
+    h+=`<div class="row" style="align-items:center;gap:10px;margin-bottom:16px"><span style="font-size:10.5px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:var(--brand);flex:none">✦ Our why</span><span class="faint" style="font-size:13px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(mtext||vtext)}</span><button class="btn" style="width:auto;padding:4px 11px;font-size:12px;flex:none" onclick="showWhyMoment((window._whyTexts||{}).m,(window._whyTexts||{}).v,true)"><i class="ti ti-eye"></i> Preview</button><button class="btn" style="width:auto;padding:4px 11px;font-size:12px;flex:none" onclick="toggleWhyEdit()"><i class="ti ti-pencil"></i> Edit</button></div>`; }
   else if(isAdmin){ h+=`<div class="card" style="padding:16px 18px;margin-bottom:18px"><div class="row" style="align-items:center;margin-bottom:8px"><span style="font-size:11.5px;font-weight:800;letter-spacing:.15em;text-transform:uppercase;color:var(--brand)">✦ Our Why</span><button class="btn" style="width:auto;margin-left:auto;padding:5px 12px;font-size:12.5px" onclick="toggleWhyEdit()"><i class="ti ti-pencil"></i> Edit</button></div><div class="faint" style="font-size:13px">Add your mission and vision — they anchor the whole team, front and center.</div></div>`; }
   if(isAdmin) h+=`<div id="whyEdit" style="display:${(mtext||vtext)?'none':'block'};margin:-10px 0 18px"><div class="card" style="padding:14px 16px"><textarea id="wbmission" placeholder="Mission — why we exist" style="width:100%;min-height:50px;padding:10px;border:1px solid var(--line2);border-radius:8px;font-family:inherit;font-size:14px;color:var(--ink);background:var(--card);margin-bottom:8px">${esc(mtext)}</textarea><textarea id="wbvision" placeholder="Vision — where we're going" style="width:100%;min-height:50px;padding:10px;border:1px solid var(--line2);border-radius:8px;font-family:inherit;font-size:14px;color:var(--ink);background:var(--card)">${esc(vtext)}</textarea><div class="row" style="margin-top:8px"><button class="btn pri" style="width:auto;margin-left:auto" onclick="saveMV()">Save</button></div></div></div>`;
   const _needRows=buildTodayFocus({ fixVis, dueRots, orders, ppl, other, todayCelebs, hToday, ojrItem, isOJR, rank:_rank, revDue });
