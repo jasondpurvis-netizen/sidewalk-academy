@@ -611,7 +611,11 @@ window.showWhyMoment=function(mtext,vtext){
   var stmt='font-size:clamp(24px,5.2vw,34px);font-weight:800;line-height:1.18;letter-spacing:-.01em;color:#fff';
   var m=document.createElement('div'); m.id='whyMoment';
   m.style.cssText='position:fixed;inset:0;z-index:10000;overflow:hidden;background:linear-gradient(135deg,var(--tealdark) 0%,var(--tealmid) 52%,var(--teallite) 100%)';
-  m.innerHTML=heroTile()
+  // the hero's tile SVG is sized for a short banner; on a full screen it would stretch huge, so scale the viewBox to keep the same tile density
+  var _sc=2.1, _vw=Math.max(160,Math.round((window.innerWidth||900)/_sc)), _vh=Math.max(160,Math.round((window.innerHeight||700)/_sc));
+  var _tile='<svg class="phero-svg" width="100%" height="100%" viewBox="0 0 '+_vw+' '+_vh+'" preserveAspectRatio="none"><defs><pattern id="swtilewhy" width="40" height="40" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path d="M20 0 L40 20 L20 40 L0 20 Z" fill="none" stroke="#EAF7FA" stroke-width="1.1"/><circle cx="20" cy="20" r="2.2" fill="#EAF7FA"/><path d="M20 6 L20 34 M6 20 L34 20" stroke="#EAF7FA" stroke-width=".7"/></pattern></defs><rect width="'+_vw+'" height="'+_vh+'" fill="url(#swtilewhy)" opacity=".13"/></svg>'
+    +'<svg class="phero-heart" viewBox="0 0 24 24" width="300" height="300"><path d="M12 21s-7-4.5-9.5-8.5C.7 9.6 2 6 5.2 6c2 0 3.2 1.2 3.9 2.2C9.6 7.2 10.8 6 12.8 6 16 6 17.3 9.6 15.5 12.5 13 16.5 12 21 12 21z"/></svg>';
+  m.innerHTML=_tile
     +'<div style="position:relative;z-index:2;height:100%;display:flex;flex-direction:column;align-items:center;padding:36px 28px 30px;overflow:auto;box-sizing:border-box">'
     +'<div style="width:100%;max-width:620px"><div style="font-size:11px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:var(--accent);margin-bottom:7px">&#10022; Every shift</div><div style="color:#DCEEF1;font-size:14.5px">'+esc(dstr)+'</div></div>'
     +'<div style="flex:1;display:flex;flex-direction:column;justify-content:center;width:100%;max-width:620px;padding:28px 0">'
