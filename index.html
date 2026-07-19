@@ -156,6 +156,9 @@
   .pcell .mt{color:var(--faint);font-size:11px;display:block}
   .daycell{border-bottom:1px solid var(--line);border-left:1px solid var(--line);padding:3px;min-height:46px}
   .daycell.dragover{background:var(--brand-soft);box-shadow:inset 0 0 0 2px var(--brand)}
+  .daycell.dragover-bad{background:#FCEBEB;box-shadow:inset 0 0 0 2px #DC2626}
+  .scard.conflict{background:#FCEBEB!important;border:1px solid #E9A6A6!important;color:#A32D2D!important}
+  .scard.conflict .x{color:#A32D2D}
   .scard[draggable="true"]{cursor:grab}
   .scard.dragging{opacity:.4}
   .daycell.today{background:var(--brand-soft)}
@@ -647,12 +650,14 @@ window.schDragEnd=function(e){
 window.schDragOver=function(e){
   if(!window._schDragSid) return;
   e.preventDefault(); try{ e.dataTransfer.dropEffect='move'; }catch(_){}
-  var c=e.currentTarget; if(c) c.classList.add('dragover');
+  var c=e.currentTarget; if(!c) return;
+  // red target if this person can't work that day, so you see it before you let go
+  c.classList.add(c.getAttribute('data-bad')?'dragover-bad':'dragover');
 };
-window.schDragLeave=function(e){ var c=e.currentTarget; if(c) c.classList.remove('dragover'); };
+window.schDragLeave=function(e){ var c=e.currentTarget; if(c){ c.classList.remove('dragover'); c.classList.remove('dragover-bad'); } };
 window.schDrop=async function(e){
   e.preventDefault();
-  var cell=e.currentTarget; if(cell) cell.classList.remove('dragover');
+  var cell=e.currentTarget; if(cell){ cell.classList.remove('dragover'); cell.classList.remove('dragover-bad'); }
   var sid=window._schDragSid; if(!sid){ try{ sid=e.dataTransfer.getData('text/plain'); }catch(_){} }
   window._schDragSid=null;
   if(!sid||!cell) return;
@@ -660,7 +665,10 @@ window.schDrop=async function(e){
   if(!nm||!iso) return;
   // move it in the UI straight away so it lands where you dropped it, instead of snapping back while the save round-trips
   var chip=document.querySelector('.scard[data-sid="'+sid+'"]'), from=chip&&chip.parentNode;
-  if(chip){ chip.classList.remove('dragging'); var hint=cell.querySelector('.addhint'); if(hint) cell.insertBefore(chip,hint); else cell.appendChild(chip); }
+  if(chip){ chip.classList.remove('dragging'); var hint=cell.querySelector('.addhint'); if(hint) cell.insertBefore(chip,hint); else cell.appendChild(chip);
+    // reflect the conflict immediately so it turns red the moment it lands, not after the refresh
+    if(cell.getAttribute('data-bad')){ chip.classList.add('conflict'); chip.title=cell.getAttribute('data-badwhy')||''; } else { chip.classList.remove('conflict'); chip.removeAttribute('title'); }
+  }
   var r=await sb.from('shifts').update({person_name:nm,on_date:iso}).eq('id',sid);
   if(r&&r.error){ if(chip&&from) from.appendChild(chip); alert('Could not move that shift: '+r.error.message); return; }
   var b=document.getElementById('schbody'); if(b&&typeof schBoard==='function') schBoard(b);
@@ -2011,10 +2019,14 @@ async function schBoard(v){
     roles[role].forEach(p=>{
       let wHrs=0,wCost=0;
       const cells=isoDays.map((iso,di)=>{ const list=byPD[p.name+'|'+iso]||[]; let cell=''; const isOjr=ojrByDay[iso]===p.name; const offRec=offMap[p.name]&&offMap[p.name][iso];
-        list.forEach(s=>{ const hrs=shiftHours(s); wHrs+=hrs; const c=hrs*(wage[p.name]||0); wCost+=c; dayHrs[di]+=hrs; dayCost[di]+=c; const tr=s.kind==='training'; const oj=isOjr?';border-color:#F4C7C7;background:#FEECEC':''; const styleAttr=isAdmin?` style="cursor:pointer${oj}"`:(isOjr?` style="border-color:#F4C7C7;background:#FEECEC"`:''); cell+=`<div class="scard${tr?' train':''}"${isAdmin?` onclick="editShift(${s.id})" draggable="true" data-sid="${s.id}" ondragstart="schDragStart(event)" ondragend="schDragEnd(event)"`:''}${styleAttr}>${isOjr?'<span style="display:inline-block;background:#DC2626;color:#fff;font-size:9px;font-weight:800;letter-spacing:.03em;padding:1px 4px;border-radius:4px;margin-right:4px;vertical-align:middle">OJR</span>':''}${s.start_time?fmtClock(s.start_time):'shift'}${s.end_time?'–'+fmtClock(s.end_time):''}${tr?' · train':''}${isAdmin?`<span class="x" onclick="event.stopPropagation();delShift(${s.id})">×</span>`:''}${(s.role&&s.role!==posOf(p.name)&&s.role.trim())?`<div style="font-size:9.5px;font-weight:700;opacity:.75;white-space:normal;line-height:1.15;margin-top:1px">${esc(s.role)}</div>`:''}</div>`; });
+        // can this person work this day at all? drives the red flag on the chip and the red drop target
+        const _av=avMapB[p.name]&&avMapB[p.name][di]; const _unavail=!!(_av&&_av.can_work===false);
+        const _pdo=(profileOf(p.name)||{}).daysOff; const _isDayOff=Array.isArray(_pdo)&&_pdo.indexOf(di)>=0;
+        const _bad=_unavail||_isDayOff; const _badWhy=_unavail?(p.name+" isn't available this day"):(_isDayOff?(p.name+' has this day off'):'');
+        list.forEach(s=>{ const hrs=shiftHours(s); wHrs+=hrs; const c=hrs*(wage[p.name]||0); wCost+=c; dayHrs[di]+=hrs; dayCost[di]+=c; const tr=s.kind==='training'; const oj=isOjr?';border-color:#F4C7C7;background:#FEECEC':''; const styleAttr=isAdmin?` style="cursor:pointer${oj}"`:(isOjr?` style="border-color:#F4C7C7;background:#FEECEC"`:''); cell+=`<div class="scard${tr?' train':''}${_bad?' conflict':''}"${_bad?` title="${esc(_badWhy)}"`:''}${isAdmin?` onclick="editShift(${s.id})" draggable="true" data-sid="${s.id}" ondragstart="schDragStart(event)" ondragend="schDragEnd(event)"`:''}${styleAttr}>${_bad?'<i class="ti ti-alert-triangle" style="font-size:11px;margin-right:3px;vertical-align:-1px"></i>':''}${isOjr?'<span style="display:inline-block;background:#DC2626;color:#fff;font-size:9px;font-weight:800;letter-spacing:.03em;padding:1px 4px;border-radius:4px;margin-right:4px;vertical-align:middle">OJR</span>':''}${s.start_time?fmtClock(s.start_time):'shift'}${s.end_time?'–'+fmtClock(s.end_time):''}${tr?' · train':''}${isAdmin?`<span class="x" onclick="event.stopPropagation();delShift(${s.id})">×</span>`:''}${(s.role&&s.role!==posOf(p.name)&&s.role.trim())?`<div style="font-size:9.5px;font-weight:700;opacity:.75;white-space:normal;line-height:1.15;margin-top:1px">${esc(s.role)}</div>`:''}</div>`; });
         if(offRec) cell=`<div class="scard" style="background:#F1F0EE;color:#8A8A8A;border-color:#E2E0DD;font-weight:600;cursor:default" title="${esc(offRec)}"><i class="ti ti-plane" style="font-size:11px"></i> Time off</div>`+cell;
         const canAdd = isAdmin && !cell;
-        return `<div class="daycell${iso===todayIso?' today':''}"${isAdmin?` data-nm="${esc(p.name)}" data-iso="${iso}" ondragover="schDragOver(event)" ondragleave="schDragLeave(event)" ondrop="schDrop(event)"`:''}${canAdd?` onclick="quickAdd(this)" style="cursor:pointer"`:''}>${cell}${canAdd?'<span class="addhint" style="display:block;text-align:center;color:var(--brand);opacity:.28;font-size:15px;font-weight:700;line-height:1">+</span>':''}</div>`;
+        return `<div class="daycell${iso===todayIso?' today':''}"${isAdmin?` data-nm="${esc(p.name)}" data-iso="${iso}"${_bad?` data-bad="1" data-badwhy="${esc(_badWhy)}"`:''} ondragover="schDragOver(event)" ondragleave="schDragLeave(event)" ondrop="schDrop(event)"`:''}${canAdd?` onclick="quickAdd(this)" style="cursor:pointer"`:''}>${cell}${canAdd?'<span class="addhint" style="display:block;text-align:center;color:var(--brand);opacity:.28;font-size:15px;font-weight:700;line-height:1">+</span>':''}</div>`;
       }).join('');
       const inits=(p.name||'?').split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
       h+=`<div class="pcell"><span class="av">${esc(inits)}</span><span style="min-width:0"><span class="nm">${esc(p.name)}</span><span class="mt">${wHrs?wHrs.toFixed(1)+' h':'0 h'}${isAdmin&&wage[p.name]?' · '+money(wCost):''}</span></span></div>${cells}`;
@@ -2068,7 +2080,11 @@ async function schBoard(v){
     h+=`<div class="sec">Pay rates</div><div class="card" style="padding:16px;display:flex;align-items:center;gap:12px"><i class="ti ti-lock" style="font-size:20px;color:var(--muted)"></i><div style="flex:1;min-width:0"><div style="font-weight:600;font-size:13.5px">Kept off the schedule</div><div class="faint" style="font-size:12px">Wages don't show here, so no one reads them over your shoulder. They still power Labor $ and Labor %.</div></div><button class="btn" style="width:auto" onclick="go('pay')">Manage pay rates</button></div>`;
     h+=`</div>`;
   }
+  // keep the reader exactly where they were: re-rendering after an edit shouldn't jump the page or lose the grid's sideways scroll
+  var _sy=(typeof window!=='undefined'&&(window.scrollY||document.documentElement.scrollTop))||0;
+  var _oldBoard=v.querySelector('.board'); var _sx=_oldBoard?_oldBoard.scrollLeft:0;
   v.innerHTML=h;
+  try{ var _nb=v.querySelector('.board'); if(_nb&&_sx) _nb.scrollLeft=_sx; if(_sy) window.scrollTo(0,_sy); }catch(e){}
   if(isAdmin){ try{ if(!localStorage.getItem('sw_schedtour')) setTimeout(function(){ if(document.getElementById('schAutoDraft')) window.startSchedTour(); },700); }catch(e){} }
 }
 window.schToggleSetup=function(){ const b=document.getElementById('schSetup'); if(!b)return; const open=b.style.display==='none'; b.style.display=open?'block':'none'; try{localStorage.setItem('sch_setup_open',open?'1':'0');}catch(e){} const c=document.getElementById('schSetupChev'); if(c)c.className='ti ti-chevron-'+(open?'up':'down'); };
@@ -2106,7 +2122,15 @@ window.resetFcAdj=async function(iso){ try{ await sb.from('day_items').delete().
 window.resetAllFcAdj=async function(a,b){ if(!confirm('Clear the forecast numbers you typed for this week and go back to the auto forecast?')) return; try{ await sb.from('day_items').delete().eq('kind','fcadj').gte('on_date',a).lte('on_date',b); }catch(e){} const _b=document.getElementById('schbody'); if(_b&&typeof schBoard==='function') schBoard(_b); };
 window.weekShift=function(n){ if(n===0){ state.ctx.wk=isoDate(weekStart(new Date())); } else { const base=state.ctx.wk?wkDate(state.ctx.wk):weekStart(new Date()); base.setDate(base.getDate()+n*7); state.ctx.wk=isoDate(base); } try{localStorage.setItem('sched_wk',state.ctx.wk);}catch(e){} const _b=document.getElementById('schbody'); if(_b&&typeof schBoard==='function'){ schBoard(_b); } else { vSchedule(document.getElementById('view')); } };
 window.addShift=async function(){ const nm=val('shname'); const on=document.getElementById('shdate').value; if(!nm||!on){ alert('Pick a person and a date.'); return; } const prof=(window._team||[]).find(p=>p.name===nm); await sb.from('shifts').insert({person_name:nm,role:val('shrole')||(prof&&prof.title)||'',on_date:on,start_time:document.getElementById('shstart').value,end_time:document.getElementById('shend').value,kind:document.getElementById('shkind').value,user_id:prof?prof.id:null}); state.ctx.wk=isoDate(weekStart(wkDate(on))); vSchedule(document.getElementById('view')); };
-window.delShift=async function(id){ await sb.from('shifts').delete().eq('id',id); vSchedule(document.getElementById('view')); };
+window.delShift=async function(id){
+  // take the chip off screen straight away, then save. Only the board refreshes, not the whole schedule page.
+  var chip=document.querySelector('.scard[data-sid="'+id+'"]'), parent=chip&&chip.parentNode, next=chip&&chip.nextSibling;
+  if(chip) chip.remove();
+  var r=await sb.from('shifts').delete().eq('id',id);
+  if(r&&r.error){ if(chip&&parent) parent.insertBefore(chip,next); alert('Could not remove that shift: '+r.error.message); return; }
+  var b=document.getElementById('schbody');
+  if(b&&typeof schBoard==='function') schBoard(b); else vSchedule(document.getElementById('view'));
+};
 // Click an empty schedule cell -> type start/end right there -> saves a shift for that person/day
 window.quickAdd=function(cell){ if(!cell||cell.querySelector('.qadd'))return; cell.innerHTML=`<div class="qadd" onclick="event.stopPropagation()" style="display:flex;flex-direction:column;gap:3px;padding:1px"><input type="time" class="qaS" value="08:00" style="font-size:11px;padding:2px 3px;border:1px solid var(--line2);border-radius:5px;font-family:inherit;background:var(--card);color:var(--ink)"/><input type="time" class="qaE" value="14:00" style="font-size:11px;padding:2px 3px;border:1px solid var(--line2);border-radius:5px;font-family:inherit;background:var(--card);color:var(--ink)"/><div style="display:flex;gap:3px"><button onclick="quickAddSave(this)" style="flex:1;font-size:10px;padding:3px;border:none;border-radius:5px;background:var(--brand);color:#fff;cursor:pointer;font-weight:700">Add</button><button onclick="vSchedule(document.getElementById('view'))" style="font-size:10px;padding:3px 5px;border:1px solid var(--line2);border-radius:5px;background:var(--card);color:var(--muted);cursor:pointer">&times;</button></div></div>`; const f=cell.querySelector('.qaS'); if(f)f.focus(); };
 window.quickAddSave=async function(btn){ const cell=btn.closest('.daycell'); const box=btn.closest('.qadd'); if(!cell||!box)return; const name=cell.dataset.nm, iso=cell.dataset.iso; const s=box.querySelector('.qaS').value, e=box.querySelector('.qaE').value; if(!s||!e){ alert('Pick a start and end time.'); return; } if(e<=s){ alert('End time needs to be after the start time.'); return; } await sb.from('shifts').insert({person_name:name, role:posOf(name), on_date:iso, start_time:s, end_time:e, kind:'shift', user_id:(profileOf(name)||{}).id||null});
