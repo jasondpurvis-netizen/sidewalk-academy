@@ -658,8 +658,11 @@ window.schDrop=async function(e){
   if(!sid||!cell) return;
   var nm=cell.getAttribute('data-nm'), iso=cell.getAttribute('data-iso');
   if(!nm||!iso) return;
+  // move it in the UI straight away so it lands where you dropped it, instead of snapping back while the save round-trips
+  var chip=document.querySelector('.scard[data-sid="'+sid+'"]'), from=chip&&chip.parentNode;
+  if(chip){ chip.classList.remove('dragging'); var hint=cell.querySelector('.addhint'); if(hint) cell.insertBefore(chip,hint); else cell.appendChild(chip); }
   var r=await sb.from('shifts').update({person_name:nm,on_date:iso}).eq('id',sid);
-  if(r&&r.error){ alert('Could not move that shift: '+r.error.message); return; }
+  if(r&&r.error){ if(chip&&from) from.appendChild(chip); alert('Could not move that shift: '+r.error.message); return; }
   var b=document.getElementById('schbody'); if(b&&typeof schBoard==='function') schBoard(b);
 };
 window.saveMV=async function(){ const m=(document.getElementById('wbmission')||{}).value||''; const vv=(document.getElementById('wbvision')||{}).value||''; for(const [k,val] of [['mission',m.trim()],['vision',vv.trim()]]){ await sb.from('day_items').delete().eq('kind',k); if(val) await sb.from('day_items').insert({kind:k,detail:val,title:k,created_by:state.user.id}); } go('today'); };
@@ -1098,7 +1101,40 @@ function vAcat(v){
   v.innerHTML=h;
   window._acatIdx=[]; list.forEach(function(t){ trackLessons(t.id).forEach(function(l){ const txt=((l.title||'')+' '+(l.subtitle||'')+' '+String(l.body||'').replace(/<[^>]+>/g,' ')).toLowerCase(); window._acatIdx.push({tid:t.id,lid:l.id,title:l.title||'',track:t.name||'',n:l.n,txt:txt}); }); });
 }
-window.acatFilter=function(){ const el=document.getElementById('acatSearch'); const main=document.getElementById('acatMain'); const res=document.getElementById('acatResults'); if(!el||!res)return; const q=(el.value||'').trim().toLowerCase(); if(!q){ res.innerHTML=''; if(main)main.style.display=''; return; } if(main)main.style.display='none'; const idx=window._acatIdx||[]; const terms=q.split(/\s+/).filter(Boolean); const hits=idx.filter(function(r){ return terms.every(function(tm){ return r.txt.indexOf(tm)>=0; }); }).slice(0,40);
+// Typo-tolerant search: "gridle" should still find "griddle". Exact match first (fast), then a bounded edit-distance check per word.
+window._lev=function(a,b,max){
+  if(a===b) return 0;
+  var la=a.length, lb=b.length;
+  if(Math.abs(la-lb)>max) return max+1;
+  var prev=new Array(lb+1), cur=new Array(lb+1), i, j;
+  for(j=0;j<=lb;j++) prev[j]=j;
+  for(i=1;i<=la;i++){
+    cur[0]=i; var best=cur[0];
+    for(j=1;j<=lb;j++){
+      var cost=a.charCodeAt(i-1)===b.charCodeAt(j-1)?0:1;
+      cur[j]=Math.min(prev[j]+1, cur[j-1]+1, prev[j-1]+cost);
+      if(cur[j]<best) best=cur[j];
+    }
+    if(best>max) return max+1;
+    var t=prev; prev=cur; cur=t;
+  }
+  return prev[lb];
+};
+window.fuzzyHas=function(txt,term){
+  if(!term) return true;
+  txt=txt||'';
+  if(txt.indexOf(term)>=0) return true;
+  if(term.length<4) return false; // too short to guess at safely
+  var max=term.length<=5?1:2;
+  var words=txt.split(/[^a-z0-9]+/);
+  for(var i=0;i<words.length;i++){
+    var w=words[i];
+    if(!w || Math.abs(w.length-term.length)>max) continue;
+    if(window._lev(w,term,max)<=max) return true;
+  }
+  return false;
+};
+window.acatFilter=function(){ const el=document.getElementById('acatSearch'); const main=document.getElementById('acatMain'); const res=document.getElementById('acatResults'); if(!el||!res)return; const q=(el.value||'').trim().toLowerCase(); if(!q){ res.innerHTML=''; if(main)main.style.display=''; return; } if(main)main.style.display='none'; const idx=window._acatIdx||[]; const terms=q.split(/\s+/).filter(Boolean); const hits=idx.filter(function(r){ return terms.every(function(tm){ return window.fuzzyHas(r.txt,tm); }); }).slice(0,40);
   if(!hits.length){ res.innerHTML='<div class="card" style="padding:22px 18px;text-align:center"><div class="muted" style="font-size:13.5px">No modules match &ldquo;'+esc(q)+'&rdquo;. Try a station name or a single word.</div></div>'; return; }
   res.innerHTML='<div class="faint" style="font-size:12px;margin:0 0 8px">'+hits.length+' match'+(hits.length===1?'':'es')+'</div><div class="card" style="padding:4px 0">'+hits.map(function(r){ const done=isDone(r.lid); return '<div class="lesson-row" onclick="go(\'lesson\',{tid:\''+r.tid+'\',lid:\''+r.lid+'\'})"><div class="dot '+(done?'done':'')+'">'+(done?'✓':'')+'</div><div style="flex:1"><div style="font-weight:500">'+esc(r.title)+'</div><div class="faint" style="font-size:12px">'+esc(r.track)+' &middot; Module '+r.n+'</div></div><span class="faint">&rsaquo;</span></div>'; }).join('')+'</div>'; };
 function vTrack(v){
@@ -1382,7 +1418,7 @@ async function vResources(v){
   setTitle('Resources', isAdmin?'Grab-and-print sheets your team can run without you':'Grab a sheet and print it at the restaurant');
   v.innerHTML='<div class="muted">Loading…</div>';
   let res=[]; try{ const {data}=await sb.from('resources').select('*').order('position'); res=data||[]; }catch(e){}
-  const q=(state.ctx.rq||'').toLowerCase(); const match=t=>!q||(t||'').toLowerCase().includes(q);
+  const q=(state.ctx.rq||'').toLowerCase(); const match=t=>!q||(typeof fuzzyHas==='function'?fuzzyHas((t||'').toLowerCase(),q):(t||'').toLowerCase().includes(q));
   let h=`<input id="rsearch" placeholder="Search resources…" value="${esc(state.ctx.rq||'')}" oninput="state.ctx.rq=this.value;clearTimeout(window._rs);window._rs=setTimeout(()=>vResources(document.getElementById('view')),200)" style="width:100%;padding:11px 13px;border:1px solid var(--line2);border-radius:9px;font-size:14px;margin-bottom:18px;background:var(--card);color:var(--ink);font-family:inherit"/>`;
   const sheets=BUILTIN_SHEETS.filter(s=>match(s.title)||match(s.cat)||match(s.desc));
   if(sheets.length){ h+=`<div class="sec">Print-ready sheets</div><div class="grid">`+sheets.map(s=>`<div class="card" style="padding:15px"><div style="font-size:22px;margin-bottom:8px;color:var(--brand)"><i class="ti ti-printer"></i></div><div style="font-weight:600;margin-bottom:3px">${s.title}</div><div class="faint" style="font-size:12px;margin-bottom:11px">${s.desc}</div><button class="btn pri" style="width:auto" onclick="printSheet('${s.id}')">Print</button></div>`).join('')+`</div>`; }
@@ -1693,7 +1729,7 @@ async function vToday(v){
   const _rank=(typeof myRank==='function')?myRank():1;
   if(!ops){
     let hL='';
-    if(mtext||vtext){ hL+=`<div class="card" style="padding:15px 17px;margin-bottom:16px;background:var(--brand-soft);border-color:var(--brand-line)">${mtext?`<div style="font-size:10.5px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--brand);margin-bottom:4px">Our mission</div><div style="font-size:16px;font-weight:700;line-height:1.4;margin-bottom:${vtext?'12px':'0'}">${esc(mtext)}</div>`:''}${vtext?`<div style="font-size:10.5px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--brand);margin-bottom:4px">Our vision</div><div style="font-size:16px;font-weight:700;line-height:1.4">${esc(vtext)}</div>`:''}</div>`; }
+    // the why now opens each person's day as its own moment (showWhyMoment), so it isn't repeated here
     if(state.progress && state.progress.size===0){ hL+=`<div class="card" style="padding:18px 20px;margin-bottom:16px"><div style="font-weight:700;font-size:16px;margin-bottom:5px">👋 Welcome to ${esc((state.settings&&state.settings.academy_name)||'the Academy')}</div><div class="muted" style="font-size:13.5px;line-height:1.62">Your space to grow as a leader. Start with <b>Foundations of Leadership</b> below.</div></div>`; }
     let _cL=null; for(const t of visibleTracks()){ for(const l of trackLessons(t.id)){ if(!isDone(l.id)){ _cL={t,l}; break; } } if(_cL) break; }
     if(_cL){ hL+=`<div class="sec">Continue your training</div><div class="card" style="padding:18px 20px;display:flex;align-items:center;gap:16px"><div style="width:46px;height:46px;border-radius:12px;background:var(--brand);color:#fff;display:flex;align-items:center;justify-content:center;font-size:21px;flex-shrink:0"><i class="ti ti-player-play"></i></div><div style="flex:1;min-width:0"><div class="faint" style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;font-weight:700">${esc(_cL.t.name)}</div><div style="font-weight:600;font-size:16px;margin:3px 0 10px">${esc(_cL.l.title)}</div><div class="bar"><i style="width:${trackPct(_cL.t.id)}%"></i></div></div><button class="btn pri" style="width:auto;gap:6px" onclick="go('lesson',{tid:'${_cL.t.id}',lid:'${_cL.l.id}'})">Resume <i class="ti ti-arrow-right"></i></button></div>`; }
@@ -1863,7 +1899,7 @@ async function schBoard(v){
   const start=weekStart(base); const days=[...Array(7)].map((_,i)=>{ const d=new Date(start); d.setDate(d.getDate()+i); return d; });
   const isoDays=days.map(isoDate); const wkStart=isoDays[0];
   const lyDates=isoDays.map(iso=>{ const x=new Date(iso+'T00:00'); x.setFullYear(x.getFullYear()-1); return isoDate(x); });
-  const [rsh,rpf,rpay,rsal,rpub,rojr,rto,rhr,,,,rcov,rfc] = await Promise.all([
+  const [rsh,rpf,rpay,rsal,rpub,rojr,rto,rhr,,,,rcov,rfc,rav] = await Promise.all([
     sb.from('shifts').select('*').gte('on_date',isoDays[0]).lte('on_date',isoDays[6]),
     sb.from('profiles').select('*'),
     sb.from('pay_rates').select('*'),
@@ -1876,8 +1912,11 @@ async function schBoard(v){
     loadArchived(),
     loadProfiles(),
     sb.from('day_items').select('detail').eq('kind','covrules').order('id',{ascending:false}).limit(1).maybeSingle(),
-    sb.from('day_items').select('on_date,detail').eq('kind','fcadj').in('on_date',isoDays)
+    sb.from('day_items').select('on_date,detail').eq('kind','fcadj').in('on_date',isoDays),
+    sb.from('availability').select('person_name,weekday,can_work,note')
   ]);
+  // availability, so the board can flag anyone scheduled on a day they said they can't work
+  const avMapB={}; (rav&&rav.data||[]).forEach(a=>{ (avMapB[a.person_name]=avMapB[a.person_name]||{})[a.weekday]=a; });
   const ojrByDay={}; (rojr.data||[]).forEach(o=>{ if(o.on_date) ojrByDay[o.on_date]=o.detail; });
   let covRules={requireLeader:true,shiftLen:8,minLen:4,maxLen:8,targetPct:'',burdenPct:'',matrix:{blocks:[]},days:{},roleReqs:[],blackouts:[]}; try{ const cd=JSON.parse((rcov&&rcov.data&&rcov.data.detail)||'{}'); covRules={requireLeader:cd.requireLeader!==false, shiftLen:+(cd.shiftLen)||8, minLen:+(cd.minLen)||4, maxLen:+(cd.maxLen)||8, targetPct:cd.targetPct||'', burdenPct:+(cd.burdenPct)||0, matrix:cd.matrix||{blocks:[]}, days:cd.days||{}, roleReqs:Array.isArray(cd.roleReqs)?cd.roleReqs:[], blackouts:Array.isArray(cd.blackouts)?cd.blackouts:[]}; }catch(e){}
   const covTarget=di=>{ const M=covRules.matrix; if(M&&M.blocks&&M.blocks.length){ let mx=0; M.blocks.forEach(b=>{ const n=+((b.n||[])[di]||0); if(n>mx)mx=n; }); return mx||null; } const c=covRules.days[di]; return c&&c.people?+c.people:null; };
@@ -1946,7 +1985,11 @@ async function schBoard(v){
     if(fc&&fc.perJsw){ isoDays.forEach(iso=>{ const jsw=new Date(iso+'T12:00:00').getDay(); const f=fc.perJsw[jsw]; let s=0; if(f&&f.s){ for(let H=0;H<24;H++) s+=(f.s[H]||0); } fcS[iso]=s; }); fcBasis=fc.basis||null; } }
   const fcAuto=Object.assign({},fcS); // remember the machine's number so we can show it next to any override
   isoDays.forEach(iso=>{ if(fcAdj[iso]>0) fcS[iso]=fcAdj[iso]; }); // owner's number wins for labor % and the week total
-  if(isAdmin){ const R=lawRules(); const warns=[]; const hoursByP={}; shifts.forEach(s=>{ if(s.person_name&&s.person_name!=='__OPEN__') hoursByP[s.person_name]=(hoursByP[s.person_name]||0)+shiftHours(s); }); const seen=new Set(); shifts.forEach(s=>{ if(s.person_name==='__OPEN__')return; if(offMap[s.person_name]&&offMap[s.person_name][s.on_date]){ const k=s.person_name+'|'+s.on_date; if(!seen.has(k)){ seen.add(k); warns.push('🌴 '+s.person_name+' is scheduled '+fmtDay(_d(s.on_date))+' but has approved time off'); } } }); const otW=R.ot_weekly_hrs||40; Object.keys(hoursByP).forEach(n=>{ if(hoursByP[n]>otW) warns.push('⏰ '+n+' is over '+otW+'h this week ('+hoursByP[n].toFixed(1)+'h)'); }); if(warns.length) h+=`<div class="card" style="padding:12px 15px;margin-bottom:14px;background:var(--amber-soft);border-color:var(--amber)"><div style="font-weight:700;color:var(--amber);margin-bottom:5px">${warns.length} thing${warns.length>1?'s':''} to check before publishing</div><div style="font-size:13px;line-height:1.8">${warns.map(w=>esc(w)).join('<br>')}</div></div>`; }
+  if(isAdmin){ const R=lawRules(); const warns=[]; const hoursByP={}; shifts.forEach(s=>{ if(s.person_name&&s.person_name!=='__OPEN__') hoursByP[s.person_name]=(hoursByP[s.person_name]||0)+shiftHours(s); }); const seen=new Set(); shifts.forEach(s=>{ if(s.person_name==='__OPEN__')return; if(offMap[s.person_name]&&offMap[s.person_name][s.on_date]){ const k=s.person_name+'|'+s.on_date; if(!seen.has(k)){ seen.add(k); warns.push('🌴 '+s.person_name+' is scheduled '+fmtDay(_d(s.on_date))+' but has approved time off'); } } });
+    // scheduled on a day they've said they can't work
+    const seenAv=new Set(); shifts.forEach(s=>{ if(s.person_name==='__OPEN__')return; const di=isoDays.indexOf(s.on_date); if(di<0)return; const a=avMapB[s.person_name]&&avMapB[s.person_name][di]; if(a&&a.can_work===false){ const k=s.person_name+'|'+s.on_date; if(!seenAv.has(k)){ seenAv.add(k); warns.push('🚫 '+s.person_name+' is scheduled '+fmtDay(_d(s.on_date))+" but isn't available that day"); } } });
+    // recurring day off (the profile rule the draft never breaks) being overridden by hand
+    const seenOff=new Set(); shifts.forEach(s=>{ if(s.person_name==='__OPEN__')return; const di=isoDays.indexOf(s.on_date); if(di<0)return; const o=(profileOf(s.person_name)||{}).daysOff; if(Array.isArray(o)&&o.indexOf(di)>=0){ const k=s.person_name+'|'+s.on_date; if(!seenOff.has(k)){ seenOff.add(k); warns.push('📅 '+s.person_name+' is scheduled '+fmtDay(_d(s.on_date))+' but that is one of their days off'); } } }); const otW=R.ot_weekly_hrs||40; Object.keys(hoursByP).forEach(n=>{ if(hoursByP[n]>otW) warns.push('⏰ '+n+' is over '+otW+'h this week ('+hoursByP[n].toFixed(1)+'h)'); }); if(warns.length) h+=`<div class="card" style="padding:12px 15px;margin-bottom:14px;background:var(--amber-soft);border-color:var(--amber)"><div style="font-weight:700;color:var(--amber);margin-bottom:5px">${warns.length} thing${warns.length>1?'s':''} to check before publishing</div><div style="font-size:13px;line-height:1.8">${warns.map(w=>esc(w)).join('<br>')}</div></div>`; }
   if(window._draftSummary){ const ds=window._draftSummary; window._draftSummary=null; h+=`<div class="card" style="padding:14px 16px;margin-bottom:14px;background:var(--brand-soft);border-color:var(--brand-line)"><div style="font-weight:700;margin-bottom:3px">✨ Auto-draft ready — ${ds.made} shift${ds.made!==1?'s':''} placed${ds.unfilled?', '+ds.unfilled+' still open':''}</div><div class="faint" style="font-size:12.5px">Review below, tweak anything, then Publish. Nothing reaches the team until you publish.</div>${ds.flags.length?`<div style="margin-top:9px;font-size:13px;line-height:1.7;border-top:1px solid var(--brand-line);padding-top:8px">${ds.flags.map(f=>`<div style="white-space:pre-line;margin-bottom:5px">${esc(f)}</div>`).join('')}</div>`:''}</div>`; }
   if(!shifts.length) h+=`<div class="card" style="padding:30px 22px;text-align:center;margin-bottom:14px"><div style="font-size:30px;color:var(--brand);margin-bottom:8px"><i class="ti ti-calendar-plus"></i></div><div style="font-weight:600;margin-bottom:3px">No shifts this week</div><div class="faint" style="font-size:13px">${isAdmin?'Add one below, tap Copy week, or ✨ Auto-draft to build it from a past week.':'Your shifts show here once leadership posts the schedule.'}</div></div>`;
   h+=`<div style="margin:0 2px 10px"><button class="btn" style="width:auto;padding:6px 12px;font-size:12.5px" onclick="addMyShiftsToCal()"><i class="ti ti-calendar-plus"></i> Add my shifts to my calendar</button></div>`;
