@@ -3341,34 +3341,9 @@ function _grantListHTML(){ const g=state.grants||{}; const names=Object.keys(g).
 window.grantSel=function(){ const who=(document.getElementById('grantWho')||{}).value; const g=(state.grants&&state.grants[who])||[]; document.querySelectorAll('.grantPg').forEach(c=>{ c.checked=g.indexOf(c.value)>=0; }); };
 /* Logins that don't resolve to a roster person. Until they're linked, that person is treated as a
    plain team member no matter what position the owner gave them. */
-/* Identity is settled once, by the person joining, not by the owner later.
-   If their sign-up name doesn't resolve to someone on the roster, we ask THEM which one they are.
-   Anyone who isn't on the roster (testers, guests) just says so and is never asked again. */
-window.identityChoices=function(){
-  const p=state.profile||{};
-  if(!p.id || p.role==='admin') return null;
-  if((window._acctLink||{})[p.id]) return null;
-  if(rosterKeyFor(p.name||'')) return null;
-  const m=window._posMap||{};
-  const taken={}; Object.keys(window._acctLink||{}).forEach(k=>{ taken[window._acctLink[k]]=1; });
-  const open=Object.keys(m).filter(n=>n && !taken[n] && m[n]!=='Owner' && (typeof isArchived!=='function'||!isArchived(n)));
-  return open.length?open.sort((a,b)=>a.localeCompare(b)):null;
-};
-function renderClaimIdentity(open){
-  window._claimList=open;
-  root.innerHTML=`<div class="auth"><div class="box" style="max-width:440px"><div class="logo">👋</div><h1>Which one is you?</h1><p class="sub">Pick your name so your shifts and training show up. You only do this once.</p><div style="display:flex;flex-direction:column;gap:8px;margin:18px 0 14px">`
-    + open.map((n,i)=>`<button class="btn" style="width:100%;justify-content:flex-start;text-align:left;padding:12px 14px" onclick="claimIdentity(${i})"><span style="font-weight:700">${esc(n)}</span><span class="faint" style="margin-left:8px;font-size:12.5px">${esc(posOf(n)||'')}</span></button>`).join('')
-    + `</div><div class="toggle"><b onclick="claimIdentity(-1)">I'm not on this list</b></div></div></div>`;
-}
-window.claimIdentity=async function(i){
-  const p=state.profile||{}; if(!p.id) return;
-  const name=(i>=0 && window._claimList)?window._claimList[i]:'__none__';
-  await sb.from('day_items').delete().eq('kind','acctlink').eq('title',p.id);
-  await sb.from('day_items').insert({kind:'acctlink',title:p.id,on_date:null,detail:name,created_by:state.user.id});
-  if(!window._acctLink) window._acctLink={};
-  window._acctLink[p.id]=name;
-  await boot();
-};
+/* Deliberately NOT here: any screen that lets a person pick which roster entry they are.
+   That would let anyone with the join code claim to be the GM and grant themselves leadership access.
+   A person's position is set by the owner on the Team page, and nowhere else. */
 window.linkAccount=async function(pid,rosterName){
   if(!pid) return;
   await sb.from('day_items').delete().eq('kind','acctlink').eq('title',pid);
@@ -3450,7 +3425,6 @@ async function boot(){
   await loadSettings();
   if(BILLING_LIVE){ const bs=billingState(); if(!bs.ok){ renderPaywall(bs); return; } }
   try{ await loadPositions(); }catch(e){}
-  try{ const _ch=window.identityChoices&&window.identityChoices(); if(_ch){ renderClaimIdentity(_ch); return; } }catch(e){}
   await loadAll();
   if(!applyHash()){
     let np='today',nc={};
