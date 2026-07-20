@@ -519,7 +519,10 @@ async function submitAuth(){
 
 /* ---------- Access levels (permissions) ---------- */
 const ROLE_LABELS={5:'Owner',4:'GM',3:'Manager',2:'Supervisor',1:'Team member'};
-const PERM_DEFAULT={whiteboard:1,home:1,ask:1,journal:1,build:5,setup:4,team:3,onboarding:3,today:3,rm:1,schedule:3,checklists:3,sales:4,saleshist:4,costsmart:4,calendar:3,lists:1,recovery:1,community:1,resources:1,downloads:1,settings:5,pay:5,clock:5};
+/* Defaults follow how workforce apps actually behave: everyone can SEE the schedule and run the
+   checklists; only leaders can build or change them. Editing is gated inside each page by rank,
+   so opening a page is not the same as being able to change it. */
+const PERM_DEFAULT={whiteboard:1,home:1,ask:1,journal:1,build:4,setup:4,team:3,onboarding:3,today:1,rm:1,schedule:1,checklists:1,sales:4,saleshist:4,costsmart:4,calendar:3,lists:1,recovery:1,community:1,resources:1,downloads:1,settings:5,pay:5,clock:5};
 const PERM_LABELS={build:'Training & SOP builder',logbook:'Log (shift close-out)',setup:'Setup',team:'Team',onboarding:'Onboarding',schedule:'Schedule',sales:'Sales',saleshist:'Sales history import',costsmart:'Cost-Smart Schedule',pay:'Pay rates',settings:'Settings',today:'Daily Report',rm:'Fix-it list (R&M)',checklists:'Checklists',calendar:'Calendar',lists:'Lists',recovery:'Recovery',community:'Community',resources:'Resources',downloads:'Downloads'};
 /* A person exists twice: the login they created (profiles.name, often just a first name) and the roster
    record the owner entered (e.g. "Presley Elizondo"). Matching those by exact string silently demoted
