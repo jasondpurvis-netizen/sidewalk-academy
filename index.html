@@ -3425,6 +3425,15 @@ async function boot(){
   await loadSettings();
   if(BILLING_LIVE){ const bs=billingState(); if(!bs.ok){ renderPaywall(bs); return; } }
   try{ await loadPositions(); }catch(e){}
+  // Someone who signs up IS on the team. Put them on the roster as Unassigned so the owner can see
+  // they joined and set their position, instead of them existing as an invisible login.
+  try{
+    const _p=state.profile;
+    if(_p && _p.name && _p.role!=='admin' && !rosterKeyFor(_p.name) && !((window._acctLink||{})[_p.id])){
+      const _ins=await sb.from('day_items').insert({kind:'pos',title:_p.name,detail:'Unassigned',on_date:null,created_by:state.user.id});
+      if(!(_ins&&_ins.error)) await loadPositions();
+    }
+  }catch(e){}
   await loadAll();
   if(!applyHash()){
     let np='today',nc={};
