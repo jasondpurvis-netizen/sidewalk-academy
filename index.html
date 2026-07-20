@@ -251,6 +251,57 @@ const SUPABASE_KEY = "sb_publishable_DQZclfAnv_MYQJLGcOdzdw_g4vMCiSC";
 const __RECOVERY_HASH = (typeof location!=='undefined' && location.hash) ? location.hash : '';
 const __RECOVERY_SEARCH = (typeof location!=='undefined' && location.search) ? location.search : '';
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { detectSessionInUrl: false, flowType: 'implicit', persistSession: true, autoRefreshToken: true } });
+/* ---------- Never let a save fail in silence ----------
+   Most write calls in this app don't check .error, so a failed save used to vanish with no sign
+   (that's how a permissions change could look saved and not be). This wraps every insert/update/
+   upsert/delete so ANY failure raises a visible notice, whether or not the caller checks. Callers
+   that do handle the error still get the normal result object, so nothing else changes. */
+(function(){
+  try{
+    var WRITE_OPS=['insert','update','upsert','delete'];
+    var _from=sb.from.bind(sb);
+    sb.from=function(table){
+      var qb=_from(table);
+      WRITE_OPS.forEach(function(op){
+        var orig=qb[op];
+        if(typeof orig!=='function') return;
+        qb[op]=function(){
+          var res=orig.apply(qb,arguments);
+          try{
+            if(res && typeof res.then==='function'){
+              var _then=res.then.bind(res);
+              res.then=function(ok,bad){
+                return _then(function(r){
+                  try{ if(r && r.error) window._writeFailed(table,op,r.error); }catch(e){}
+                  return ok?ok(r):r;
+                },bad);
+              };
+            }
+          }catch(e){}
+          return res;
+        };
+      });
+      return qb;
+    };
+  }catch(e){}
+})();
+window._writeFailed=function(table,op,err){
+  var msg=(err&&err.message)||'Unknown error';
+  var key=table+'|'+op+'|'+msg;
+  window._wfSeen=window._wfSeen||{};
+  var now=Date.now(); if(window._wfSeen[key] && now-window._wfSeen[key]<6000) return; // don't stack duplicates
+  window._wfSeen[key]=now;
+  try{ console.error('Write failed on '+table+'.'+op+': '+msg); }catch(e){}
+  var box=document.getElementById('wfBar');
+  if(!box){ box=document.createElement('div'); box.id='wfBar'; document.body.appendChild(box); }
+  box.style.cssText='position:fixed;left:14px;right:14px;bottom:14px;z-index:10050;background:#7F1D1D;color:#fff;border-radius:12px;padding:13px 15px;box-shadow:0 8px 30px rgba(0,0,0,.3);display:flex;gap:11px;align-items:flex-start;max-width:520px;margin:0 auto';
+  box.innerHTML='<i class="ti ti-alert-triangle" style="font-size:19px;flex:none;margin-top:1px"></i>'
+    +'<div style="flex:1;min-width:0"><div style="font-weight:800;font-size:13.5px;margin-bottom:2px">That didn\'t save</div>'
+    +'<div style="font-size:12.5px;line-height:1.5;opacity:.95;word-break:break-word">'+esc(msg)+'</div>'
+    +'<div style="font-size:11.5px;opacity:.75;margin-top:4px">'+esc(table)+' &middot; '+esc(op)+'. Your change was not stored, so try again.</div></div>'
+    +'<button onclick="var b=document.getElementById(\'wfBar\');if(b)b.remove()" style="border:none;background:transparent;color:#fff;font-size:18px;cursor:pointer;line-height:1;flex:none">&times;</button>';
+  clearTimeout(window._wfTimer); window._wfTimer=setTimeout(function(){ var b=document.getElementById('wfBar'); if(b)b.remove(); },12000);
+};
 
 const root = document.getElementById("root");
 let state = { user:null, profile:null, tracks:[], lessons:{}, progress:new Set(), responses:{}, settings:{}, glossary:[], assignments:[], page:"home", ctx:{}, authMode:"in", busy:false };
