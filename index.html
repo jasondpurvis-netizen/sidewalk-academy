@@ -539,7 +539,8 @@ function rosterKeyFor(nm){
 function myRosterName(){
   const p=state.profile||{};
   const lk=(window._acctLink&&p.id)?window._acctLink[p.id]:null;
-  if(lk) return lk;
+  if(lk&&lk!=='__none__') return lk;      // they told us who they are
+  if(lk==='__none__') return p.name||'';  // they said they're not on the roster; stop asking
   return rosterKeyFor(p.name||'')||(p.name||'');
 }
 function myRank(){ if(state.previewLIT) return state.previewRank||1; if(state.profile&&state.profile.role==='admin') return 5; const pos=(window._posMap&&window._posMap[myRosterName()])||''; if(pos==='Owner')return 5; if(pos==='GM'||pos==='General Manager')return 4; if(pos==='Manager')return 3; if(pos==='Supervisor')return 2; return 1; }
@@ -3162,19 +3163,7 @@ async function teamRoster(v){
   const roster=[...set].filter(n=>n&&!isArchived(n)&&n!=='__OPEN__'&&n!=='__open__');
   const groups={}; roster.forEach(n=>{ (groups[posOf(n)]=groups[posOf(n)]||[]).push(n); });
   const ordered=Object.keys(groups).sort((a,b)=>{const ia=POS_ORDER.indexOf(a),ib=POS_ORDER.indexOf(b);return (ia<0?99:ia)-(ib<0?99:ib)||a.localeCompare(b);});
-  let h='';
-  // A login whose name doesn't resolve to a roster person is stuck as a plain team member,
-  // whatever position you gave them. Surface those so they can be matched up.
-  if(state.profile&&state.profile.role==='admin'){
-    const unl=(rpf.data||[]).filter(p=>p&&p.name&&p.role!=='admin'&&!((window._acctLink||{})[p.id])&&!rosterKeyFor(p.name)&&!isArchived(p.name));
-    if(unl.length){
-      const opts=roster.slice().sort((a,b)=>a.localeCompare(b));
-      h+=`<div class="card" style="padding:14px 16px;margin-bottom:14px;background:var(--amber-soft);border-color:var(--amber)"><div style="font-weight:700;color:var(--amber);margin-bottom:3px">${unl.length} login${unl.length>1?'s':''} not matched to a person</div><div class="faint" style="font-size:12.5px;line-height:1.5;margin-bottom:10px">They signed up with a name that doesn't match anyone on the roster, so the app treats them as a team member no matter what position you gave them. Pick who each one is.</div>`
-        +unl.map(p=>`<div class="row" style="gap:9px;align-items:center;margin-bottom:7px;flex-wrap:wrap"><span style="font-weight:600;font-size:13.5px;min-width:110px">${esc(p.name)}</span><select onchange="linkAccount('${esc(p.id)}',this.value)" style="flex:1;min-width:170px;padding:7px 9px;border:1px solid var(--line2);border-radius:8px;background:var(--card);color:var(--ink);font-family:inherit;font-size:13px"><option value="">Who is this?</option>${opts.map(n=>`<option value="${esc(n)}">${esc(n)} &middot; ${esc(posOf(n))}</option>`).join('')}</select></div>`).join('')
-        +`</div>`;
-    }
-  }
-  h+=`<div class="faint" style="font-size:12.5px;margin-bottom:12px">Tap anyone to open their profile — position, birthday, hire date, contact, emergency contact and pay. Positions here flow to the schedule automatically.</div>`;
+  let h=`<div class="faint" style="font-size:12.5px;margin-bottom:12px">Tap anyone to open their profile — position, birthday, hire date, contact, emergency contact and pay. Positions here flow to the schedule automatically.</div>`;
   if(!roster.length) h+=`<div class="card" style="padding:24px;text-align:center"><div class="faint">No team yet. Add people in Onboarding.</div></div>`;
   ordered.forEach(pos=>{ const c=POS_COL[pos]||'#94A3B8'; h+=`<div class="band" style="background:${c}14;color:${c};border-left:4px solid ${c};margin:14px 0 0">${esc(pos)} <span style="opacity:.7;font-weight:500">· ${groups[pos].length}</span></div><div class="card" style="margin-top:0">`+groups[pos].slice().sort().map(n=>{ const p=profileOf(n); const inits=(n||'?').split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase(); const sub=p.mobile?esc(p.mobile):'Tap to view profile'; return `<div class="row" style="padding:11px 15px;border-bottom:1px solid var(--line);cursor:pointer" onclick='openProfile(${JSON.stringify(n)})'><span class="av">${esc(inits)}</span><div style="flex:1;min-width:0"><div style="font-weight:600;font-size:14px">${esc(n)}</div><div class="faint" style="font-size:12px">${sub}</div></div><i class="ti ti-chevron-right" style="color:var(--faint)"></i></div>`; }).join('')+`</div>`; });
   v.innerHTML=h;
@@ -3352,6 +3341,34 @@ function _grantListHTML(){ const g=state.grants||{}; const names=Object.keys(g).
 window.grantSel=function(){ const who=(document.getElementById('grantWho')||{}).value; const g=(state.grants&&state.grants[who])||[]; document.querySelectorAll('.grantPg').forEach(c=>{ c.checked=g.indexOf(c.value)>=0; }); };
 /* Logins that don't resolve to a roster person. Until they're linked, that person is treated as a
    plain team member no matter what position the owner gave them. */
+/* Identity is settled once, by the person joining, not by the owner later.
+   If their sign-up name doesn't resolve to someone on the roster, we ask THEM which one they are.
+   Anyone who isn't on the roster (testers, guests) just says so and is never asked again. */
+window.identityChoices=function(){
+  const p=state.profile||{};
+  if(!p.id || p.role==='admin') return null;
+  if((window._acctLink||{})[p.id]) return null;
+  if(rosterKeyFor(p.name||'')) return null;
+  const m=window._posMap||{};
+  const taken={}; Object.keys(window._acctLink||{}).forEach(k=>{ taken[window._acctLink[k]]=1; });
+  const open=Object.keys(m).filter(n=>n && !taken[n] && m[n]!=='Owner' && (typeof isArchived!=='function'||!isArchived(n)));
+  return open.length?open.sort((a,b)=>a.localeCompare(b)):null;
+};
+function renderClaimIdentity(open){
+  window._claimList=open;
+  root.innerHTML=`<div class="auth"><div class="box" style="max-width:440px"><div class="logo">👋</div><h1>Which one is you?</h1><p class="sub">Pick your name so your shifts and training show up. You only do this once.</p><div style="display:flex;flex-direction:column;gap:8px;margin:18px 0 14px">`
+    + open.map((n,i)=>`<button class="btn" style="width:100%;justify-content:flex-start;text-align:left;padding:12px 14px" onclick="claimIdentity(${i})"><span style="font-weight:700">${esc(n)}</span><span class="faint" style="margin-left:8px;font-size:12.5px">${esc(posOf(n)||'')}</span></button>`).join('')
+    + `</div><div class="toggle"><b onclick="claimIdentity(-1)">I'm not on this list</b></div></div></div>`;
+}
+window.claimIdentity=async function(i){
+  const p=state.profile||{}; if(!p.id) return;
+  const name=(i>=0 && window._claimList)?window._claimList[i]:'__none__';
+  await sb.from('day_items').delete().eq('kind','acctlink').eq('title',p.id);
+  await sb.from('day_items').insert({kind:'acctlink',title:p.id,on_date:null,detail:name,created_by:state.user.id});
+  if(!window._acctLink) window._acctLink={};
+  window._acctLink[p.id]=name;
+  await boot();
+};
 window.linkAccount=async function(pid,rosterName){
   if(!pid) return;
   await sb.from('day_items').delete().eq('kind','acctlink').eq('title',pid);
@@ -3433,6 +3450,7 @@ async function boot(){
   await loadSettings();
   if(BILLING_LIVE){ const bs=billingState(); if(!bs.ok){ renderPaywall(bs); return; } }
   try{ await loadPositions(); }catch(e){}
+  try{ const _ch=window.identityChoices&&window.identityChoices(); if(_ch){ renderClaimIdentity(_ch); return; } }catch(e){}
   await loadAll();
   if(!applyHash()){
     let np='today',nc={};
