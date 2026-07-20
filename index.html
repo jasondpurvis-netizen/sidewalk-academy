@@ -311,7 +311,9 @@ const STALL_DAYS=5;
 const DEFAULT_BRAND='#4A9CAD';
 const DEFAULT_NAME='Sidewalk Academy';
 const DEFAULT_LOGO="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%234A9CAD'/%3E%3Ctext x='50' y='71' font-family='Georgia,serif' font-style='italic' font-size='60' fill='white' text-anchor='middle'%3ES%3C/text%3E%3C/svg%3E";
-async function loadSettings(){ const { data } = await sb.from('settings').select('*').eq('id',1).maybeSingle(); const s=data||{}; let _tn=null,_tjc=null,_tan=null,_tbc=null,_tlg=null,_tlj=null,_tof=null; const _isSW=!!(state.profile && state.profile.tenant_id==='11111111-1111-1111-1111-111111111111'); if(state.profile && state.profile.tenant_id){ try{ const _tr=await sb.from('tenants').select('*').maybeSingle(); if(_tr.data){ state.tenant=_tr.data; _tn=_tr.data.name; _tjc=_tr.data.join_code; _tan=_tr.data.academy_name; _tbc=_tr.data.brand_color; _tlg=_tr.data.logo_url; _tlj=_tr.data.law_jurisdiction; _tof=_tr.data.open_floor; } }catch(e){} try{ const _su=await sb.from('subscriptions').select('*').maybeSingle(); if(_su.data) state.sub=_su.data; }catch(e){} } state.settings = Object.assign({}, s, { academy_name: _tan||_tn||(_isSW?s.academy_name:null)||DEFAULT_NAME, brand_color: _tbc||(_isSW?s.brand_color:null)||DEFAULT_BRAND, logo_url: (_tlg!=null&&_tlg!=='')?_tlg:(_isSW?(s.logo_url||(data?DEFAULT_LOGO:'')):''), join_code: _tjc||s.join_code||'', law_jurisdiction: _tlj||s.law_jurisdiction||'AZ', open_floor: _tof||s.open_floor||'05:30' }); try{ const rs=await sb.from('day_items').select('detail').eq('kind','stations').maybeSingle(); const arr=JSON.parse((rs.data&&rs.data.detail)||'[]'); if(Array.isArray(arr)) state.settings.stations=arr; }catch(e){} try{ const rp=await sb.from('day_items').select('detail').eq('kind','perms').maybeSingle(); state.perms=JSON.parse((rp.data&&rp.data.detail)||'{}'); }catch(e){ state.perms={}; } try{ const rg=await sb.from('day_items').select('title,detail').eq('kind','usergrant'); const gm={}; (rg.data||[]).forEach(x=>{ try{ const d=JSON.parse(x.detail||'{}'); if(x.title&&Array.isArray(d.pages)) gm[x.title]=d.pages; }catch(e){} }); state.grants=gm; }catch(e){ state.grants={}; } applyBrand(state.settings.brand_color); }
+async function loadSettings(){ const { data } = await sb.from('settings').select('*').eq('id',1).maybeSingle(); const s=data||{}; let _tn=null,_tjc=null,_tan=null,_tbc=null,_tlg=null,_tlj=null,_tof=null; const _isSW=!!(state.profile && state.profile.tenant_id==='11111111-1111-1111-1111-111111111111'); if(state.profile && state.profile.tenant_id){ try{ const _tr=await sb.from('tenants').select('*').maybeSingle(); if(_tr.data){ state.tenant=_tr.data; _tn=_tr.data.name; _tjc=_tr.data.join_code; _tan=_tr.data.academy_name; _tbc=_tr.data.brand_color; _tlg=_tr.data.logo_url; _tlj=_tr.data.law_jurisdiction; _tof=_tr.data.open_floor; } }catch(e){} try{ const _su=await sb.from('subscriptions').select('*').maybeSingle(); if(_su.data) state.sub=_su.data; }catch(e){} } state.settings = Object.assign({}, s, { academy_name: _tan||_tn||(_isSW?s.academy_name:null)||DEFAULT_NAME, brand_color: _tbc||(_isSW?s.brand_color:null)||DEFAULT_BRAND, logo_url: (_tlg!=null&&_tlg!=='')?_tlg:(_isSW?(s.logo_url||(data?DEFAULT_LOGO:'')):''), join_code: _tjc||s.join_code||'', law_jurisdiction: _tlj||s.law_jurisdiction||'AZ', open_floor: _tof||s.open_floor||'05:30' }); try{ const rs=await sb.from('day_items').select('detail').eq('kind','stations').maybeSingle(); const arr=JSON.parse((rs.data&&rs.data.detail)||'[]'); if(Array.isArray(arr)) state.settings.stations=arr; }catch(e){} try{ const rp=await sb.from('day_items').select('detail').eq('kind','perms').maybeSingle(); state.perms=JSON.parse((rp.data&&rp.data.detail)||'{}'); }catch(e){ state.perms={}; } try{ const rg=await sb.from('day_items').select('title,detail').eq('kind','usergrant'); const gm={}; (rg.data||[]).forEach(x=>{ try{ const d=JSON.parse(x.detail||'{}'); if(x.title&&Array.isArray(d.pages)) gm[x.title]=d.pages; }catch(e){} }); state.grants=gm; }catch(e){ state.grants={}; }
+  // explicit login-to-roster links (title = profile id, detail = roster name), for names we can't resolve on our own
+  try{ const rl=await sb.from('day_items').select('title,detail').eq('kind','acctlink'); const lm={}; (rl.data||[]).forEach(x=>{ if(x.title&&x.detail) lm[x.title]=x.detail; }); window._acctLink=lm; }catch(e){ window._acctLink={}; } applyBrand(state.settings.brand_color); }
 
 function esc(s){ return (s||"").replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c])); }
 function richBody(html){
@@ -519,10 +521,31 @@ async function submitAuth(){
 const ROLE_LABELS={5:'Owner',4:'GM',3:'Manager',2:'Supervisor',1:'Team member'};
 const PERM_DEFAULT={whiteboard:1,home:1,ask:1,journal:1,build:5,setup:4,team:3,onboarding:3,today:3,rm:1,schedule:3,checklists:3,sales:4,saleshist:4,costsmart:4,calendar:3,lists:1,recovery:1,community:1,resources:1,downloads:1,settings:5,pay:5,clock:5};
 const PERM_LABELS={build:'Training & SOP builder',logbook:'Log (shift close-out)',setup:'Setup',team:'Team',onboarding:'Onboarding',schedule:'Schedule',sales:'Sales',saleshist:'Sales history import',costsmart:'Cost-Smart Schedule',pay:'Pay rates',settings:'Settings',today:'Daily Report',rm:'Fix-it list (R&M)',checklists:'Checklists',calendar:'Calendar',lists:'Lists',recovery:'Recovery',community:'Community',resources:'Resources',downloads:'Downloads'};
-function myRank(){ if(state.previewLIT) return state.previewRank||1; if(state.profile&&state.profile.role==='admin') return 5; const pos=(window._posMap&&window._posMap[(state.profile&&state.profile.name)||''])||''; if(pos==='Owner')return 5; if(pos==='GM'||pos==='General Manager')return 4; if(pos==='Manager')return 3; if(pos==='Supervisor')return 2; return 1; }
+/* A person exists twice: the login they created (profiles.name, often just a first name) and the roster
+   record the owner entered (e.g. "Presley Elizondo"). Matching those by exact string silently demoted
+   every leader to rank 1. Resolve the roster name properly: an explicit link wins, then exact, then
+   case-insensitive, then a UNIQUE first-name match. Ambiguous names (two Jessicas) resolve to nothing
+   and get surfaced for the owner to link by hand rather than guessed at. */
+function rosterKeyFor(nm){
+  const m=window._posMap||{}; if(!nm) return '';
+  if(m[nm]!=null) return nm;
+  const low=String(nm).trim().toLowerCase(); const keys=Object.keys(m);
+  let hit=keys.filter(k=>String(k).trim().toLowerCase()===low);
+  if(hit.length===1) return hit[0];
+  hit=keys.filter(k=>String(k).trim().toLowerCase().split(/\s+/)[0]===low);
+  if(hit.length===1) return hit[0];
+  return '';
+}
+function myRosterName(){
+  const p=state.profile||{};
+  const lk=(window._acctLink&&p.id)?window._acctLink[p.id]:null;
+  if(lk) return lk;
+  return rosterKeyFor(p.name||'')||(p.name||'');
+}
+function myRank(){ if(state.previewLIT) return state.previewRank||1; if(state.profile&&state.profile.role==='admin') return 5; const pos=(window._posMap&&window._posMap[myRosterName()])||''; if(pos==='Owner')return 5; if(pos==='GM'||pos==='General Manager')return 4; if(pos==='Manager')return 3; if(pos==='Supervisor')return 2; return 1; }
 function permOf(page){ const o=state.perms&&state.perms[page]; return (o&&+o)||PERM_DEFAULT[page]||1; }
 // Per-person "extra access" — lets a specific person (e.g. a scheduler who's still a team member) into an area beyond their role. Ignored while previewing as a Leader in Training.
-function hasGrant(page){ if(state.previewLIT)return false; const nm=state.profile&&state.profile.name; const g=nm&&state.grants&&state.grants[nm]; return !!(g&&g.indexOf(page)>=0); }
+function hasGrant(page){ if(state.previewLIT)return false; const nm=myRosterName(); const g=nm&&state.grants&&state.grants[nm]; return !!(g&&g.indexOf(page)>=0); }
 function canSee(page){ return myRank()>=permOf(page)||hasGrant(page); }
 function renderApp(){
   const isAdmin = state.profile && state.profile.role==="admin";
@@ -3133,13 +3156,25 @@ window.cycleLevel=function(name,station,btn){ const d=window._profiles[name]||(w
 window.toggleCap=function(name,cap,checked){ const d=window._profiles[name]||(window._profiles[name]={}); const caps=(d.caps&&typeof d.caps==='object')?d.caps:(d.caps={}); caps[cap]=!!checked; _saveProfileNow(name); };
 async function teamRoster(v){
   v.innerHTML='<div class="muted">Loading…</div>';
-  const [rpf,rsh]=await Promise.all([ sb.from('profiles').select('name,role'), sb.from('shifts').select('person_name') ]);
+  const [rpf,rsh]=await Promise.all([ sb.from('profiles').select('id,name,role'), sb.from('shifts').select('person_name') ]);
   await loadPositions(); await loadProfiles(); await loadArchived();
   const set=new Set(); rosterNames().forEach(n=>set.add(n)); (rsh.data||[]).forEach(s=>{ if(s.person_name)set.add(s.person_name); });
   const roster=[...set].filter(n=>n&&!isArchived(n)&&n!=='__OPEN__'&&n!=='__open__');
   const groups={}; roster.forEach(n=>{ (groups[posOf(n)]=groups[posOf(n)]||[]).push(n); });
   const ordered=Object.keys(groups).sort((a,b)=>{const ia=POS_ORDER.indexOf(a),ib=POS_ORDER.indexOf(b);return (ia<0?99:ia)-(ib<0?99:ib)||a.localeCompare(b);});
-  let h=`<div class="faint" style="font-size:12.5px;margin-bottom:12px">Tap anyone to open their profile — position, birthday, hire date, contact, emergency contact and pay. Positions here flow to the schedule automatically.</div>`;
+  let h='';
+  // A login whose name doesn't resolve to a roster person is stuck as a plain team member,
+  // whatever position you gave them. Surface those so they can be matched up.
+  if(state.profile&&state.profile.role==='admin'){
+    const unl=(rpf.data||[]).filter(p=>p&&p.name&&p.role!=='admin'&&!((window._acctLink||{})[p.id])&&!rosterKeyFor(p.name)&&!isArchived(p.name));
+    if(unl.length){
+      const opts=roster.slice().sort((a,b)=>a.localeCompare(b));
+      h+=`<div class="card" style="padding:14px 16px;margin-bottom:14px;background:var(--amber-soft);border-color:var(--amber)"><div style="font-weight:700;color:var(--amber);margin-bottom:3px">${unl.length} login${unl.length>1?'s':''} not matched to a person</div><div class="faint" style="font-size:12.5px;line-height:1.5;margin-bottom:10px">They signed up with a name that doesn't match anyone on the roster, so the app treats them as a team member no matter what position you gave them. Pick who each one is.</div>`
+        +unl.map(p=>`<div class="row" style="gap:9px;align-items:center;margin-bottom:7px;flex-wrap:wrap"><span style="font-weight:600;font-size:13.5px;min-width:110px">${esc(p.name)}</span><select onchange="linkAccount('${esc(p.id)}',this.value)" style="flex:1;min-width:170px;padding:7px 9px;border:1px solid var(--line2);border-radius:8px;background:var(--card);color:var(--ink);font-family:inherit;font-size:13px"><option value="">Who is this?</option>${opts.map(n=>`<option value="${esc(n)}">${esc(n)} &middot; ${esc(posOf(n))}</option>`).join('')}</select></div>`).join('')
+        +`</div>`;
+    }
+  }
+  h+=`<div class="faint" style="font-size:12.5px;margin-bottom:12px">Tap anyone to open their profile — position, birthday, hire date, contact, emergency contact and pay. Positions here flow to the schedule automatically.</div>`;
   if(!roster.length) h+=`<div class="card" style="padding:24px;text-align:center"><div class="faint">No team yet. Add people in Onboarding.</div></div>`;
   ordered.forEach(pos=>{ const c=POS_COL[pos]||'#94A3B8'; h+=`<div class="band" style="background:${c}14;color:${c};border-left:4px solid ${c};margin:14px 0 0">${esc(pos)} <span style="opacity:.7;font-weight:500">· ${groups[pos].length}</span></div><div class="card" style="margin-top:0">`+groups[pos].slice().sort().map(n=>{ const p=profileOf(n); const inits=(n||'?').split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase(); const sub=p.mobile?esc(p.mobile):'Tap to view profile'; return `<div class="row" style="padding:11px 15px;border-bottom:1px solid var(--line);cursor:pointer" onclick='openProfile(${JSON.stringify(n)})'><span class="av">${esc(inits)}</span><div style="flex:1;min-width:0"><div style="font-weight:600;font-size:14px">${esc(n)}</div><div class="faint" style="font-size:12px">${sub}</div></div><i class="ti ti-chevron-right" style="color:var(--faint)"></i></div>`; }).join('')+`</div>`; });
   v.innerHTML=h;
@@ -3315,6 +3350,16 @@ function _grantPageList(){ return ['schedule','today','logbook','rm','team','onb
 function _grantRoster(){ const set={}; (window._profNames||[]).forEach(n=>{ if(n)set[n]=1; }); Object.keys(window._posMap||{}).forEach(n=>{ if(n)set[n]=1; }); return Object.keys(set).filter(n=>typeof isArchived!=='function'||!isArchived(n)).sort(); }
 function _grantListHTML(){ const g=state.grants||{}; const names=Object.keys(g).filter(n=>(g[n]||[]).length); if(!names.length) return '<div class="faint" style="font-size:12.5px">No one has extra access yet.</div>'; return names.sort().map(n=>`<div class="row" style="gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line)"><span style="font-weight:600;font-size:13px;flex-shrink:0">${esc(n)}</span><span class="faint" style="font-size:12px;flex:1">${g[n].map(p=>esc(PERM_LABELS[p]||p)).join(', ')}</span><span style="color:#B32D2D;cursor:pointer;font-size:12px;flex-shrink:0" onclick='removeUserGrant(${JSON.stringify(n)})'>Remove</span></div>`).join(''); }
 window.grantSel=function(){ const who=(document.getElementById('grantWho')||{}).value; const g=(state.grants&&state.grants[who])||[]; document.querySelectorAll('.grantPg').forEach(c=>{ c.checked=g.indexOf(c.value)>=0; }); };
+/* Logins that don't resolve to a roster person. Until they're linked, that person is treated as a
+   plain team member no matter what position the owner gave them. */
+window.linkAccount=async function(pid,rosterName){
+  if(!pid) return;
+  await sb.from('day_items').delete().eq('kind','acctlink').eq('title',pid);
+  if(rosterName){ const r=await sb.from('day_items').insert({kind:'acctlink',title:pid,on_date:null,detail:rosterName,created_by:state.user.id}); if(r&&r.error) return; }
+  if(!window._acctLink) window._acctLink={};
+  if(rosterName) window._acctLink[pid]=rosterName; else delete window._acctLink[pid];
+  if(typeof vTeam==='function') vTeam(document.getElementById('view'));
+};
 window.saveUserGrant=async function(){ const who=(document.getElementById('grantWho')||{}).value; if(!who)return; const pages=[...document.querySelectorAll('.grantPg')].filter(c=>c.checked).map(c=>c.value); const m=document.getElementById('grantMsg'); await sb.from('day_items').delete().eq('kind','usergrant').eq('title',who); if(pages.length){ const ins=await sb.from('day_items').insert({kind:'usergrant',title:who,on_date:null,detail:JSON.stringify({pages}),created_by:state.user.id}); if(ins&&ins.error){ if(m){m.textContent="Couldn't save — "+ins.error.message;m.style.color='#B32D2D';} return; } if(!state.grants)state.grants={}; state.grants[who]=pages; } else { if(state.grants)delete state.grants[who]; } if(m){m.textContent='Saved ✓ — takes effect on their next screen';m.style.color='var(--green)';} const gl=document.getElementById('grantList'); if(gl)gl.innerHTML=_grantListHTML(); };
 window.removeUserGrant=async function(name){ await sb.from('day_items').delete().eq('kind','usergrant').eq('title',name); if(state.grants)delete state.grants[name]; const gl=document.getElementById('grantList'); if(gl)gl.innerHTML=_grantListHTML(); const who=(document.getElementById('grantWho')||{}).value; if(who===name && typeof grantSel==='function')grantSel(); };
 function _inviteText(code){ const nm=(state.settings&&state.settings.academy_name)||'our team'; const url=location.origin+'/?join='+encodeURIComponent(code); return "You're invited to join "+nm+"!\n\n"
