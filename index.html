@@ -410,7 +410,7 @@ async function ensureProfile(){
   state.profile = { id:state.user.id, name, role:"team", title:"Team member" };
 }
 function trackLessons(tid){ return state.lessons[tid]||[]; }
-function visibleTracks(){ const admin=state.profile&&state.profile.role==='admin'; const myName=(state.profile&&state.profile.name)||''; const ta=state.trackAssign||{}; return state.tracks.filter(t=>{ if(admin) return true; const names=ta[t.id]; if(names&&names.length) return names.indexOf(myName)>=0; return (t.audience||'all')!=='admin'; }); }
+function visibleTracks(){ const admin=state.profile&&state.profile.role==='admin'; const rn=(typeof myRosterName==='function')?myRosterName():''; const ln=(state.profile&&state.profile.name)||''; const isLeader=admin||(typeof myRank==='function'&&myRank()>=2); const ta=state.trackAssign||{}; return state.tracks.filter(t=>{ if(admin) return true; const names=ta[t.id]; if(names&&names.length) return names.indexOf(rn)>=0 || names.indexOf(ln)>=0; /* assigned by roster name, but people log in with a short name */ const aud=(t.audience||'all'); if(aud==='admin') return isLeader; /* "Leaders only" means leaders, not just the owner */ return true; }); }
 function isDone(lid){ return state.progress.has(lid); }
 function trackPct(tid){ const ls=trackLessons(tid); const d=ls.filter(l=>isDone(l.id)).length; return ls.length?Math.round(d/ls.length*100):0; }
 function trackDone(tid){ const ls=trackLessons(tid); return ls.length>0 && ls.every(l=>isDone(l.id)); }
