@@ -1319,19 +1319,22 @@ window.effectiveChannels=function(){
 };
 async function vCommunity(v){
   const isAdmin = state.profile && state.profile.role==='admin';
+  // "leadership" = the owner plus any leader rank (Supervisor and up). The leadership channel and
+  // announcement posting were gated on isAdmin (owner only), so every leader was silently shut out.
+  const isLeader = isAdmin || myRank()>=2;
   const ch = state.ctx.ch || 'announcements';
   const tag = (state.ctx.tag||'').toLowerCase();
   setTitle("Community", tag?('Posts tagged '+tag):"Talk it through together");
   if(!state.community){ v.innerHTML=`<div class="muted">Loading…</div>`; const [p,c,m,rx,rd,pf,cd]=await Promise.all([ sb.from('posts').select('*').order('created_at',{ascending:false}), sb.from('comments').select('*').order('created_at'), sb.from('channel_modes').select('*'), sb.from('reactions').select('*'), sb.from('channel_reads').select('*').eq('user_id',state.user.id), sb.from('profiles').select('id,name,avatar_url'), sb.from('day_items').select('title,detail').eq('kind','chandef') ]); const chandefs=(cd.data||[]).map(r=>{ try{ const d=typeof r.detail==='string'?JSON.parse(r.detail||'{}'):(r.detail||{}); d.id=d.id||r.title; return d; }catch(e){ return null; } }).filter(x=>x&&x.id); state.community={posts:p.data||[],comments:c.data||[],modes:m.data||[],reactions:rx.data||[],reads:rd.data||[],profiles:pf.data||[],chandefs}; }
   const allCh=effectiveChannels();
-  const canCh=id=>{ const cc=allCh.find(x=>x.id===id); if(!cc||cc.hidden) return false; return isAdmin || cc.memberVisible; };
+  const canCh=id=>{ const cc=allCh.find(x=>x.id===id); if(!cc||cc.hidden) return false; return isLeader || cc.memberVisible; };
   if(!canCh(ch)){ go('community',{ch:'announcements'}); return; }
-  const visible = allCh.filter(c=> !c.hidden && (isAdmin || c.memberVisible));
+  const visible = allCh.filter(c=> !c.hidden && (isLeader || c.memberVisible));
   let _cf={}; try{ _cf=JSON.parse(localStorage.getItem('sw_chfav')||'{}'); _cf[ch]=(_cf[ch]||0)+1; localStorage.setItem('sw_chfav',JSON.stringify(_cf)); }catch(e){} visible.sort((a,b)=>(_cf[b.id]||0)-(_cf[a.id]||0)); /* your most-used channels float to the front so you don't scroll to find them */
-  let posts = tag ? state.community.posts.filter(p=>(p.body||'').toLowerCase().includes(tag) && (p.channel!=='leadership'||isAdmin)) : state.community.posts.filter(p=>p.channel===ch);
+  let posts = tag ? state.community.posts.filter(p=>(p.body||'').toLowerCase().includes(tag) && (p.channel!=='leadership'||isLeader)) : state.community.posts.filter(p=>p.channel===ch);
   const cBy={}; state.community.comments.forEach(c=>{ (cBy[c.post_id]=cBy[c.post_id]||[]).push(c); });
   const cur = allCh.find(c=>c.id===ch)||visible[0]||allCh[0];
-  const _ov=state.community.modes.find(x=>x.channel===ch); const twoWay = _ov? _ov.two_way : !cur.announceOnly; const canPost = isAdmin || twoWay;
+  const _ov=state.community.modes.find(x=>x.channel===ch); const twoWay = _ov? _ov.two_way : !cur.announceOnly; const canPost = isLeader || twoWay;
   const reads={}; (state.community.reads||[]).forEach(r=>{ reads[r.channel]=r.last_read_at; });
   const unreadOf=cid=>{ const lr=reads[cid]?new Date(reads[cid]).getTime():0; return state.community.posts.filter(pp=>pp.channel===cid && new Date(pp.created_at).getTime()>lr).length; };
   sb.from('channel_reads').upsert({user_id:state.user.id,channel:ch,last_read_at:new Date().toISOString()}).then(()=>{}); reads[ch]=new Date().toISOString();
@@ -1341,7 +1344,7 @@ async function vCommunity(v){
   const chName=id=>{const cc=allCh.find(x=>x.id===id);return cc?cc.label:id;};
   h+=`<div class="row" style="gap:8px;margin-bottom:16px;flex-wrap:wrap"><div style="flex:1;min-width:180px;position:relative"><i class="ti ti-search" style="position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--brand);font-size:16px"></i><input id="comq" value="${esc(state.ctx.q||'')}" placeholder="Search everything you can see…" onkeydown="if(event.key==='Enter')comSearch(document.getElementById('comq').value)" style="width:100%;padding:11px 14px 11px 38px;border:1.5px solid var(--brand-line);border-radius:999px;background:var(--brand-soft);color:var(--ink);font-family:inherit;font-size:14px"/></div><button class="btn" style="width:auto" onclick="comSearch(document.getElementById('comq').value)">Search</button><button class="btn ${mediaMode?'pri':''}" style="width:auto" onclick="comMedia(${mediaMode?'false':'true'})"><i class="ti ti-photo"></i> Media</button></div>`;
   if(q){
-    const res=state.community.posts.filter(p=>canCh(p.channel) && (p.channel!=='leadership'||isAdmin) && ((p.body||'').toLowerCase().includes(q)||(p.author_name||'').toLowerCase().includes(q)));
+    const res=state.community.posts.filter(p=>canCh(p.channel) && (p.channel!=='leadership'||isLeader) && ((p.body||'').toLowerCase().includes(q)||(p.author_name||'').toLowerCase().includes(q)));
     h+=`<div class="faint" style="font-size:13px;margin-bottom:12px">${res.length} result${res.length===1?'':'s'} for "${esc(q)}" · <span style="color:var(--brand);cursor:pointer;font-weight:600" onclick="comSearch('')">clear</span></div>`;
     if(!res.length) h+=`<div class="card" style="padding:30px;text-align:center"><div class="faint">No posts match. Try a different word.</div></div>`;
     else h+=res.map(p=>`<div class="card" style="padding:14px 16px;margin-bottom:10px;cursor:pointer" onclick="go('community',{ch:'${p.channel}'})"><div class="row" style="gap:8px;margin-bottom:6px;flex-wrap:wrap"><span class="pill" style="background:var(--brand-soft);color:var(--brand);font-size:11px">${esc(chName(p.channel))}</span><span style="font-weight:600;font-size:13px">${esc(p.author_name||'Someone')}</span><span class="faint" style="font-size:12px">${timeAgo(p.created_at)}</span></div><div class="muted" style="font-size:13.5px;line-height:1.5;white-space:pre-wrap">${esc((p.body||'').slice(0,240))}${(p.body||'').length>240?'…':''}</div>${p.media_url?`<div class="faint" style="font-size:12px;margin-top:5px"><i class="ti ti-${p.media_type==='video'?'video':'photo'}"></i> ${p.media_type==='video'?'video':'photo'} attached</div>`:''}</div>`).join('');
