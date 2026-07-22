@@ -380,9 +380,18 @@ async function loadCommunityUnread(){
     sb.from('channel_reads').select('channel,last_read_at').eq('user_id',state.user.id)
   ]);
   const lastRead={}; (rd.data||[]).forEach(r=>{ lastRead[r.channel]=new Date(r.last_read_at).getTime(); });
-  let n=0;
-  (rp.data||[]).forEach(p=>{ if(p.author_id===state.user.id) return; const t=new Date(p.created_at).getTime(); if(t>(lastRead[p.channel]||0)) n++; });
+  const byCh={}; let n=0;
+  (rp.data||[]).forEach(p=>{ if(p.author_id===state.user.id) return; const t=new Date(p.created_at).getTime(); if(t>(lastRead[p.channel]||0)){ n++; byCh[p.channel]=(byCh[p.channel]||0)+1; } });
   window._communityUnread=n;
+  const labels={}; (typeof effectiveChannels==='function'?effectiveChannels():[]).forEach(c=>labels[c.id]=c.label);
+  window._communityDigest=Object.keys(byCh).map(id=>({id, label:labels[id]||id, count:byCh[id]})).sort((a,b)=>b.count-a.count);
+}
+// One compact, tappable line for the Today page. Empty when nothing's unread, so a caught-up day stays clean.
+function communityDigestCard(){
+  const tot=window._communityUnread||0; const by=window._communityDigest||[];
+  if(!tot||!by.length) return '';
+  const parts=by.slice(0,4).map(c=>esc(c.label)+' ('+c.count+')').join(', ');
+  return `<div class="card" style="padding:11px 15px;margin-bottom:14px;display:flex;align-items:center;gap:11px;cursor:pointer" onclick="go('community')"><div style="width:32px;height:32px;border-radius:9px;background:var(--brand-soft);color:var(--brand);display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="ti ti-messages" style="font-size:17px"></i></div><div style="flex:1;min-width:0"><div style="font-weight:700;font-size:13.5px">${tot} new in Community</div><div class="faint" style="font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${parts}</div></div><i class="ti ti-chevron-right" style="color:var(--muted);flex-shrink:0"></i></div>`;
 }
 async function saveResponse(lid, text){
   state.responses[lid]=text;
@@ -1855,7 +1864,7 @@ async function vToday(v){
   const meName=(state.profile&&state.profile.name)||'';
   const _rank=(typeof myRank==='function')?myRank():1;
   if(!ops){
-    let hL='';
+    let hL=communityDigestCard();
     // the why now opens each person's day as its own moment (showWhyMoment), so it isn't repeated here
     if(state.progress && state.progress.size===0){ hL+=`<div class="card" style="padding:18px 20px;margin-bottom:16px"><div style="font-weight:700;font-size:16px;margin-bottom:5px">👋 Welcome to ${esc((state.settings&&state.settings.academy_name)||'the Academy')}</div><div class="muted" style="font-size:13.5px;line-height:1.62">Your space to grow as a leader. Start with <b>Foundations of Leadership</b> below.</div></div>`; }
     let _cL=null; for(const t of visibleTracks()){ for(const l of trackLessons(t.id)){ if(!isDone(l.id)){ _cL={t,l}; break; } } if(_cL) break; }
@@ -1867,7 +1876,7 @@ async function vToday(v){
   const hToday=usHolidays(new Date().getFullYear()).find(x=>x.date===iso);
   const isOJR=!!(ojrItem&&ojrItem.detail&&meName&&String(ojrItem.detail).toLowerCase().indexOf(meName.toLowerCase())>=0);
   let revDue=[]; if(_rank>=3){ try{ const [rhh,rvv]=await Promise.all([ sb.from('hires').select('*'), sb.from('day_items').select('detail').eq('kind','review') ]); const rmap={}; (rvv.data||[]).forEach(x2=>{ let d={};try{d=typeof x2.detail==='string'?JSON.parse(x2.detail||'{}'):(x2.detail||{})}catch(e){} if(d.hireId!=null)(rmap[d.hireId]=rmap[d.hireId]||[]).push(d.milestone); }); (rhh.data||[]).forEach(hh=>{ if(!hh.start_date)return; reviewMilestones(hh.start_date).forEach(m=>{ const due=isoDate(new Date(_d(hh.start_date).getTime()+m.d*864e5)); if((rmap[hh.id]||[]).indexOf(m.k)<0 && due<=iso){ revDue.push({name:hh.name,label:m.l}); } }); }); }catch(e){} }
-  let h='';
+  let h=communityDigestCard();
   // The why now opens each person's day as its own moment (showWhyMoment), so it isn't permanent furniture here.
   // Owners keep a quiet one-line handle so they can still edit it.
   if((mtext||vtext) && isAdmin){ try{ window._whyTexts={m:mtext,v:vtext}; }catch(e){}
