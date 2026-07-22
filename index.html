@@ -1862,6 +1862,7 @@ async function vToday(v){
   const other=open.filter(i=>['task'].includes(i.kind)); if(other.length) parts.push(other.length+' task'+(other.length>1?'s':''));
   const todayCelebs=upcomingCelebrations(0);
   const meName=(state.profile&&state.profile.name)||'';
+  const meRoster=(typeof myRosterName==='function')?myRosterName():meName; // login name may be short ("Presley"); roster name is "Presley Elizondo" — match on roster
   const _rank=(typeof myRank==='function')?myRank():1;
   if(!ops){
     let hL=communityDigestCard();
@@ -1872,9 +1873,9 @@ async function vToday(v){
     else if(visibleTracks().length){ hL+=`<div class="sec">Your training</div><div class="card" style="padding:22px;text-align:center"><div style="font-size:26px;margin-bottom:8px">🎓</div><div style="font-weight:600;margin-bottom:4px">You're all caught up</div><div class="muted" style="font-size:13.5px">Every module you've been assigned is complete. Nice work.</div></div>`; }
     v.innerHTML=hL; return;
   }
-  let fixVis=[]; try{ const rmR=await sb.from('day_items').select('*').eq('kind','fixit').eq('done',false).order('created_at'); const rmAll=(rmR.data||[]).map(x=>{let d={};try{d=JSON.parse(x.detail||'{}')}catch(e){} return {id:x.id,d};}); fixVis=_rank>=3?rmAll:rmAll.filter(x=>x.d.anyone||(x.d.assignees||[]).indexOf(meName)>=0); fixVis.sort((a,b)=>(b.d.safety?1:0)-(a.d.safety?1:0)); }catch(e){}
+  let fixVis=[]; try{ const rmR=await sb.from('day_items').select('*').eq('kind','fixit').eq('done',false).order('created_at'); const rmAll=(rmR.data||[]).map(x=>{let d={};try{d=JSON.parse(x.detail||'{}')}catch(e){} return {id:x.id,d};}); fixVis=_rank>=3?rmAll:rmAll.filter(x=>x.d.anyone||(x.d.assignees||[]).indexOf(meRoster)>=0||(x.d.assignees||[]).indexOf(meName)>=0); fixVis.sort((a,b)=>(b.d.safety?1:0)-(a.d.safety?1:0)); }catch(e){}
   const hToday=usHolidays(new Date().getFullYear()).find(x=>x.date===iso);
-  const isOJR=!!(ojrItem&&ojrItem.detail&&meName&&String(ojrItem.detail).toLowerCase().indexOf(meName.toLowerCase())>=0);
+  const isOJR=!!(ojrItem&&ojrItem.detail&&String(ojrItem.detail).toLowerCase().indexOf((meRoster||meName||'').toLowerCase())>=0);
   let revDue=[]; if(_rank>=3){ try{ const [rhh,rvv]=await Promise.all([ sb.from('hires').select('*'), sb.from('day_items').select('detail').eq('kind','review') ]); const rmap={}; (rvv.data||[]).forEach(x2=>{ let d={};try{d=typeof x2.detail==='string'?JSON.parse(x2.detail||'{}'):(x2.detail||{})}catch(e){} if(d.hireId!=null)(rmap[d.hireId]=rmap[d.hireId]||[]).push(d.milestone); }); (rhh.data||[]).forEach(hh=>{ if(!hh.start_date)return; reviewMilestones(hh.start_date).forEach(m=>{ const due=isoDate(new Date(_d(hh.start_date).getTime()+m.d*864e5)); if((rmap[hh.id]||[]).indexOf(m.k)<0 && due<=iso){ revDue.push({name:hh.name,label:m.l}); } }); }); }catch(e){} }
   let h=communityDigestCard();
   // The why now opens each person's day as its own moment (showWhyMoment), so it isn't permanent furniture here.
