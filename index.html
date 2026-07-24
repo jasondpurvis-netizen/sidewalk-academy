@@ -3191,8 +3191,8 @@ async function teamAreas(v){
   // top of the map: the owner(s)
   if(owners.length){ h+=`<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:6px">`+owners.map(o=>`<div class="card" style="padding:12px 15px;display:flex;align-items:center;gap:10px;border:1px solid var(--brand);background:var(--brand-soft)">${av(o)}<div><div style="font-weight:700;font-size:14px">${esc(o)}</div><div class="faint" style="font-size:11.5px;text-transform:uppercase;letter-spacing:.06em">Owner</div></div></div>`).join('')+`</div><div style="width:2px;height:14px;background:var(--line2);margin:0 0 6px 24px"></div>`; }
   if(!areas.length){
-    if(isAdmin){ h+=`<div class="card" style="padding:20px 22px"><div style="font-weight:700;font-size:15px;margin-bottom:5px">Set up your areas</div><div class="faint" style="font-size:13px;line-height:1.55;margin-bottom:14px">Give each part of the business a point of contact. Start with a common set and change what you like, or build your own.</div><button class="btn pri" style="width:auto" onclick="areaAddStarter()"><i class="ti ti-wand"></i> Add a starter set</button> <button class="btn" style="width:auto" onclick="areaAdd()"><i class="ti ti-plus"></i> Add one area</button></div>`; }
-    else { h+=`<div class="card" style="padding:22px;text-align:center"><div class="faint">No areas set up yet.</div></div>`; }
+    if(isAdmin){ h+=`<div class="card" style="padding:20px 22px"><div style="font-weight:700;font-size:15px;margin-bottom:5px">Set up who owns what</div><div class="faint" style="font-size:13px;line-height:1.55;margin-bottom:14px">Give each part of the business a point of contact. Start with a common set and change what you like, or build your own.</div><button class="btn pri" style="width:auto" onclick="areaAddStarter()"><i class="ti ti-wand"></i> Add a starter set</button> <button class="btn" style="width:auto" onclick="areaAdd()"><i class="ti ti-plus"></i> Add one</button></div>`; }
+    else { h+=`<div class="card" style="padding:22px;text-align:center"><div class="faint">Nothing set up here yet.</div></div>`; }
     v.innerHTML=h; return;
   }
   h+=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px">`+areas.map(a=>{
@@ -3200,7 +3200,7 @@ async function teamAreas(v){
       : (a.owner?`<div class="row" style="gap:8px;align-items:center;margin-top:9px">${av(a.owner)}<div><div style="font-weight:600;font-size:13.5px">${esc(a.owner)}</div><div class="faint" style="font-size:11.5px">${esc(posOf(a.owner)||'')}</div></div></div>`:`<div class="faint" style="font-size:12.5px;margin-top:9px">No point of contact yet</div>`);
     return `<div class="card" style="padding:15px 16px"><div class="row" style="align-items:center;gap:9px"><i class="ti ${esc(a.icon)}" style="font-size:19px;color:var(--brand)"></i><div style="font-weight:700;font-size:15px;flex:1;min-width:0">${esc(a.name)}</div>${isAdmin?`<button onclick="areaDelete(${a.id})" title="Remove area" style="border:none;background:none;color:var(--muted);cursor:pointer;font-size:15px"><i class="ti ti-trash"></i></button>`:''}</div>${a.desc?`<div class="faint" style="font-size:12px;line-height:1.45;margin-top:4px">${esc(a.desc)}</div>`:''}${ownerSel}</div>`;
   }).join('')+`</div>`;
-  if(isAdmin) h+=`<div style="margin-top:14px"><button class="btn" style="width:auto" onclick="areaAdd()"><i class="ti ti-plus"></i> Add an area</button></div>`;
+  if(isAdmin) h+=`<div style="margin-top:14px"><button class="btn" style="width:auto" onclick="areaAdd()"><i class="ti ti-plus"></i> Add one</button></div>`;
   v.innerHTML=h;
 }
 window.areaAddStarter=async function(){
@@ -3217,7 +3217,7 @@ async function vTeam(v){
   const tab=state.ctx.ttab||'roster';
   setTitle('Team','Your people — profiles, progress & former team');
   const seg=(k,l)=>`<button onclick="state.ctx.ttab='${k}';vTeam(document.getElementById('view'))" style="padding:7px 15px;font-size:13px;font-weight:600;border:none;cursor:pointer;font-family:inherit;background:${tab===k?'var(--brand)':'var(--card)'};color:${tab===k?'#fff':'var(--muted)'}">${l}</button>`;
-  v.innerHTML=`<div style="display:inline-flex;border:1px solid var(--line2);border-radius:9px;overflow:hidden;margin-bottom:18px;flex-wrap:wrap">${seg('roster','Roster')}${seg('areas','Areas')}${seg('skills','Skills')}${seg('certs','Certifications')}${seg('progress','Academy progress')}${seg('former','Former team')}</div><div id="teambody"><div class="muted">Loading…</div></div>`;
+  v.innerHTML=`<div style="display:inline-flex;border:1px solid var(--line2);border-radius:9px;overflow:hidden;margin-bottom:18px;flex-wrap:wrap">${seg('roster','Roster')}${seg('areas','Who owns what')}${seg('skills','Skills')}${seg('certs','Certifications')}${seg('progress','Academy progress')}${seg('former','Former team')}</div><div id="teambody"><div class="muted">Loading…</div></div>`;
   const body=document.getElementById('teambody');
   if(tab==='areas'){ teamAreas(body); return; }
   if(tab==='progress'){ vSummary(body); return; }
