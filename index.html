@@ -3168,13 +3168,58 @@ async function teamCerts(v){
 }
 window.addCert=async function(){ const person=((document.getElementById('ctPerson')||{}).value||'').trim(); const type=(document.getElementById('ctType')||{}).value||'Other'; const exp=(document.getElementById('ctExp')||{}).value||null; const note=((document.getElementById('ctNote')||{}).value||'').trim()||null; const m=document.getElementById('ctmsg'); if(!person){ if(m)m.textContent='Pick who it belongs to.'; return; } const r=await sb.from('certifications').insert({person_name:person,cert_type:type,expires_on:exp,note,created_by:state.user.id}); if(r&&r.error){ if(m)m.textContent='Could not save: '+r.error.message; return; } teamCerts(document.getElementById('teambody')||document.getElementById('view')); };
 window.delCert=async function(id){ if(!confirm('Remove this certification record?'))return; await sb.from('certifications').delete().eq('id',id); teamCerts(document.getElementById('teambody')||document.getElementById('view')); };
+/* ---------- Areas of responsibility (the ownership map / org chart) ----------
+   An area = a part of the business with ONE point of contact. Ownership is who you go to,
+   not who does it alone, and it never restricts anyone's access. Everyone sees the map;
+   only the owner edits it. Stored as day_items kind 'area', detail {owner, icon, order, desc}. */
+const AREA_STARTER=[
+  {name:'Culture', icon:'ti-confetti', desc:'Birthdays, anniversaries, celebrations, team feel'},
+  {name:'Facilities', icon:'ti-tools', desc:'Repairs, upkeep, the building running right'},
+  {name:'Training', icon:'ti-school', desc:'Onboarding, skill sign-offs, growing the team'},
+  {name:'Baking', icon:'ti-bread', desc:'Rolling, bake, pastry, prep standards'},
+  {name:'Service', icon:'ti-coffee', desc:'Register, bar, expo, the guest experience'}
+];
+async function loadAreas(){ const r=await sb.from('day_items').select('*').eq('kind','area'); return (r.data||[]).map(x=>{ let d={}; try{ d=typeof x.detail==='string'?JSON.parse(x.detail||'{}'):(x.detail||{}); }catch(e){} return {id:x.id, name:x.title, owner:d.owner||'', icon:d.icon||'ti-flag', desc:d.desc||'', order:+d.order||0}; }).sort((a,b)=>a.order-b.order||a.name.localeCompare(b.name)); }
+async function teamAreas(v){
+  const isAdmin=state.profile&&state.profile.role==='admin';
+  await loadPositions(); await loadArchived();
+  const areas=await loadAreas();
+  const roster=Object.keys(window._posMap||{}).filter(n=>n&&!isArchived(n)&&posOf(n)!=='Owner').sort((a,b)=>a.localeCompare(b));
+  const owners=Object.keys(window._posMap||{}).filter(n=>posOf(n)==='Owner'&&!isArchived(n));
+  const av=n=>`<span style="width:30px;height:30px;border-radius:50%;flex:none;background:var(--brand-soft);color:var(--brand);display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:700">${esc((n||'?').split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase())}</span>`;
+  let h=`<div class="faint" style="font-size:12.5px;margin-bottom:14px;line-height:1.5">Who to go to for what. Everyone still pitches in everywhere; each area just has one point of contact who makes sure it gets done.</div>`;
+  // top of the map: the owner(s)
+  if(owners.length){ h+=`<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:6px">`+owners.map(o=>`<div class="card" style="padding:12px 15px;display:flex;align-items:center;gap:10px;border:1px solid var(--brand);background:var(--brand-soft)">${av(o)}<div><div style="font-weight:700;font-size:14px">${esc(o)}</div><div class="faint" style="font-size:11.5px;text-transform:uppercase;letter-spacing:.06em">Owner</div></div></div>`).join('')+`</div><div style="width:2px;height:14px;background:var(--line2);margin:0 0 6px 24px"></div>`; }
+  if(!areas.length){
+    if(isAdmin){ h+=`<div class="card" style="padding:20px 22px"><div style="font-weight:700;font-size:15px;margin-bottom:5px">Set up your areas</div><div class="faint" style="font-size:13px;line-height:1.55;margin-bottom:14px">Give each part of the business a point of contact. Start with a common set and change what you like, or build your own.</div><button class="btn pri" style="width:auto" onclick="areaAddStarter()"><i class="ti ti-wand"></i> Add a starter set</button> <button class="btn" style="width:auto" onclick="areaAdd()"><i class="ti ti-plus"></i> Add one area</button></div>`; }
+    else { h+=`<div class="card" style="padding:22px;text-align:center"><div class="faint">No areas set up yet.</div></div>`; }
+    v.innerHTML=h; return;
+  }
+  h+=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px">`+areas.map(a=>{
+    const ownerSel=isAdmin?`<select onchange="areaSetOwner(${a.id},this.value)" style="width:100%;margin-top:8px;padding:8px 9px;border:1px solid var(--line2);border-radius:8px;background:var(--card);color:var(--ink);font-family:inherit;font-size:13px"><option value="">Assign a point of contact…</option>${roster.map(n=>`<option value="${esc(n)}"${a.owner===n?' selected':''}>${esc(n)} &middot; ${esc(posOf(n))}</option>`).join('')}</select>`
+      : (a.owner?`<div class="row" style="gap:8px;align-items:center;margin-top:9px">${av(a.owner)}<div><div style="font-weight:600;font-size:13.5px">${esc(a.owner)}</div><div class="faint" style="font-size:11.5px">${esc(posOf(a.owner)||'')}</div></div></div>`:`<div class="faint" style="font-size:12.5px;margin-top:9px">No point of contact yet</div>`);
+    return `<div class="card" style="padding:15px 16px"><div class="row" style="align-items:center;gap:9px"><i class="ti ${esc(a.icon)}" style="font-size:19px;color:var(--brand)"></i><div style="font-weight:700;font-size:15px;flex:1;min-width:0">${esc(a.name)}</div>${isAdmin?`<button onclick="areaDelete(${a.id})" title="Remove area" style="border:none;background:none;color:var(--muted);cursor:pointer;font-size:15px"><i class="ti ti-trash"></i></button>`:''}</div>${a.desc?`<div class="faint" style="font-size:12px;line-height:1.45;margin-top:4px">${esc(a.desc)}</div>`:''}${ownerSel}</div>`;
+  }).join('')+`</div>`;
+  if(isAdmin) h+=`<div style="margin-top:14px"><button class="btn" style="width:auto" onclick="areaAdd()"><i class="ti ti-plus"></i> Add an area</button></div>`;
+  v.innerHTML=h;
+}
+window.areaAddStarter=async function(){
+  const existing=(await loadAreas()).map(a=>a.name.toLowerCase());
+  let i=0;
+  for(const a of AREA_STARTER){ if(existing.includes(a.name.toLowerCase())) continue; await sb.from('day_items').insert({kind:'area',title:a.name,on_date:null,detail:JSON.stringify({owner:'',icon:a.icon,desc:a.desc,order:i++}),created_by:state.user.id}); }
+  teamAreas(document.getElementById('teambody')||document.getElementById('view'));
+};
+window.areaAdd=async function(){ const name=prompt('Name this area (e.g. Catering, Merch, Cleanliness)'); if(!name||!name.trim())return; const n=(await loadAreas()).length; const r=await sb.from('day_items').insert({kind:'area',title:name.trim(),on_date:null,detail:JSON.stringify({owner:'',icon:'ti-flag',order:n}),created_by:state.user.id}); if(r&&r.error)return; teamAreas(document.getElementById('teambody')||document.getElementById('view')); };
+window.areaSetOwner=async function(id,owner){ const r=await sb.from('day_items').select('detail').eq('id',id).maybeSingle(); let d={}; try{ d=JSON.parse((r.data&&r.data.detail)||'{}'); }catch(e){} d.owner=owner; await sb.from('day_items').update({detail:JSON.stringify(d)}).eq('id',id); };
+window.areaDelete=async function(id){ if(!confirm('Remove this area? Nobody loses any access; it just comes off the map.'))return; await sb.from('day_items').delete().eq('id',id); teamAreas(document.getElementById('teambody')||document.getElementById('view')); };
 async function vTeam(v){
   if(!canSee(state.page)){ go('home'); return; }
   const tab=state.ctx.ttab||'roster';
   setTitle('Team','Your people — profiles, progress & former team');
   const seg=(k,l)=>`<button onclick="state.ctx.ttab='${k}';vTeam(document.getElementById('view'))" style="padding:7px 15px;font-size:13px;font-weight:600;border:none;cursor:pointer;font-family:inherit;background:${tab===k?'var(--brand)':'var(--card)'};color:${tab===k?'#fff':'var(--muted)'}">${l}</button>`;
-  v.innerHTML=`<div style="display:inline-flex;border:1px solid var(--line2);border-radius:9px;overflow:hidden;margin-bottom:18px;flex-wrap:wrap">${seg('roster','Roster')}${seg('skills','Skills')}${seg('certs','Certifications')}${seg('progress','Academy progress')}${seg('former','Former team')}</div><div id="teambody"><div class="muted">Loading…</div></div>`;
+  v.innerHTML=`<div style="display:inline-flex;border:1px solid var(--line2);border-radius:9px;overflow:hidden;margin-bottom:18px;flex-wrap:wrap">${seg('roster','Roster')}${seg('areas','Areas')}${seg('skills','Skills')}${seg('certs','Certifications')}${seg('progress','Academy progress')}${seg('former','Former team')}</div><div id="teambody"><div class="muted">Loading…</div></div>`;
   const body=document.getElementById('teambody');
+  if(tab==='areas'){ teamAreas(body); return; }
   if(tab==='progress'){ vSummary(body); return; }
   if(tab==='former'){ teamFormer(body); return; }
   if(tab==='skills'){ vTeamSkills(body); return; }
