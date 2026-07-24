@@ -3179,6 +3179,33 @@ const AREA_STARTER=[
   {name:'Baking', icon:'ti-bread', desc:'Rolling, bake, pastry, prep standards'},
   {name:'Service', icon:'ti-coffee', desc:'Register, bar, expo, the guest experience'}
 ];
+const AREA_TREE_CSS=`.ocwrap{overflow-x:auto;padding:8px 2px 6px}
+.octree{display:inline-block;min-width:100%;text-align:center}
+.octree ul{display:flex;justify-content:center;padding:22px 0 0 0;position:relative;margin:0;list-style:none}
+.octree li{list-style:none;position:relative;padding:22px 9px 0;text-align:center}
+.octree li::before,.octree li::after{content:'';position:absolute;top:0;right:50%;border-top:2px solid var(--line2);width:50%;height:22px}
+.octree li::after{right:auto;left:50%;border-left:2px solid var(--line2)}
+.octree li:only-child::before,.octree li:only-child::after{display:none}
+.octree li:only-child{padding-top:0}
+.octree li:first-child::before,.octree li:last-child::after{border:0 none}
+.octree li:last-child::before{border-right:2px solid var(--line2);border-radius:0 6px 0 0}
+.octree li:first-child::after{border-radius:6px 0 0 0}
+.octree ul ul::before{content:'';position:absolute;top:0;left:50%;border-left:2px solid var(--line2);width:0;height:22px}
+.octree .node{display:inline-block;vertical-align:top}
+.octree .onode{display:inline-flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.octree .ochip{display:flex;align-items:center;gap:8px;background:var(--brand-soft);border:1px solid var(--brand);border-radius:12px;padding:9px 13px}
+.octree .onm{font-weight:700;font-size:13.5px;line-height:1.15}
+.octree .orole{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.octree .cnode{background:var(--card);border:1px solid var(--line2);border-radius:12px;padding:11px 14px;min-width:152px;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+.octree .chead{display:flex;align-items:center;gap:7px;justify-content:center;font-weight:700;font-size:14px;margin-bottom:8px}
+.octree .chead i{color:var(--brand);font-size:17px}
+.octree .pline{display:inline-flex;align-items:center;gap:7px;justify-content:center}
+.octree .pnm{font-weight:600;font-size:12.5px;line-height:1.15}
+.octree .prole{font-size:10.5px;color:var(--muted)}
+.octree .pnone{color:var(--muted);font-style:italic;font-size:12px}
+.octree .hnode{display:inline-flex;align-items:center;gap:7px;background:var(--card);border:1px solid var(--line2);border-radius:10px;padding:7px 11px;min-width:118px}
+.octree .hnm{font-weight:600;font-size:12px;line-height:1.15}
+.octree .hrole{font-size:10px;color:var(--muted)}`;
 async function loadAreas(){ const r=await sb.from('day_items').select('*').eq('kind','area'); return (r.data||[]).map(x=>{ let d={}; try{ d=typeof x.detail==='string'?JSON.parse(x.detail||'{}'):(x.detail||{}); }catch(e){} return {id:x.id, name:x.title, owner:d.owner||'', icon:d.icon||'ti-flag', desc:d.desc||'', order:+d.order||0, helpers:Array.isArray(d.helpers)?d.helpers:[]}; }).sort((a,b)=>a.order-b.order||a.name.localeCompare(b.name)); }
 async function teamAreas(v){
   const isAdmin=state.profile&&state.profile.role==='admin';
@@ -3187,12 +3214,25 @@ async function teamAreas(v){
   const roster=Object.keys(window._posMap||{}).filter(n=>n&&!isArchived(n)&&posOf(n)!=='Owner').sort((a,b)=>a.localeCompare(b));
   const owners=Object.keys(window._posMap||{}).filter(n=>posOf(n)==='Owner'&&!isArchived(n));
   const av=n=>`<span style="width:30px;height:30px;border-radius:50%;flex:none;background:var(--brand-soft);color:var(--brand);display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:700">${esc((n||'?').split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase())}</span>`;
-  let h=`<div class="faint" style="font-size:12.5px;margin-bottom:14px;line-height:1.5">Who to go to for what, and who helps. Each part of the business has a point of contact, with the people helping them listed underneath, so everyone can see how the team lines up. Nobody loses any access; this is just the map.</div>`;
-  // top of the map: the owner(s)
-  if(owners.length){ h+=`<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:6px">`+owners.map(o=>`<div class="card" style="padding:12px 15px;display:flex;align-items:center;gap:10px;border:1px solid var(--brand);background:var(--brand-soft)">${av(o)}<div><div style="font-weight:700;font-size:14px">${esc(o)}</div><div class="faint" style="font-size:11.5px;text-transform:uppercase;letter-spacing:.06em">Owner</div></div></div>`).join('')+`</div><div style="width:2px;height:14px;background:var(--line2);margin:0 0 6px 24px"></div>`; }
+  const mgmt=isAdmin && window._areaMgmt;
+  const avSm=n=>`<span style="width:24px;height:24px;border-radius:50%;flex:none;background:var(--brand-soft);color:var(--brand);display:inline-flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:700">${esc((n||'?').split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase())}</span>`;
+  let h=`<div class="row" style="justify-content:space-between;align-items:flex-start;gap:14px;margin-bottom:14px"><div class="faint" style="font-size:12.5px;line-height:1.5;flex:1">Who to go to for what, and who helps. Owner at the top, each part of the business below it, and the people helping under their point of contact. Nobody loses any access; this is just the map.</div>${isAdmin?`<button class="btn" style="width:auto;flex:none;white-space:nowrap" onclick="window._areaMgmt=${mgmt?'false':'true'};window._areaEdit=null;areaRerender()">${mgmt?'<i class="ti ti-check"></i> Done':'<i class="ti ti-adjustments-horizontal"></i> Edit'}</button>`:''}</div>`;
+  // management view shows the owner bar; the clean chart draws its own owner box
+  if(mgmt && owners.length){ h+=`<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:6px">`+owners.map(o=>`<div class="card" style="padding:12px 15px;display:flex;align-items:center;gap:10px;border:1px solid var(--brand);background:var(--brand-soft)">${av(o)}<div><div style="font-weight:700;font-size:14px">${esc(o)}</div><div class="faint" style="font-size:11.5px;text-transform:uppercase;letter-spacing:.06em">Owner</div></div></div>`).join('')+`</div><div style="width:2px;height:14px;background:var(--line2);margin:0 0 6px 24px"></div>`; }
   if(!areas.length){
     if(isAdmin){ h+=`<div class="card" style="padding:20px 22px"><div style="font-weight:700;font-size:15px;margin-bottom:5px">Set up who owns what</div><div class="faint" style="font-size:13px;line-height:1.55;margin-bottom:14px">Give each part of the business one point of contact. The starter set drops in five common ones, Culture, Facilities, Training, Baking and Service, that you can rename, reassign or remove. Or build your own from scratch.</div><button class="btn pri" style="width:auto" onclick="areaAddStarter()"><i class="ti ti-wand"></i> Use the starter set</button> <button class="btn" style="width:auto" onclick="areaAdd()"><i class="ti ti-plus"></i> Build my own</button></div>`; }
     else { h+=`<div class="card" style="padding:22px;text-align:center"><div class="faint">Nothing set up here yet.</div></div>`; }
+    v.innerHTML=h; return;
+  }
+  if(!mgmt){
+    const ownerBox=`<div class="onode">${(owners.length?owners:['Owner']).map(o=>`<div class="ochip">${avSm(o)}<div style="text-align:left"><div class="onm">${esc(o)}</div><div class="orole">Owner</div></div></div>`).join('')}</div>`;
+    const cats=areas.map(a=>{
+      const poc=a.owner?`<div class="pline">${avSm(a.owner)}<div style="text-align:left"><div class="pnm">${esc(a.owner)}</div><div class="prole">${esc(posOf(a.owner)||'')}</div></div></div>`:`<div class="pline pnone">Point of contact TBD</div>`;
+      const hh=a.helpers||[];
+      const helpers=hh.length?`<ul>${hh.map(hn=>`<li><div class="node hnode">${avSm(hn)}<div style="text-align:left"><div class="hnm">${esc(hn)}</div><div class="hrole">${esc(posOf(hn)||'')}</div></div></div></li>`).join('')}</ul>`:'';
+      return `<li><div class="node cnode"><div class="chead"><i class="ti ${esc(a.icon)}"></i><span>${esc(a.name)}</span></div>${poc}</div>${helpers}</li>`;
+    }).join('');
+    h+=`<style>${AREA_TREE_CSS}</style><div class="ocwrap"><div class="octree"><ul><li><div class="node">${ownerBox}</div><ul>${cats}</ul></li></ul></div></div>`;
     v.innerHTML=h; return;
   }
   const editing=window._areaEdit;
@@ -3230,9 +3270,9 @@ window.areaEditCancel=function(){ window._areaEdit=null; areaRerender(); };
 window.areaEditSave=async function(id){ const nm=((document.getElementById('aeN_'+id)||{}).value||'').trim(); const ds=((document.getElementById('aeD_'+id)||{}).value||'').trim(); if(!nm){ alert('Give it a name.'); return; } const r=await sb.from('day_items').select('detail').eq('id',id).maybeSingle(); let d={}; try{ d=JSON.parse((r.data&&r.data.detail)||'{}'); }catch(e){} d.desc=ds; const u=await sb.from('day_items').update({title:nm,detail:JSON.stringify(d)}).eq('id',id); if(u&&u.error)return; window._areaEdit=null; areaRerender(); };
 async function vTeam(v){
   if(!canSee(state.page)){ go('home'); return; }
-  const tab=state.ctx.ttab||'roster';
+  let tab=state.ctx.ttab; if(!tab){ try{ tab=localStorage.getItem('teamTab'); }catch(e){} } if(!tab) tab='roster'; state.ctx.ttab=tab;
   setTitle('Team','Your people — profiles, progress & former team');
-  const seg=(k,l)=>`<button onclick="state.ctx.ttab='${k}';vTeam(document.getElementById('view'))" style="padding:7px 15px;font-size:13px;font-weight:600;border:none;cursor:pointer;font-family:inherit;background:${tab===k?'var(--brand)':'var(--card)'};color:${tab===k?'#fff':'var(--muted)'}">${l}</button>`;
+  const seg=(k,l)=>`<button onclick="state.ctx.ttab='${k}';try{localStorage.setItem('teamTab','${k}')}catch(e){};vTeam(document.getElementById('view'))" style="padding:7px 15px;font-size:13px;font-weight:600;border:none;cursor:pointer;font-family:inherit;background:${tab===k?'var(--brand)':'var(--card)'};color:${tab===k?'#fff':'var(--muted)'}">${l}</button>`;
   v.innerHTML=`<div style="display:inline-flex;border:1px solid var(--line2);border-radius:9px;overflow:hidden;margin-bottom:18px;flex-wrap:wrap">${seg('roster','Roster')}${seg('areas','Who owns what')}${seg('skills','Skills')}${seg('certs','Certifications')}${seg('progress','Academy progress')}${seg('former','Former team')}</div><div id="teambody"><div class="muted">Loading…</div></div>`;
   const body=document.getElementById('teambody');
   if(tab==='areas'){ teamAreas(body); return; }
