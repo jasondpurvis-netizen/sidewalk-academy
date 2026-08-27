@@ -639,7 +639,7 @@ const ROLE_LABELS={5:'Owner',4:'GM',3:'Manager',2:'Supervisor',1:'Team member'};
 /* Defaults follow how workforce apps actually behave: everyone can SEE the schedule and run the
    checklists; only leaders can build or change them. Editing is gated inside each page by rank,
    so opening a page is not the same as being able to change it. */
-const PERM_DEFAULT={whiteboard:1,home:1,ask:1,journal:1,build:4,setup:4,team:3,ownership:2,onboarding:3,today:1,rm:1,schedule:1,checklists:1,sales:4,saleshist:4,costsmart:4,calendar:3,lists:1,recovery:1,community:1,resources:1,downloads:1,settings:5,pay:5,clock:5};
+const PERM_DEFAULT={brain:3,whiteboard:1,home:1,ask:1,journal:1,build:4,setup:4,team:3,ownership:2,onboarding:3,today:1,rm:1,schedule:1,checklists:1,sales:4,saleshist:4,costsmart:4,calendar:3,lists:1,recovery:1,community:1,resources:1,downloads:1,settings:5,pay:5,clock:5};
 const PERM_LABELS={build:'Training & SOP builder',logbook:'Log (shift close-out)',setup:'Setup',team:'Team',ownership:'Who owns what (org chart)',onboarding:'Onboarding',schedule:'Schedule',sales:'Sales',saleshist:'Sales history import',costsmart:'Cost-Smart Schedule',pay:'Pay rates',settings:'Settings',today:'Daily Report',rm:'Fix-it list (R&M)',checklists:'Checklists',calendar:'Calendar',lists:'Lists',recovery:'Recovery',community:'Community',resources:'Resources',downloads:'Downloads'};
 /* A person exists twice: the login they created (profiles.name, often just a first name) and the roster
    record the owner entered (e.g. "Presley Elizondo"). Matching those by exact string silently demoted
@@ -671,7 +671,7 @@ function canSee(page){ return myRank()>=permOf(page)||hasGrant(page); }
 function renderApp(){
   const isAdmin = state.profile && state.profile.role==="admin";
   const realAdmin = state.previewLIT ? (state._realRole==='admin') : isAdmin;
-  const NAV_ALL=[["",[["today","Today","ti-sun"],["logbook","Log","ti-clipboard-check"]]],["Academy",[["home","Academy","ti-school"],["build","Build","ti-tools"],["ask","Ask","ti-bulb"],["journal","Journal","ti-notebook"]]],["Every day",[["schedule","Schedule","ti-calendar-week"],["team","Team","ti-users"],["ownership","Who owns what","ti-sitemap"],["onboarding","New Hires","ti-user-plus"],["calendar","Calendar","ti-calendar-month"]]],["Lists",[["rm","Fix-it list","ti-tool"],["recovery","Recovery","ti-heart-handshake"],["lists","Lists","ti-list-details"]]],["Numbers",[["sales","Sales","ti-chart-line"]]],["Shared",[["community","Community","ti-messages"],["resources","Resources","ti-files"],["downloads","Downloads","ti-download"]]],["",[["setup","Getting started","ti-list-check"],["settings","Settings","ti-settings"]]]];
+  const NAV_ALL=[["",[["today","Today","ti-sun"],["logbook","Log","ti-clipboard-check"]]],["Academy",[["home","Academy","ti-school"],["build","Build","ti-tools"],["ask","Ask","ti-bulb"],["journal","Journal","ti-notebook"]]],["Every day",[["schedule","Schedule","ti-calendar-week"],["team","Team","ti-users"],["ownership","Who owns what","ti-sitemap"],["onboarding","New Hires","ti-user-plus"],["calendar","Calendar","ti-calendar-month"]]],["Lists",[["rm","Fix-it list","ti-tool"],["recovery","Recovery","ti-heart-handshake"],["lists","Lists","ti-list-details"]]],["Numbers",[["sales","Sales","ti-chart-line"]]],["Shared",[["community","Community","ti-messages"],["resources","Resources","ti-files"],["downloads","Downloads","ti-download"]]],["",[["brain","The Brain","ti-bulb"],["setup","Getting started","ti-list-check"],["settings","Settings","ti-settings"]]]];
   let nav = NAV_ALL.map(([g,items])=>[g, items.filter(([p])=>canSee(p))]).filter(([g,items])=>items.length);
   let _pins=[]; try{ _pins=JSON.parse(localStorage.getItem('sw_favpin')||'[]'); }catch(e){}
   try{ const meta={}; NAV_ALL.forEach(([g,items])=>items.forEach(it=>meta[it[0]]=it)); const pinnedFavs=_pins.filter(p=>meta[p]&&canSee(p)); if(pinnedFavs.length){ nav = nav.map(([g,items])=>[g, items.filter(([p])=>_pins.indexOf(p)<0)]).filter(([g,items])=>items.length); nav.unshift(['Favorites', pinnedFavs.map(p=>meta[p])]); } }catch(e){}
@@ -690,7 +690,7 @@ function renderApp(){
   const PI={whiteboard:'ti-layout-dashboard',home:'ti-school',summary:'ti-chart-bar',team:'ti-users',onboarding:'ti-user-plus',ask:'ti-bulb',build:'ti-tools',today:'ti-clipboard-list',schedule:'ti-calendar-week',calendar:'ti-calendar-month',community:'ti-messages',resources:'ti-files',downloads:'ti-download',settings:'ti-settings',journal:'ti-notebook',track:'ti-book-2',lesson:'ti-book-2',feedback:'ti-message-2',ownership:'ti-sitemap'};
   const _ti=document.getElementById('topicon'); if(_ti)_ti.innerHTML='<i class="ti '+(PI[state.page]||'ti-point')+'"></i>';
   const v=document.getElementById("view");
-  ({whiteboard:vToday, home:vHome, acat:vAcat, track:vTrack, lesson:vLesson, summary:vSummary, team:vTeam, ownership:vOwnership, journal:vJournal, community:vCommunity, feedback:vFeedback, downloads:vDownloads, settings:vSettings, resources:vResources, ask:vAsk, build:vBuild, today:vToday, logbook:schLogbook, rm:vRM, lists:vLists, recovery:vRecovery, schedule:vSchedule, onboarding:vOnboarding, calendar:vCalendar, sales:vSales, checklists:vChecklists, setup:vSetup, pay:vPay, clock:vClock, saleshist:vSalesHist, costsmart:vCostSmart}[state.page]||vHome)(v);
+  ({whiteboard:vToday, home:vHome, acat:vAcat, track:vTrack, lesson:vLesson, summary:vSummary, team:vTeam, ownership:vOwnership, journal:vJournal, community:vCommunity, feedback:vFeedback, downloads:vDownloads, settings:vSettings, brain:vBrain, resources:vResources, ask:vAsk, build:vBuild, today:vToday, logbook:schLogbook, rm:vRM, lists:vLists, recovery:vRecovery, schedule:vSchedule, onboarding:vOnboarding, calendar:vCalendar, sales:vSales, checklists:vChecklists, setup:vSetup, pay:vPay, clock:vClock, saleshist:vSalesHist, costsmart:vCostSmart}[state.page]||vHome)(v);
 }
 const PAGE_HERO={
   acat:'&#10022; The Academy',
@@ -3997,6 +3997,91 @@ window.dispName=function(n){
   if(!initialClash) return first+' '+li+'.';            // "Jessica S." is enough
   return first+' '+last;                                // two Jessica S-somethings: use the whole name
 };
+
+
+/* ================= The Brain =================
+   What the restaurant knows about itself: its stations, who can work them, how many
+   people it needs and when, and who has to be in charge. Auto-draft is only as good as
+   this, which is why it lived scattered across the schedule page and Settings and why
+   neither screen made sense. Gathering it in one place does two things: the schedule page
+   becomes just the schedule, and the setup work gets a visible payoff -- a readiness
+   score that climbs as you fill it in, and a plain list of what auto-draft still cannot
+   do without you. Nobody finishes a forty-minute setup on faith. */
+async function vBrain(v){
+  if(!canSee('brain')){ go('home'); return; }
+  setTitle('The Brain','What your restaurant knows about itself — everything auto-draft needs, in one place');
+  v.innerHTML='<div class="muted">Loading…</div>';
+  await loadSettings(); await loadPositions(); await loadProfiles(); await loadArchived();
+  const [rcov, rav, rpay] = await Promise.all([
+    sb.from('day_items').select('detail').eq('kind','covrules').order('id',{ascending:false}).limit(1).maybeSingle(),
+    sb.from('availability').select('person_name'),
+    sb.from('pay_rates').select('person_name,wage')
+  ]);
+  const people = rosterNames().filter(n=>!isArchived(n) && posOf(n)!=='Owner');
+  const stations = (state.settings && Array.isArray(state.settings.stations)) ? state.settings.stations : [];
+  const skilled = people.filter(n=>(((window._profiles||{})[n]||{}).roles||[]).length>0);
+  const avail = new Set((rav.data||[]).map(r=>r.person_name));
+  const withAvail = people.filter(n=>avail.has(n));
+  const paid = new Set((rpay.data||[]).filter(r=>+r.wage>0).map(r=>r.person_name));
+  const withPay = people.filter(n=>paid.has(n));
+  let cov=null; try{ cov=JSON.parse((rcov.data&&rcov.data.detail)||'null'); }catch(e){}
+  const covSet = !!(cov && cov.matrix && cov.matrix.blocks && Object.keys(cov.matrix.blocks).length);
+  const leaders = people.filter(n=>['GM','Manager','Supervisor'].indexOf(posOf(n))>=0);
+
+  const parts = [
+    {k:'stations', done: stations.length>0,        label:'Stations',        detail: stations.length? stations.length+' set up' : 'None yet',
+     why:'Auto-draft cannot place anyone until it knows what jobs exist.', act:'openConceptSetup()', cta: stations.length?'Edit stations':'Set up stations'},
+    {k:'skills',   done: people.length? skilled.length===people.length : false, label:'Who works where', detail: people.length? skilled.length+' of '+people.length+' people' : 'No team yet',
+     why:'Without skills, auto-draft will put people on stations they cannot run.', act:'openSkillsSetup()', cta:'Set skills'},
+    {k:'coverage', done: covSet,                   label:'Coverage rules',  detail: covSet? 'Matrix set' : 'Not set',
+     why:'This is how many people you need, hour by hour. Without it there is nothing to staff against.', act:"go('schedule',{stab:'schedule'})", cta:'Set coverage'},
+    {k:'leaders',  done: leaders.length>0,         label:'Leadership',      detail: leaders.length? leaders.length+' leader'+(leaders.length>1?'s':'') : 'Nobody assigned',
+     why:'Every shift needs someone in charge. Auto-draft protects open and close first.', act:"go('team',{ttab:'roster'})", cta:'Set positions'},
+    {k:'avail',    done: people.length? withAvail.length===people.length : false, label:'Availability', detail: people.length? withAvail.length+' of '+people.length+' people' : 'No team yet',
+     why:'Auto-draft will schedule people when they cannot work until it knows their hours.', act:"go('schedule',{stab:'availability'})", cta:'Set availability'},
+    {k:'pay',      done: people.length? withPay.length===people.length : false, label:'Pay rates', detail: people.length? withPay.length+' of '+people.length+' people' : 'No team yet',
+     why:'Needed for labour cost and your labour target. Scheduling still works without it.', act:"go('schedule',{stab:'team'})", cta:'Set pay', soft:true}
+  ];
+  const hard = parts.filter(p=>!p.soft);
+  const ready = Math.round(hard.filter(p=>p.done).length / hard.length * 100);
+  const blocking = parts.filter(p=>!p.done && !p.soft);
+
+  let h = '';
+
+  h += `<div class="card" style="padding:18px 20px;margin-bottom:16px">
+    <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap">
+      <div style="font-size:34px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums">${ready}%</div>
+      <div style="flex:1;min-width:170px">
+        <div style="font-weight:700;font-size:15px">${ready===100?'Auto-draft is ready':'Auto-draft is not ready yet'}</div>
+        <div class="faint" style="font-size:12.5px">${ready===100?'Everything it needs is set. Build a week and it will hold up.':blocking.length+' thing'+(blocking.length>1?'s':'')+' still missing.'}</div>
+      </div>
+    </div>
+    <div style="height:8px;background:var(--bg);border-radius:99px;margin-top:14px;overflow:hidden">
+      <div style="height:8px;width:${ready}%;background:${ready===100?'#2C6E4B':'var(--brand)'};border-radius:99px;transition:width .3s"></div>
+    </div>
+  </div>`;
+
+  h += `<div class="sec">What it knows</div><div class="card" style="padding:0;overflow:hidden">`;
+  parts.forEach((p,i)=>{
+    h += `<div style="display:flex;gap:13px;align-items:flex-start;padding:15px 17px;${i?'border-top:1px solid var(--line)':''}">
+      <i class="ti ${p.done?'ti-circle-check':'ti-circle-dashed'}" style="font-size:20px;flex:none;margin-top:1px;color:${p.done?'#2C6E4B':'var(--muted)'}"></i>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:700;font-size:14.5px">${esc(p.label)} ${p.soft?'<span class="faint" style="font-weight:500;font-size:11.5px">· optional</span>':''}</div>
+        <div class="faint" style="font-size:12.5px;margin-top:1px">${esc(p.detail)}</div>
+        ${p.done?'':`<div class="faint" style="font-size:12.5px;margin-top:5px;line-height:1.5">${esc(p.why)}</div>`}
+      </div>
+      <button class="btn" style="width:auto;padding:7px 13px;font-size:12.5px;flex:none" onclick="${p.act}">${esc(p.cta)}</button>
+    </div>`;
+  });
+  h += `</div>`;
+
+  if(blocking.length){
+    h += `<div class="card" style="padding:15px 18px;margin-top:16px;background:#F7EEDC;border-color:#E4CFA3">
+      <div style="font-weight:700;font-size:14.5px;color:#7A5B1E;margin-bottom:5px">What auto-draft cannot do yet</div>
+      <div style="font-size:13px;line-height:1.7;color:#7A5B1E">${blocking.map(b=>'&bull; '+esc(b.why)).join('<br>')}</div></div>`;
+  }
+  v.innerHTML = h;
+}
 
 async function teamRoster(v){
   v.innerHTML='<div class="muted">Loading…</div>';
