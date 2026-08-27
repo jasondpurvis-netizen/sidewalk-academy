@@ -4269,6 +4269,20 @@ async function boot(){
     if(!state.profile || !state.profile.tenant_id){ renderNewRestaurant(); return; }
   }
   await loadSettings();
+  /* Nine of thirteen logins had no last name. The app matches people to shifts by name,
+     so those staff could not see their own schedule and showed up as a second person on
+     the roster. Signup now demands a full name, but existing accounts predate that -- so
+     ask once, on the way in, rather than leaving them quietly broken. */
+  try{
+    const _nm=String((state.profile&&state.profile.name)||'').trim();
+    if(_nm && _nm.split(/\s+/).filter(Boolean).length<2){
+      const _full=prompt('Your account is saved as "'+_nm+'".\n\nAdd your last name so your shifts and messages reach you. Use the name your manager has on the schedule.', _nm+' ');
+      if(_full && _full.trim().split(/\s+/).filter(Boolean).length>=2){
+        const _u=await sb.from('profiles').update({name:_full.trim().replace(/\s+/g,' ')}).eq('id',state.profile.id);
+        if(!(_u&&_u.error)) state.profile.name=_full.trim().replace(/\s+/g,' ');
+      }
+    }
+  }catch(e){}
   if(BILLING_LIVE){ const bs=billingState(); if(!bs.ok){ renderPaywall(bs); return; } }
   try{ await loadPositions(); }catch(e){}
   // Someone who signs up IS on the team. Put them on the roster as Unassigned so the owner can see
