@@ -1092,7 +1092,7 @@ window.csRenderPreview=function(){
   const todayIso=isoDate(new Date());
   const names=[...new Set(p.draft.filter(d=>d.person_name!=='__OPEN__').map(d=>d.person_name))];
   const roster={}; names.forEach(n=>{ const r=posOf(n); (roster[r]=roster[r]||[]).push(n); });
-  const POS_ORDER=['OJR','Owner','Manager','Supervisor','Trainer','Trainee','Team Member','Unassigned']; const POS_COL={OJR:'#DC2626',Owner:'#7C3AED',Manager:'#2563EB',Supervisor:'#0D9488',Trainer:'#0891B2',Trainee:'#D97706','Team Member':'#64748B',Unassigned:'#94A3B8'};
+  const POS_ORDER=['OJR','Owner','GM','Manager','Supervisor','Trainer','Trainee','Team Member','Unassigned']; const POS_COL={OJR:'#DC2626',Owner:'#7C3AED',Manager:'#2563EB',Supervisor:'#0D9488',Trainer:'#0891B2',Trainee:'#D97706','Team Member':'#64748B',Unassigned:'#94A3B8'};
   const byPD={}; p.draft.forEach(s=>{ (byPD[s.person_name+'|'+s.on_date]=byPD[s.person_name+'|'+s.on_date]||[]).push(s); });
   h+=`<div class="board"><div class="board-grid"><div class="bh bh-team">Team</div>`+p.isoDays.map(iso=>{ const dt=new Date(iso+'T00:00'); return `<div class="bh ${iso===todayIso?'bh-today':''}">${DN[dt.getDay()]}<span>${dt.getDate()}</span></div>`; }).join('');
   Object.keys(roster).sort((a,b)=>{const ia=POS_ORDER.indexOf(a),ib=POS_ORDER.indexOf(b);return (ia<0?99:ia)-(ib<0?99:ib)||a.localeCompare(b);}).forEach(role=>{
@@ -2347,7 +2347,7 @@ h+=`<div class="board"><div class="board-grid"><div class="bh bh-team">Team</div
     }
   }
   const dayHrs=isoDays.map(()=>0), dayCost=isoDays.map(()=>0);
-  const POS_ORDER=['OJR','Owner','Manager','Supervisor','Trainer','Trainee','Team Member','Unassigned']; const POS_COL={OJR:'#DC2626',Owner:'#7C3AED',Manager:'#2563EB',Supervisor:'#0D9488',Trainer:'#0891B2',Trainee:'#D97706','Team Member':'#64748B',Unassigned:'#94A3B8'};
+  const POS_ORDER=['OJR','Owner','GM','Manager','Supervisor','Trainer','Trainee','Team Member','Unassigned']; const POS_COL={OJR:'#DC2626',Owner:'#7C3AED',Manager:'#2563EB',Supervisor:'#0D9488',Trainer:'#0891B2',Trainee:'#D97706','Team Member':'#64748B',Unassigned:'#94A3B8'};
   Object.keys(roles).sort((a,b)=>{const ia=POS_ORDER.indexOf(a),ib=POS_ORDER.indexOf(b);return (ia<0?99:ia)-(ib<0?99:ib)||a.localeCompare(b);}).forEach(role=>{
     const _bc=POS_COL[role]||'#94A3B8';
     h+=`<div class="band" style="background:${_bc}14;color:${_bc};border-left:4px solid ${_bc}">${esc(role)}</div>`;
@@ -3557,7 +3557,7 @@ window._impMap=function(headers){
   });
   return m;
 };
-var RANKW={'Team Member':0,'Trainer':1,'Supervisor':2,'Manager':3,'Owner':4};
+var RANKW={'Team Member':0,'Trainee':0,'Trainer':1,'Supervisor':2,'Manager':3,'GM':4,'Owner':5};
 window._impRank=function(utype,dept,role){
   /* Rank comes from the job title, not from the vendor's permission fields. A first
      pass trusted "User type: Admin" and "Department: Manager" and produced 53 managers
@@ -3568,7 +3568,8 @@ window._impRank=function(utype,dept,role){
   var r=(role||'').toLowerCase().trim(), u=(utype||'').toLowerCase();
   if(r){
     if(r.indexOf('owner')>=0) return 'Owner';
-    if(r.indexOf('gm')>=0||r.indexOf('general manager')>=0||r.indexOf('manager')>=0) return 'Manager';
+    if(r.indexOf('gm')>=0||r.indexOf('general manager')>=0) return 'GM';
+    if(r.indexOf('manager')>=0) return 'Manager';
     if(r.indexOf('supervisor')>=0||r.indexOf('leader')>=0||r.indexOf('lead')>=0) return 'Supervisor';
     if(r.indexOf('trainer')>=0||r.indexOf('ojr')>=0) return 'Trainer';
     return 'Team Member';
