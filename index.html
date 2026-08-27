@@ -1997,7 +1997,7 @@ async function vToday(v){
     h+=`<div class="row" style="align-items:center;gap:10px;margin-bottom:16px"><span style="font-size:10.5px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:var(--brand);flex:none">✦ Our why</span><span class="faint" style="font-size:13px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(mtext||vtext)}</span><button class="btn" style="width:auto;padding:4px 11px;font-size:12px;flex:none" onclick="showWhyMoment((window._whyTexts||{}).m,(window._whyTexts||{}).v,true)"><i class="ti ti-eye"></i> Preview</button><button class="btn" style="width:auto;padding:4px 11px;font-size:12px;flex:none" onclick="toggleWhyEdit()"><i class="ti ti-pencil"></i> Edit</button></div>`; }
   else if(isAdmin){ h+=`<div class="card" style="padding:16px 18px;margin-bottom:18px"><div class="row" style="align-items:center;margin-bottom:8px"><span style="font-size:11.5px;font-weight:800;letter-spacing:.15em;text-transform:uppercase;color:var(--brand)">✦ Our Why</span><button class="btn" style="width:auto;margin-left:auto;padding:5px 12px;font-size:12.5px" onclick="toggleWhyEdit()"><i class="ti ti-pencil"></i> Edit</button></div><div class="faint" style="font-size:13px">Add your mission and vision — they anchor the whole team, front and center.</div></div>`; }
   if(isAdmin) h+=`<div id="whyEdit" style="display:${(mtext||vtext)?'none':'block'};margin:-10px 0 18px"><div class="card" style="padding:14px 16px"><textarea id="wbmission" placeholder="Mission — why we exist" style="width:100%;min-height:50px;padding:10px;border:1px solid var(--line2);border-radius:8px;font-family:inherit;font-size:14px;color:var(--ink);background:var(--card);margin-bottom:8px">${esc(mtext)}</textarea><textarea id="wbvision" placeholder="Vision — where we're going" style="width:100%;min-height:50px;padding:10px;border:1px solid var(--line2);border-radius:8px;font-family:inherit;font-size:14px;color:var(--ink);background:var(--card)">${esc(vtext)}</textarea><div class="row" style="margin-top:8px"><button class="btn pri" style="width:auto;margin-left:auto" onclick="saveMV()">Save</button></div></div></div>`;
-  const _needRows=buildTodayFocus({ fixVis, dueRots, orders, ppl, other, todayCelebs, hToday, ojrItem, isOJR, rank:_rank, revDue });
+  const _needRows=buildTodayFocus({ fixVis, dueRots, orders, ppl, other, todayCelebs, hToday, ojrItem, isOJR, rank:_rank, revDue }); try{ const _nf=await loadNotifs(); const _un=_nf.filter(n=>n.unread); if(_un.length) _needRows.unshift({p:-1,border:'#2F7F91',emoji:'\u{1F514}',title:_un.length===1?_un[0].title:_un.length+' new updates',sub:_un.slice(0,2).map(n=>n.body).filter(Boolean).join(' \u00b7 '),act:(_un[0].act||"go('today')")+';markNotifsSeen()',btn:'See'}); }catch(e){};
   const _todo=await loadTodoData(iso,today); const _todoItems=_todo.todoItems||[], _dueRems=_todo.dueRems||[], _allRems=_todo.allRems||[];
   const _hn=notes.filter(x=>!x.resolved);
   let _certSoon=[]; try{ const _rc=await sb.from('certifications').select('person_name,cert_type,expires_on').not('expires_on','is',null); _certSoon=(_rc.data||[]).map(c=>{ const dd=new Date(c.expires_on+'T00:00:00'); return {p:c.person_name,ct:c.cert_type,days:Math.ceil((dd.getTime()-Date.now())/864e5)}; }).filter(c=>c.days<=30).sort((a,b)=>a.days-b.days); }catch(e){}
@@ -2609,6 +2609,8 @@ window.setWage=function(name,w){ if(window._sch&&window._sch.wage) window._sch.w
 window._salesTmr={};
 window.setSales=function(iso,s){ window._noSalesEver=false; refreshLabor(); clearTimeout(window._salesTmr[iso]); window._salesTmr[iso]=setTimeout(()=>{ sb.from('day_sales').upsert({on_date:iso, sales:Number(s)||0}).then(()=>{}); },500); };
 window.publishWeek=async function(){ const wk=state.ctx.wk||isoDate(weekStart(new Date())); const start=weekStart(wkDate(wk)); const d6=isoDate(new Date(start.getTime()+6*864e5));
+  try{ const _mon=new Date(start); const _lbl=_mon.toLocaleDateString(undefined,{month:'short',day:'numeric'});
+    await notify({title:'The schedule is up', body:'Week of '+_lbl+' has been published. Check your shifts.', act:"go('schedule')"}); }catch(e){}
   // Snapshot the published state so "What changed" can diff later edits against it.
   try{ const rs=await sb.from('shifts').select('person_name,on_date,start_time,end_time').gte('on_date',wk).lte('on_date',d6); const snap=(rs.data||[]).filter(s=>s.person_name&&s.person_name!=='__OPEN__').map(s=>({n:s.person_name,d:s.on_date,s:s.start_time,e:s.end_time})); await sb.from('day_items').delete().eq('kind','pubsnap').eq('title',wk); await sb.from('day_items').insert({kind:'pubsnap',title:wk,on_date:null,detail:JSON.stringify(snap),created_by:state.user.id}); }catch(e){}
   await sb.from('published_weeks').upsert({week_start:wk, published_at:new Date().toISOString()}); vSchedule(document.getElementById('view')); };
@@ -4177,6 +4179,53 @@ window._asWin=async function(name,from,to){
   if(f && t && t<=f){ alert('The end time needs to be after the start time.'); _asRender(); return; }
   await _avUpsert(name,wd,{can_work:true,note:f+'-'+t});
   _asRender();
+};
+
+
+/* ---------- Telling people things ----------
+   Real reviews of competing tools complain overwhelmingly about this: the schedule got
+   built fine, the message about it never arrived. This app had no notification of any
+   kind -- no push, no email, nothing -- so publishing a week told nobody.
+   Events are recorded as day_items rows (kind 'notif'), which inherits the tenant
+   isolation already in place and needs no schema change. Push and email become delivery
+   channels reading these same records later; the record is the thing that matters. */
+window.notify=async function(opts){
+  try{
+    const row={
+      kind:'notif',
+      title: String(opts.title||'').slice(0,180),
+      on_date: isoDate(new Date()),
+      detail: JSON.stringify({
+        body: String(opts.body||'').slice(0,400),
+        act: opts.act||'',
+        who: Array.isArray(opts.who)? opts.who : (opts.who? [opts.who] : null),  // null = everyone
+        from: (state.profile&&state.profile.name)||'',
+        at: new Date().toISOString()
+      }),
+      created_by: state.user && state.user.id
+    };
+    await sb.from('day_items').insert(row);
+  }catch(e){}
+};
+window.loadNotifs=async function(){
+  const me=(myRosterName&&myRosterName())||((state.profile&&state.profile.name)||'');
+  const since=isoDate(new Date(Date.now()-14*864e5));
+  const r=await sb.from('day_items').select('id,title,detail,on_date').eq('kind','notif').gte('on_date',since).order('id',{ascending:false}).limit(40);
+  let seen={}; try{ seen=JSON.parse(localStorage.getItem('notif_seen')||'{}'); }catch(e){}
+  const out=[];
+  (r.data||[]).forEach(function(x){
+    let d={}; try{ d=JSON.parse(x.detail||'{}'); }catch(e){}
+    if(d.who && d.who.length && d.who.indexOf(me)<0) return;   // addressed to specific people
+    out.push({id:x.id, title:x.title, body:d.body||'', act:d.act||'', at:d.at||x.on_date, unread:!seen[x.id]});
+  });
+  window._notifs=out; return out;
+};
+window.markNotifsSeen=function(){
+  try{
+    let seen={}; try{ seen=JSON.parse(localStorage.getItem('notif_seen')||'{}'); }catch(e){}
+    (window._notifs||[]).forEach(function(n){ seen[n.id]=1; });
+    localStorage.setItem('notif_seen', JSON.stringify(seen));
+  }catch(e){}
 };
 
 async function teamRoster(v){
