@@ -3986,13 +3986,16 @@ window._cxSave=async function(){
    is shared by someone else currently on the team. Ambiguity is the trigger, not policy. */
 window.dispName=function(n){
   n=String(n||'').trim(); if(!n) return '';
-  const parts=n.split(/\s+/); const first=parts[0];
+  const parts=n.split(/\s+/); const first=parts[0]; const last=parts[parts.length-1];
   if(parts.length<2) return first;
-  try{
-    const others=rosterNames().filter(x=>x!==n && !isArchived(x) && String(x||'').trim().split(/\s+/)[0].toLowerCase()===first.toLowerCase());
-    if(!others.length) return first;
-  }catch(e){ return n; }
-  return first+' '+parts[parts.length-1].charAt(0).toUpperCase()+'.';
+  let peers=[];
+  try{ peers=rosterNames().filter(x=>x&&x!==n&&!isArchived(x)&&String(x).trim().split(/\s+/)[0].toLowerCase()===first.toLowerCase()); }
+  catch(e){ return n; }
+  if(!peers.length) return first;                       // nobody else has this first name
+  const li=last.charAt(0).toUpperCase();
+  const initialClash = peers.some(x=>{ const lp=String(x).trim().split(/\s+/); return lp[lp.length-1].charAt(0).toUpperCase()===li; });
+  if(!initialClash) return first+' '+li+'.';            // "Jessica S." is enough
+  return first+' '+last;                                // two Jessica S-somethings: use the whole name
 };
 
 async function teamRoster(v){
