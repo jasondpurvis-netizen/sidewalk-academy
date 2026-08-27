@@ -2038,7 +2038,7 @@ async function vSchedule(v){
   const stab=state.ctx.stab||'schedule';
   setTitle('Operations','Scheduling, team & the daily log — one place');
   const _w=document.querySelector('.wrap'); if(_w) _w.style.maxWidth='1180px';
-  const TABS=[['schedule','Schedule',1],['team','Team',3],['availability','Availability',1],['timeoff','Time off',1],['pool','Shift pool',1],['reports','Reports',3]];
+  const TABS=[['schedule','Schedule',1],['team','Who\u2019s working',3],['availability','Availability',1],['timeoff','Time off',1],['pool','Shift pool',1],['reports','Reports',3]];
   const tabs=TABS.filter(t=>myRank()>=t[2]); const allowed=new Set(tabs.map(t=>t[0])); const useTab=allowed.has(stab)?stab:'overview';
   v.innerHTML=`<div class="schtabs">`+tabs.map(t=>`<button class="schtab${useTab===t[0]?' on':''}" onclick="schGo('${t[0]}')">${t[1]}</button>`).join('')+`</div><div id="schbody"><div class="muted">Loading…</div></div>`;
   const body=document.getElementById('schbody');
