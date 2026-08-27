@@ -2363,7 +2363,19 @@ async function schBoard(v){
     // Shifts left behind by someone who no longer works here. They don't get a row on the board, so without this they're invisible.
     const _ghost={}; (rsh.data||[]).forEach(s=>{ if(s.person_name&&s.person_name!=='__OPEN__'&&typeof isArchived==='function'&&isArchived(s.person_name)) _ghost[s.person_name]=(_ghost[s.person_name]||0)+1; });
     const _gn=Object.keys(_ghost);
-    if(_gn.length){ h+=`<div class="card" style="padding:12px 15px;margin-bottom:14px;background:#FCEBEB;border-color:#E9A6A6"><div style="font-weight:700;color:#A32D2D;margin-bottom:4px">Still on the schedule but no longer employed</div><div style="font-size:13px;line-height:1.7;margin-bottom:9px">${_gn.map(n=>esc(n)+' &middot; '+_ghost[n]+' shift'+(_ghost[n]>1?'s':'')+' this week').join('<br>')}</div><button class="btn" style="width:auto;padding:6px 12px;font-size:12.5px" onclick="clearFormerShifts()"><i class="ti ti-trash"></i> Remove their upcoming shifts</button></div>`; } }
+    if(_gn.length){
+      /* The list is of shifts in the week being viewed; the button only deletes shifts
+         from today onward. On a past week those never overlap, so the button correctly
+         removed nothing and the panel never cleared -- which reads as broken. Count what
+         is actually upcoming and only offer the button when there is something to remove. */
+      let _up = 0;
+      try{ const _ur = await sb.from('shifts').select('id').gte('on_date', isoDate(new Date())).in('person_name', _gn); _up = (_ur.data||[]).length; }catch(e){}
+      const _past = !_up;
+      h+=`<div class="card" style="padding:12px 15px;margin-bottom:14px;background:#FCEBEB;border-color:#E9A6A6"><div style="font-weight:700;color:#A32D2D;margin-bottom:4px">Still on the schedule but no longer employed</div><div style="font-size:13px;line-height:1.7;margin-bottom:9px">${_gn.map(n=>esc(n)+' &middot; '+_ghost[n]+' shift'+(_ghost[n]>1?'s':'')+' this week').join('<br>')}</div>`
+        + (_past
+            ? `<div style="font-size:12.5px;color:#7A2E2E;opacity:.9">These are in the past, so they stay on the record. Nothing upcoming to remove.</div>`
+            : `<button class="btn" style="width:auto;padding:6px 12px;font-size:12.5px" onclick="clearFormerShifts()"><i class="ti ti-trash"></i> Remove ${_up} upcoming shift${_up>1?'s':''}</button>`)
+        + `</div>`; } }
   if(window._draftSummary){ const ds=window._draftSummary; window._draftSummary=null; h+=`<div class="card" style="padding:14px 16px;margin-bottom:14px;background:var(--brand-soft);border-color:var(--brand-line)"><div style="font-weight:700;margin-bottom:3px">✨ Auto-draft ready — ${ds.made} shift${ds.made!==1?'s':''} placed${ds.unfilled?', '+ds.unfilled+' still open':''}</div><div class="faint" style="font-size:12.5px">Review below, tweak anything, then Publish. Nothing reaches the team until you publish.</div>${ds.flags.length?`<div style="margin-top:9px;font-size:13px;line-height:1.7;border-top:1px solid var(--brand-line);padding-top:8px">${ds.flags.map(f=>`<div style="white-space:pre-line;margin-bottom:5px">${esc(f)}</div>`).join('')}</div>`:''}</div>`; }
   if(!shifts.length) h+=`<div class="card" style="padding:30px 22px;text-align:center;margin-bottom:14px"><div style="font-size:30px;color:var(--brand);margin-bottom:8px"><i class="ti ti-calendar-plus"></i></div><div style="font-weight:600;margin-bottom:3px">No shifts this week</div><div class="faint" style="font-size:13px">${isAdmin?'Add one below, tap Copy week, or ✨ Auto-draft to build it from a past week.':'Your shifts show here once leadership posts the schedule.'}</div></div>`;
   h+=`<div style="margin:0 2px 10px"><button class="btn" style="width:auto;padding:6px 12px;font-size:12.5px" onclick="addMyShiftsToCal()"><i class="ti ti-calendar-plus"></i> Add my shifts to my calendar</button></div>`;
