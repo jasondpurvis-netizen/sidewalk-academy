@@ -611,8 +611,16 @@ async function submitAuth(){
   document.getElementById("go").textContent="Working…";
   try{
     if(state.authMode==="up"){
-      const nm=(document.getElementById('nm')?document.getElementById('nm').value.trim():'');
+      const nm=(document.getElementById('nm')?document.getElementById('nm').value.trim().replace(/\s+/g,' '):'');
       const jc=(document.getElementById('jc')?document.getElementById('jc').value.trim():'');
+      /* First name only creates a person the roster cannot match. One team member signed
+         up as "Jessica" while her 27 shifts sat under "Jessica Scheller", so the app made
+         a second roster entry and her own schedule was invisible to her. Names must match
+         the roster to be useful, and the roster uses full names. */
+      if(nm.split(' ').filter(Boolean).length < 2){
+        amsg("Please enter your first and last name, exactly as your manager has it on the schedule.","err");
+        document.getElementById("go").textContent="Create account"; state.busy=false; return;
+      }
       window._pendingName=nm; window._pendingJoin=jc;
       const { data, error } = await sb.auth.signUp({ email, password:pass });
       if(error){ amsg(error.message,"err"); }
@@ -3678,6 +3686,14 @@ window._impCount=function(){
 window._impCommit=async function(){
   var all=window._impFresh||[];
   var list=[].map.call(document.querySelectorAll('#impList [data-impchk]:checked'), function(c){ return all[+c.getAttribute('data-impchk')]; }).filter(Boolean);
+  /* Re-check against the roster now, not just when the preview was drawn. The preview is
+     built from whatever was loaded at the time; if the roster had not finished loading,
+     someone already on it could be offered again and end up with two entries. */
+  try{
+    await loadPositions();
+    var have={}; rosterNames().forEach(function(n){ have[n.toLowerCase()]=1; });
+    list=list.filter(function(p){ return !have[p.name.toLowerCase()]; });
+  }catch(e){}
   if(!list.length) return;
   var go=document.getElementById('impGo'), msg=document.getElementById('impMsg');
   if(go){ go.disabled=true; go.textContent='Importing…'; }
