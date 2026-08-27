@@ -2845,7 +2845,7 @@ async function schTeam(v){
     v.innerHTML=h; return;
   }
   const roles={}; team.forEach(p=>{ if(p.name==='__OPEN__'||p.name==='__open__') return; (roles[p.title]=roles[p.title]||[]).push(p); });
-  h+=`${isAdmin?`<div style="display:flex;justify-content:flex-end;margin-bottom:10px"><button onclick="openRosterImport()" style="background:transparent;border:1px solid var(--line2,#d5dde0);border-radius:9px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;color:inherit"><i class="ti ti-upload"></i> Import from another scheduler</button><button onclick="openSkillsSetup()" style="margin-left:8px;background:transparent;border:1px solid var(--line2,#d5dde0);border-radius:9px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;color:inherit"><i class="ti ti-checkbox"></i> Set up who works where</button></div>`:''}`;
+  h+=`${isAdmin?`<div style="display:flex;justify-content:flex-end;margin-bottom:10px"><button onclick="openRosterImport()" style="background:transparent;border:1px solid var(--line2,#d5dde0);border-radius:9px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;color:inherit"><i class="ti ti-upload"></i> Import from another scheduler</button><button onclick="openConceptSetup()" style="margin-left:8px;background:transparent;border:1px solid var(--line2,#d5dde0);border-radius:9px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;color:inherit"><i class="ti ti-building-store"></i> Set up stations</button><button onclick="openSkillsSetup()" style="margin-left:8px;background:transparent;border:1px solid var(--line2,#d5dde0);border-radius:9px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;color:inherit"><i class="ti ti-checkbox"></i> Set up who works where</button></div>`:''}`;
 h+=`<div class="faint" style="font-size:13px;margin-bottom:14px">${team.length} people${isAdmin?' · positions are set in Onboarding':''}</div>`;
   if(!team.length) h+=`<div class="card" style="padding:24px;text-align:center"><div class="faint">No team yet. Add shifts in the Schedule tab, or share your join code so they sign in.</div></div>`;
   else Object.keys(roles).sort((a,b)=>{const ia=POS_ORDER.indexOf(a),ib=POS_ORDER.indexOf(b);return (ia<0?99:ia)-(ib<0?99:ib)||a.localeCompare(b);}).forEach(role=>{
@@ -3790,6 +3790,97 @@ window._ssToggle=function(name){
   _ssRender();
 };
 window._ssGo=function(step){ window._ssIdx=Math.max(0,window._ssIdx+step); _ssRender(); };
+
+
+/* ---------- Concept templates ----------
+   Stations are wildly different by concept: a coffee and bagel shop runs 6-8, a QSR
+   runs 20+, and a casual place with a bar has servers, bartenders and a kitchen
+   brigade that share almost nothing with either. Starting everyone from a blank list
+   (or from one restaurant's list) means every operator does the same tedious guessing.
+   These are starting points, not rules -- every station can be renamed, removed or
+   added to, because the words a team actually uses on the floor matter more than ours. */
+window.CONCEPTS=[
+  {id:'coffee', name:'Coffee / bakery cafe', blurb:'Counter service, espresso, baked goods',
+   stations:['Register','Espresso Bar','Bake','Roller','Prep','Expo','Dish'],
+   dayparts:['Open','Morning Rush','Midday','Close']},
+  {id:'qsr', name:'Quick service (QSR)', blurb:'Drive-thru, front counter, high volume',
+   stations:['Front Counter','Drive-Thru Order','Drive-Thru Window','Headset','Grill','Fries','Breading','Assembly','Expo','Bagger','Runner','Prep','Dining Room','Dish'],
+   dayparts:['Breakfast','Lunch','Dinner','Late Night']},
+  {id:'fastcasual', name:'Fast casual', blurb:'Order at counter, made-to-order line',
+   stations:['Register','Make Line','Grill','Prep','Expo','Dining Room','Dish'],
+   dayparts:['Open','Lunch','Dinner','Close']},
+  {id:'casual', name:'Casual dining with bar', blurb:'Servers, full bar, table service',
+   stations:['Host','Server','Bartender','Barback','Busser','Food Runner','Line Cook','Prep Cook','Expo','Dish'],
+   dayparts:['Lunch','Happy Hour','Dinner','Late']},
+  {id:'finedining', name:'Fine dining', blurb:'Full service, brigade kitchen',
+   stations:['Host','Server','Sommelier','Bartender','Busser','Runner','Garde Manger','Saute','Grill','Pastry','Expo','Dish'],
+   dayparts:['Prep','Dinner','Close']},
+  {id:'pizza', name:'Pizza', blurb:'Dough, oven, delivery or carry-out',
+   stations:['Register','Phones','Dough','Make Line','Oven','Cut & Box','Delivery','Prep','Dish'],
+   dayparts:['Open','Lunch','Dinner','Close']},
+  {id:'bar', name:'Bar / pub', blurb:'Drinks led, kitchen support',
+   stations:['Bartender','Barback','Server','Host','Kitchen','Dish'],
+   dayparts:['Open','Happy Hour','Evening','Late']},
+  {id:'truck', name:'Food truck / small counter', blurb:'Small team, tight space',
+   stations:['Window','Grill','Prep','Expo'],
+   dayparts:['Prep','Service','Close']}
+];
+window.openConceptSetup=function(){
+  var w=document.createElement('div'); w.id='cxModal';
+  w.style.cssText='position:fixed;inset:0;z-index:10060;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:18px';
+  w.innerHTML='<div id="cxCard" style="background:var(--card,#fff);color:var(--ink,#111);border-radius:16px;max-width:600px;width:100%;max-height:88vh;overflow:auto;padding:22px 24px;box-shadow:0 20px 60px rgba(0,0,0,.3)"></div>';
+  document.body.appendChild(w); _cxPick();
+};
+window._cxPick=function(){
+  var c=document.getElementById('cxCard'); if(!c) return;
+  var h='<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">'
+    +'<div><div style="font-weight:800;font-size:20px">What kind of restaurant is this?</div>'
+    +'<div class="muted" style="font-size:13px;margin-top:4px">Pick the closest one. It just fills in a starting set of stations — you can rename or remove any of them next.</div></div>'
+    +'<button onclick="var m=document.getElementById(\'cxModal\');if(m)m.remove()" style="border:none;background:transparent;font-size:22px;cursor:pointer;line-height:1;color:inherit">&times;</button></div>';
+  h+='<div style="display:grid;gap:9px;margin-top:16px">'
+    + CONCEPTS.map(function(k,i){ return '<button onclick="_cxChoose('+i+')" style="text-align:left;background:transparent;border:1.5px solid var(--line2,#d5dde0);border-radius:11px;padding:13px 15px;cursor:pointer;color:inherit">'
+        +'<div style="font-weight:700;font-size:15px">'+esc(k.name)+'</div>'
+        +'<div class="muted" style="font-size:12.5px;margin-top:2px">'+esc(k.blurb)+' · '+k.stations.length+' stations</div></button>'; }).join('')
+    +'</div>';
+  c.innerHTML=h;
+};
+window._cxChoose=function(i){
+  var k=CONCEPTS[i]; window._cxSel=JSON.parse(JSON.stringify(k));
+  _cxEdit();
+};
+window._cxEdit=function(){
+  var k=window._cxSel, c=document.getElementById('cxCard'); if(!c) return;
+  var h='<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">'
+    +'<div><div style="font-weight:800;font-size:20px">Make these your own</div>'
+    +'<div class="muted" style="font-size:13px;margin-top:4px">Use the words your team actually says on the floor. Remove anything you do not run.</div></div>'
+    +'<button onclick="var m=document.getElementById(\'cxModal\');if(m)m.remove()" style="border:none;background:transparent;font-size:22px;cursor:pointer;line-height:1;color:inherit">&times;</button></div>';
+  h+='<div style="margin-top:16px;display:flex;flex-direction:column;gap:7px">'
+    + k.stations.map(function(st,j){ return '<div style="display:flex;gap:8px;align-items:center">'
+        +'<input value="'+esc(st)+'" oninput="_cxSet('+j+',this.value)" style="flex:1;padding:9px 12px;border:1px solid var(--line2,#d5dde0);border-radius:9px;font-size:13.5px;background:transparent;color:inherit">'
+        +'<button onclick="_cxDel('+j+')" title="Remove" style="border:none;background:transparent;font-size:19px;cursor:pointer;color:var(--muted,#6b8087);line-height:1">&times;</button></div>'; }).join('')
+    +'</div>';
+  h+='<button onclick="_cxAdd()" style="margin-top:10px;background:transparent;border:1px dashed var(--line2,#d5dde0);border-radius:9px;padding:9px 14px;font-size:13px;cursor:pointer;color:inherit">+ Add a station</button>';
+  h+='<div style="display:flex;gap:9px;margin-top:18px;align-items:center">'
+    +'<button onclick="_cxSave()" id="cxGo" style="background:var(--brand,#4a9cad);color:#fff;border:none;border-radius:9px;padding:11px 20px;font-weight:700;cursor:pointer">Save '+k.stations.length+' stations</button>'
+    +'<button onclick="_cxPick()" style="background:transparent;border:1px solid var(--line2,#d5dde0);border-radius:9px;padding:11px 16px;cursor:pointer;color:inherit">Back</button>'
+    +'<span id="cxMsg" class="muted" style="font-size:12.5px"></span></div>';
+  c.innerHTML=h;
+};
+window._cxSet=function(j,v){ window._cxSel.stations[j]=v; };
+window._cxDel=function(j){ window._cxSel.stations.splice(j,1); _cxEdit(); };
+window._cxAdd=function(){ window._cxSel.stations.push(''); _cxEdit(); };
+window._cxSave=async function(){
+  var list=window._cxSel.stations.map(function(x){ return String(x||'').trim(); }).filter(Boolean);
+  var seen={}, out=[]; list.forEach(function(x){ var k=x.toLowerCase(); if(!seen[k]){ seen[k]=1; out.push(x); } });
+  var msg=document.getElementById('cxMsg'), go=document.getElementById('cxGo');
+  if(!out.length){ if(msg){ msg.style.color='#B32D2D'; msg.textContent='Add at least one station.'; } return; }
+  if(go){ go.disabled=true; go.textContent='Saving…'; }
+  var r=await window._replaceKind('stations',{kind:'stations',title:'stations',on_date:null,detail:JSON.stringify(out),created_by:state.user.id});
+  if(!r.ok){ if(msg){ msg.style.color='#B32D2D'; msg.textContent=window._replaceMsg(r); } if(go){ go.disabled=false; go.textContent='Try again'; } return; }
+  state.settings.stations=out;
+  var m=document.getElementById('cxModal'); if(m) m.remove();
+  if(confirm('Stations saved.\n\nSet who can work each one now? It is one screen per station — tap the people who can work it.')) openSkillsSetup();
+};
 
 async function teamRoster(v){
   v.innerHTML='<div class="muted">Loading…</div>';
