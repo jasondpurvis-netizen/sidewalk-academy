@@ -2837,7 +2837,8 @@ async function schTeam(v){
     v.innerHTML=h; return;
   }
   const roles={}; team.forEach(p=>{ if(p.name==='__OPEN__'||p.name==='__open__') return; (roles[p.title]=roles[p.title]||[]).push(p); });
-  h+=`<div class="faint" style="font-size:13px;margin-bottom:14px">${team.length} people${isAdmin?' · positions are set in Onboarding':''}</div>`;
+  h+=`${isAdmin?`<div style="display:flex;justify-content:flex-end;margin-bottom:10px"><button onclick="openRosterImport()" style="background:transparent;border:1px solid var(--line2,#d5dde0);border-radius:9px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;color:inherit"><i class="ti ti-upload"></i> Import from another scheduler</button></div>`:''}`;
+h+=`<div class="faint" style="font-size:13px;margin-bottom:14px">${team.length} people${isAdmin?' · positions are set in Onboarding':''}</div>`;
   if(!team.length) h+=`<div class="card" style="padding:24px;text-align:center"><div class="faint">No team yet. Add shifts in the Schedule tab, or share your join code so they sign in.</div></div>`;
   else Object.keys(roles).sort((a,b)=>{const ia=POS_ORDER.indexOf(a),ib=POS_ORDER.indexOf(b);return (ia<0?99:ia)-(ib<0?99:ib)||a.localeCompare(b);}).forEach(role=>{
     const _bc=POS_COL[role]||'#94A3B8';
