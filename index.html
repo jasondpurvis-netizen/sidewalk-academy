@@ -4038,7 +4038,7 @@ async function vBrain(v){
     {k:'leaders',  done: leaders.length>0,         label:'Leadership',      detail: leaders.length? leaders.length+' leader'+(leaders.length>1?'s':'') : 'Nobody assigned',
      why:'Every shift needs someone in charge. Auto-draft protects open and close first.', act:"go('team',{ttab:'roster'})", cta:'Set positions'},
     {k:'avail',    done: people.length? withAvail.length===people.length : false, label:'Availability', detail: people.length? withAvail.length+' of '+people.length+' people' : 'No team yet',
-     why:'Auto-draft will schedule people when they cannot work until it knows their hours.', act:"go('schedule',{stab:'availability'})", cta:'Set availability'},
+     why:'Auto-draft will schedule people when they cannot work until it knows their hours.', act:'openAvailSetup()', cta:'Set availability'},
     {k:'pay',      done: people.length? withPay.length===people.length : false, label:'Pay rates', detail: people.length? withPay.length+' of '+people.length+' people' : 'No team yet',
      why:'Needed for labour cost and your labour target. Scheduling still works without it.', act:"go('schedule',{stab:'team'})", cta:'Set pay', soft:true}
   ];
@@ -4082,6 +4082,71 @@ async function vBrain(v){
   }
   v.innerHTML = h;
 }
+
+
+/* ---------- Availability, asked by day instead of by person ----------
+   No POS holds availability -- a POS records what happened, not what someone can do --
+   and 7shifts has no availability export either, so this has to be entered by hand.
+   That makes the shape of the asking the whole job. Per person it is 14 people x 7 days
+   = 98 decisions across 14 forms. Per day it is 7 screens: everyone starts available,
+   and you tap the few who cannot work. Most people can work most days, so the taps are
+   few. Worked history is deliberately NOT used to prefill: someone free every Sunday who
+   has never been scheduled on one would be marked unavailable, and a confident wrong
+   answer is worse than an empty one. */
+window.WDAYS=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+window.openAvailSetup=async function(){
+  const people=rosterNames().filter(n=>!isArchived(n)&&posOf(n)!=='Owner').sort();
+  if(!people.length){ alert('Add your team first — there is nobody to set availability for.'); return; }
+  const r=await sb.from('availability').select('*');
+  window._avail={}; (r.data||[]).forEach(row=>{ (window._avail[row.person_name]=window._avail[row.person_name]||{})[row.weekday]=row; });
+  window._asPeople=people; window._asDay=0;
+  let w=document.getElementById('asModal'); if(w) w.remove();
+  w=document.createElement('div'); w.id='asModal';
+  w.style.cssText='position:fixed;inset:0;z-index:10060;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:18px';
+  w.innerHTML='<div id="asCard" style="background:var(--card,#fff);color:var(--ink,#111);border-radius:16px;max-width:580px;width:100%;max-height:88vh;overflow:auto;padding:22px 24px;box-shadow:0 20px 60px rgba(0,0,0,.3)"></div>';
+  document.body.appendChild(w); _asRender();
+};
+window._asRender=function(){
+  const c=document.getElementById('asCard'); if(!c) return;
+  const i=window._asDay, people=window._asPeople;
+  if(i>=7){
+    const done=people.filter(n=>Object.keys((window._avail||{})[n]||{}).length>0).length;
+    c.innerHTML='<div style="text-align:center;padding:14px 4px">'
+      +'<div style="font-size:34px;line-height:1">✓</div>'
+      +'<div style="font-weight:800;font-size:19px;margin-top:8px">Availability is set</div>'
+      +'<div class="muted" style="font-size:13.5px;margin-top:6px;line-height:1.6">'+done+' of '+people.length+' people now have a weekly pattern. Auto-draft will stop scheduling anyone on a day they cannot work.</div>'
+      +'<button onclick="var m=document.getElementById(\'asModal\');if(m)m.remove(); try{go(\'brain\');}catch(e){}" style="margin-top:16px;background:var(--brand,#4a9cad);color:#fff;border:none;border-radius:9px;padding:11px 20px;font-weight:700;cursor:pointer">Back to the Brain</button></div>';
+    return;
+  }
+  const wd=i, dayName=WDAYS[i];
+  const off=people.filter(n=>{ const row=((window._avail||{})[n]||{})[wd]; return row && row.can_work===false; });
+  let h='<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">'
+    +'<div><div class="muted" style="font-size:11.5px;letter-spacing:.09em;text-transform:uppercase">Day '+(i+1)+' of 7</div>'
+    +'<div style="font-weight:800;font-size:21px;margin-top:3px">Who <u>cannot</u> work '+esc(dayName)+'?</div>'
+    +'<div class="muted" style="font-size:13px;margin-top:3px">Everyone is available unless you tap them. Most weeks that is only a couple of people.</div></div>'
+    +'<button onclick="var m=document.getElementById(\'asModal\');if(m)m.remove()" style="border:none;background:transparent;font-size:22px;cursor:pointer;line-height:1;color:inherit">&times;</button></div>';
+  h+='<div style="height:5px;background:var(--bg,#eef3f4);border-radius:99px;margin:14px 0 4px"><div style="height:5px;width:'+Math.round(i/7*100)+'%;background:var(--brand,#4a9cad);border-radius:99px;transition:width .2s"></div></div>';
+  h+='<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:14px">'
+    + people.map(function(n){
+        const row=((window._avail||{})[n]||{})[wd];
+        const cannot = row && row.can_work===false;
+        return '<button onclick="_asToggle('+JSON.stringify(n).replace(/"/g,'&quot;')+')" style="border:1.5px solid '+(cannot?'#A8401C':'var(--line2,#d5dde0)')+';background:'+(cannot?'#F7E1DA':'transparent')+';color:'+(cannot?'#A8401C':'inherit')+';border-radius:999px;padding:9px 15px;font-size:13.5px;font-weight:600;cursor:pointer">'+esc(dispName(n))+(cannot?' &times;':'')+'</button>';
+      }).join('')
+    +'</div>';
+  h+='<div class="muted" style="font-size:12.5px;margin-top:12px">'+(off.length? off.length+' cannot work '+esc(dayName) : 'Everyone can work '+esc(dayName))+'</div>';
+  h+='<div style="display:flex;gap:9px;margin-top:18px;align-items:center">'
+    +(i>0?'<button onclick="_asGo(-1)" style="background:transparent;border:1px solid var(--line2,#d5dde0);border-radius:9px;padding:11px 16px;cursor:pointer;color:inherit">Back</button>':'')
+    +'<button onclick="_asGo(1)" style="background:var(--brand,#4a9cad);color:#fff;border:none;border-radius:9px;padding:11px 20px;font-weight:700;cursor:pointer">'+(i===6?'Finish':'Next day')+'</button></div>';
+  c.innerHTML=h;
+};
+window._asToggle=async function(name){
+  const wd=window._asDay;
+  const row=((window._avail||{})[name]||{})[wd];
+  const cannotNow = !(row && row.can_work===false);   // tapping marks them unavailable
+  await _avUpsert(name, wd, {can_work: !cannotNow, note:null});
+  _asRender();
+};
+window._asGo=function(step){ window._asDay=Math.max(0,window._asDay+step); _asRender(); };
 
 async function teamRoster(v){
   v.innerHTML='<div class="muted">Loading…</div>';
