@@ -2313,10 +2313,13 @@ async function schBoard(v){
      Green: a leader opens and a leader closes. Amber: covered, but one of those ends is
      bare. Red: nobody scheduled, or no leader on the day at all. */
   const LEAD_POS = ['Owner','GM','Manager','Supervisor'];
-  const _isLead = n => LEAD_POS.indexOf(posOf(n)) >= 0;
+  /* Archived people still hold their old position, so without this check someone who quit
+     still counted as leadership cover and every day read "Covered". A verdict is about
+     whether the shift will actually be run, and a leader who left will not be running it. */
+  const _isLead = n => !isArchived(n) && LEAD_POS.indexOf(posOf(n)) >= 0;
   const _mins = t => { const m=/^(\d{1,2}):(\d{2})/.exec(t||''); return m ? (+m[1])*60 + (+m[2]) : null; };
   const dayVerdict = isoDays.map(function(iso){
-    const list = (rsh.data||[]).filter(s => s.on_date===iso && s.start_time && s.end_time);
+    const list = (rsh.data||[]).filter(s => s.on_date===iso && s.start_time && s.end_time && !isArchived(s.person_name) && s.person_name!=='__OPEN__' && s.person_name!=='__open__');
     if(!list.length) return {level:'none', label:'Nobody on', why:'No shifts scheduled for this day.'};
     const starts = list.map(s=>_mins(s.start_time)).filter(v=>v!==null);
     const ends   = list.map(s=>_mins(s.end_time)).filter(v=>v!==null);
