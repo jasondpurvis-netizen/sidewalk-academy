@@ -3467,6 +3467,173 @@ function _saveProfileNow(name){ clearTimeout(window._roleSaveTmr[name]); window.
 window.toggleRole=function(name,station,checked){ const d=window._profiles[name]||(window._profiles[name]={}); const roles=Array.isArray(d.roles)?d.roles:(d.roles=[]); const i=roles.indexOf(station); if(checked&&i<0) roles.push(station); if(!checked&&i>=0) roles.splice(i,1); _saveProfileNow(name); const c=document.querySelector('#teambody'); };
 window.cycleLevel=function(name,station,btn){ const d=window._profiles[name]||(window._profiles[name]={}); const sl=(d.skillLevels&&typeof d.skillLevels==='object')?d.skillLevels:(d.skillLevels={}); const roles=Array.isArray(d.roles)?d.roles:(d.roles=[]); let cur=(station in sl)?(+sl[station]||0):(roles.indexOf(station)>=0?2:0); const nx=(cur+1)%4; if(nx===0) delete sl[station]; else sl[station]=nx; const i=roles.indexOf(station); if(nx>=1&&i<0) roles.push(station); if(nx===0&&i>=0) roles.splice(i,1); _saveProfileNow(name); if(btn){ const LV=[['—','var(--muted)','var(--card)'],['L','#fff','#B7791F'],['S','#fff','var(--brand)'],['E','#fff','#1B7B3F']]; btn.textContent=LV[nx][0]; btn.style.color=LV[nx][1]; btn.style.background=LV[nx][2]; } };
 window.toggleCap=function(name,cap,checked){ const d=window._profiles[name]||(window._profiles[name]={}); const caps=(d.caps&&typeof d.caps==='object')?d.caps:(d.caps={}); caps[cap]=!!checked; _saveProfileNow(name); };
+
+/* ---------- Import a roster from another scheduler (CSV) ----------
+   Typing in 100+ people is the reason nobody finishes setup. Every scheduling tool
+   (7shifts, HotSchedules, When I Work) exports employees to CSV, so we read that
+   instead. Column names differ per vendor, so headers are matched loosely.
+   Two things worth noting:
+     - Exports include everyone who ever worked there. A 632-row file was 518 former
+       staff. We default to active only and say so plainly.
+     - The vendor's "Role" column (Baker, Coffee, BOH) is a STATION, not a rank. It
+       gets stored as a skill, which pre-fills part of the scheduling brain. */
+window._impPick=function(h){
+  h=(h||'').toLowerCase().replace(/[^a-z]/g,'');
+  return function(cands){ return cands.some(function(c){ return h===c || h.indexOf(c)>=0; }); };
+};
+window._impMap=function(headers){
+  var m={};
+  headers.forEach(function(h,i){
+    var t=(h||'').toLowerCase().replace(/[^a-z]/g,'');
+    if(m.first==null && (t==='firstname'||t==='first'||t==='givenname')) m.first=i;
+    else if(m.last==null && (t==='lastname'||t==='last'||t==='surname'||t==='familyname')) m.last=i;
+    else if(m.full==null && (t==='name'||t==='employeename'||t==='fullname')) m.full=i;
+    else if(m.role==null && (t==='role'||t==='position'||t==='job'||t==='jobtitle')) m.role=i;
+    else if(m.wage==null && (t==='wage'||t==='payrate'||t==='rate'||t==='hourlyrate')) m.wage=i;
+    else if(m.status==null && (t==='userstatus'||t==='status'||t==='employmentstatus')) m.status=i;
+    else if(m.utype==null && (t==='usertype'||t==='accesslevel'||t==='permission')) m.utype=i;
+    else if(m.dept==null && (t==='department'||t==='dept')) m.dept=i;
+    else if(m.term==null && (t==='terminationdate'||t==='enddate'||t==='termdate')) m.term=i;
+  });
+  return m;
+};
+window._impRank=function(utype,dept,role){
+  /* Rank comes from the job title, not from the vendor's permission fields. A first
+     pass trusted "User type: Admin" and "Department: Manager" and produced 53 managers
+     out of 114 -- those columns describe app access, not who runs the shift. The Role
+     column is the only one that reliably names the job. Anything unrecognised lands as
+     Team Member, which is the safe default: under-promoting is easy to correct in the
+     roster, over-promoting hands out permissions nobody asked for. */
+  var r=(role||'').toLowerCase().trim(), u=(utype||'').toLowerCase();
+  if(r){
+    if(r.indexOf('owner')>=0) return 'Owner';
+    if(r.indexOf('gm')>=0||r.indexOf('general manager')>=0||r.indexOf('manager')>=0) return 'Manager';
+    if(r.indexOf('supervisor')>=0||r.indexOf('leader')>=0||r.indexOf('lead')>=0) return 'Supervisor';
+    if(r.indexOf('trainer')>=0||r.indexOf('ojr')>=0) return 'Trainer';
+    return 'Team Member';
+  }
+  if(u.indexOf('owner')>=0) return 'Owner';
+  return 'Team Member';
+};
+window._impParse=function(text){
+  var rows=_csvParse(text);
+  if(!rows.length) return {error:'That file looks empty.'};
+  var headers=rows[0], m=_impMap(headers);
+  if(m.first==null && m.full==null) return {error:'I could not find a name column. Expected something like "First name" or "Name".'};
+  var out=[], skippedNoName=0, inactive=0;
+  for(var i=1;i<rows.length;i++){
+    var r=rows[i];
+    var nm = (m.full!=null? (r[m.full]||'') : ((r[m.first]||'')+' '+(r[m.last]||''))).trim().replace(/\s+/g,' ');
+    if(!nm){ skippedNoName++; continue; }
+    var st=(m.status!=null?(r[m.status]||''):'').trim().toLowerCase();
+    var termed = m.term!=null && (r[m.term]||'').trim()!=='';
+    var active = st ? (st.indexOf('active')===0) : !termed;
+    if(!active){ inactive++; continue; }
+    var wage=parseFloat(String(m.wage!=null?(r[m.wage]||''):'').replace(/[^0-9.]/g,''));
+    out.push({
+      name:nm,
+      station:(m.role!=null?(r[m.role]||''):'').trim(),
+      rank:_impRank(m.utype!=null?r[m.utype]:'', m.dept!=null?r[m.dept]:'', m.role!=null?r[m.role]:''),
+      wage:isFinite(wage)&&wage>0?wage:null
+    });
+  }
+  return {people:out, inactive:inactive, skippedNoName:skippedNoName, total:rows.length-1};
+};
+
+
+window.openRosterImport=function(){
+  var w=document.createElement('div'); w.id='impModal';
+  w.style.cssText='position:fixed;inset:0;z-index:10060;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:18px';
+  w.innerHTML='<div style="background:var(--card,#fff);color:var(--ink,#111);border-radius:16px;max-width:620px;width:100%;max-height:88vh;overflow:auto;padding:22px 24px;box-shadow:0 20px 60px rgba(0,0,0,.3)">'
+    +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">'
+    +'<div><div style="font-weight:800;font-size:18px">Bring your team over</div>'
+    +'<div class="muted" style="font-size:13px;margin-top:3px">Export your staff list from your current scheduler and drop the file here. Nothing is typed by hand.</div></div>'
+    +'<button onclick="var m=document.getElementById(\'impModal\');if(m)m.remove()" style="border:none;background:transparent;font-size:22px;cursor:pointer;line-height:1;color:inherit">&times;</button></div>'
+    +'<div id="impDrop" style="margin-top:16px;border:2px dashed var(--line2,#d5dde0);border-radius:12px;padding:26px;text-align:center;cursor:pointer">'
+    +'<div style="font-weight:700;font-size:14.5px">Choose your CSV file</div>'
+    +'<div class="muted" style="font-size:12.5px;margin-top:4px">or drag it here</div>'
+    +'<input id="impFile" type="file" accept=".csv,text/csv" style="display:none"></div>'
+    +'<div id="impBody" style="margin-top:16px"></div></div>';
+  document.body.appendChild(w);
+  var drop=document.getElementById('impDrop'), inp=document.getElementById('impFile');
+  drop.onclick=function(){ inp.click(); };
+  inp.onchange=function(){ if(inp.files&&inp.files[0]) _impRead(inp.files[0]); };
+  drop.ondragover=function(e){ e.preventDefault(); drop.style.borderColor='var(--brand,#4a9cad)'; };
+  drop.ondragleave=function(){ drop.style.borderColor='var(--line2,#d5dde0)'; };
+  drop.ondrop=function(e){ e.preventDefault(); drop.style.borderColor='var(--line2,#d5dde0)'; var f=e.dataTransfer.files&&e.dataTransfer.files[0]; if(f) _impRead(f); };
+};
+window._impRead=function(file){
+  var body=document.getElementById('impBody');
+  body.innerHTML='<div class="muted">Reading '+esc(file.name)+'…</div>';
+  var fr=new FileReader();
+  fr.onload=function(){
+    var res=_impParse(String(fr.result||''));
+    if(res.error){ body.innerHTML='<div style="color:#B32D2D;font-size:13.5px">'+esc(res.error)+'</div>'; return; }
+    window._impPending=res.people;
+    var known={}; try{ rosterNames().forEach(function(n){ known[n.toLowerCase()]=1; }); }catch(e){}
+    var fresh=res.people.filter(function(p){ return !known[p.name.toLowerCase()]; });
+    window._impFresh=fresh;
+    var stations={}; res.people.forEach(function(p){ if(p.station) stations[p.station]=(stations[p.station]||0)+1; });
+    var stationList=Object.keys(stations).sort(function(a,b){return stations[b]-stations[a];});
+    var h='<div style="background:var(--bg,#f4f7f8);border-radius:11px;padding:14px 16px">'
+      +'<div style="font-weight:800;font-size:15px">'+fresh.length+' people ready to import</div>'
+      +'<div class="muted" style="font-size:12.5px;margin-top:5px;line-height:1.6">'
+      +'Your file had '+res.total+' rows. '
+      +(res.inactive? ('<b>'+res.inactive+'</b> are former staff and were left out. ') : '')
+      +((res.people.length-fresh.length)? ('<b>'+(res.people.length-fresh.length)+'</b> are already on your roster and will be skipped. ') : '')
+      +'</div></div>';
+    if(stationList.length){
+      h+='<div style="margin-top:14px"><div style="font-weight:700;font-size:13.5px;margin-bottom:6px">Stations found</div>'
+        +'<div style="display:flex;flex-wrap:wrap;gap:6px">'
+        + stationList.map(function(k){ return '<span style="background:var(--bg,#eef3f4);border-radius:999px;padding:4px 10px;font-size:12px">'+esc(k)+' &middot; '+stations[k]+'</span>'; }).join('')
+        +'</div><div class="muted" style="font-size:12px;margin-top:6px">These become skills on each person, so the schedule builder already knows who can work where.</div></div>';
+    }
+    if(fresh.length){
+      h+='<div style="margin-top:14px;max-height:210px;overflow:auto;border:1px solid var(--line2,#e2e9ea);border-radius:10px">'
+        +'<table style="width:100%;border-collapse:collapse;font-size:13px">'
+        + fresh.slice(0,80).map(function(p){ return '<tr><td style="padding:7px 11px;border-bottom:1px solid var(--line,#eef2f3)">'+esc(p.name)+'</td>'
+            +'<td style="padding:7px 11px;border-bottom:1px solid var(--line,#eef2f3)" class="muted">'+esc(p.rank)+'</td>'
+            +'<td style="padding:7px 11px;border-bottom:1px solid var(--line,#eef2f3)" class="muted">'+esc(p.station||'')+'</td>'
+            +'<td style="padding:7px 11px;border-bottom:1px solid var(--line,#eef2f3);text-align:right" class="muted">'+(p.wage?('$'+p.wage.toFixed(2)):'')+'</td></tr>'; }).join('')
+        +'</table></div>';
+      if(fresh.length>80) h+='<div class="muted" style="font-size:12px;margin-top:6px">Showing the first 80 of '+fresh.length+'.</div>';
+      h+='<div style="display:flex;gap:9px;margin-top:16px;align-items:center">'
+        +'<button class="btn" onclick="_impCommit()" id="impGo" style="background:var(--brand,#4a9cad);color:#fff;border:none;border-radius:9px;padding:11px 18px;font-weight:700;cursor:pointer">Import '+fresh.length+' people</button>'
+        +'<button onclick="var m=document.getElementById(\'impModal\');if(m)m.remove()" style="background:transparent;border:1px solid var(--line2,#d5dde0);border-radius:9px;padding:11px 16px;cursor:pointer;color:inherit">Cancel</button>'
+        +'<span id="impMsg" class="muted" style="font-size:12.5px"></span></div>';
+    } else {
+      h+='<div class="muted" style="margin-top:14px;font-size:13.5px">Everyone in this file is already on your roster. Nothing to import.</div>';
+    }
+    body.innerHTML=h;
+  };
+  fr.onerror=function(){ body.innerHTML='<div style="color:#B32D2D">Could not read that file.</div>'; };
+  fr.readAsText(file);
+};
+window._impCommit=async function(){
+  var list=window._impFresh||[]; if(!list.length) return;
+  var go=document.getElementById('impGo'), msg=document.getElementById('impMsg');
+  if(go){ go.disabled=true; go.textContent='Importing…'; }
+  var uid=state.user.id;
+  var posRows=list.map(function(p){ return {kind:'pos',title:p.name,detail:p.rank,on_date:null,created_by:uid}; });
+  var ins=await sb.from('day_items').insert(posRows);
+  if(ins.error){ if(msg){ msg.style.color='#B32D2D'; msg.textContent='Nothing was imported: '+ins.error.message; } if(go){go.disabled=false;go.textContent='Try again';} return; }
+  // Stations become skills, so the scheduling brain starts with real data instead of blanks.
+  var withStation=list.filter(function(p){ return p.station; });
+  if(withStation.length){
+    var profRows=withStation.map(function(p){ return {kind:'profile',title:p.name,on_date:null,detail:JSON.stringify({roles:[p.station]}),created_by:uid}; });
+    var pr=await sb.from('day_items').insert(profRows);
+    if(pr.error && msg){ msg.style.color='#7A6224'; msg.textContent='People imported, but stations did not save: '+pr.error.message; }
+  }
+  var withWage=list.filter(function(p){ return p.wage; });
+  if(withWage.length){
+    var wr=await sb.from('pay_rates').upsert(withWage.map(function(p){ return {person_name:p.name, wage:p.wage, updated_at:new Date().toISOString()}; }));
+    if(wr.error && msg){ msg.style.color='#7A6224'; msg.textContent='People imported, but pay rates did not save: '+wr.error.message; }
+  }
+  var m=document.getElementById('impModal'); if(m) m.remove();
+  try{ await loadPositions(); await loadProfiles(); }catch(e){}
+  try{ go('team',{ttab:'roster'}); }catch(e){ location.reload(); }
+};
+
 async function teamRoster(v){
   v.innerHTML='<div class="muted">Loading…</div>';
   const [rpf,rsh]=await Promise.all([ sb.from('profiles').select('id,name,role'), sb.from('shifts').select('person_name') ]);
@@ -3475,7 +3642,7 @@ async function teamRoster(v){
   const roster=[...set].filter(n=>n&&!isArchived(n)&&n!=='__OPEN__'&&n!=='__open__');
   const groups={}; roster.forEach(n=>{ (groups[posOf(n)]=groups[posOf(n)]||[]).push(n); });
   const ordered=Object.keys(groups).sort((a,b)=>{const ia=POS_ORDER.indexOf(a),ib=POS_ORDER.indexOf(b);return (ia<0?99:ia)-(ib<0?99:ib)||a.localeCompare(b);});
-  let h=`<div class="faint" style="font-size:12.5px;margin-bottom:12px">Tap anyone to open their profile — position, birthday, hire date, contact, emergency contact and pay. Positions here flow to the schedule automatically.</div>`;
+  let h=`<div style="display:flex;justify-content:flex-end;margin-bottom:10px"><button onclick="openRosterImport()" style="background:transparent;border:1px solid var(--line2,#d5dde0);border-radius:9px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;color:inherit"><i class="ti ti-upload"></i> Import from another scheduler</button></div><div class="faint" style="font-size:12.5px;margin-bottom:12px">Tap anyone to open their profile — position, birthday, hire date, contact, emergency contact and pay. Positions here flow to the schedule automatically.</div>`;
   if(!roster.length) h+=`<div class="card" style="padding:24px;text-align:center"><div class="faint">No team yet. Add people in Onboarding.</div></div>`;
   ordered.forEach(pos=>{ const c=POS_COL[pos]||'#94A3B8'; h+=`<div class="band" style="background:${c}14;color:${c};border-left:4px solid ${c};margin:14px 0 0">${esc(pos)} <span style="opacity:.7;font-weight:500">· ${groups[pos].length}</span></div><div class="card" style="margin-top:0">`+groups[pos].slice().sort().map(n=>{ const p=profileOf(n); const inits=(n||'?').split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase(); const sub=p.mobile?esc(p.mobile):'Tap to view profile'; return `<div class="row" style="padding:11px 15px;border-bottom:1px solid var(--line);cursor:pointer" onclick='openProfile(${JSON.stringify(n)})'><span class="av">${esc(inits)}</span><div style="flex:1;min-width:0"><div style="font-weight:600;font-size:14px">${esc(n)}</div><div class="faint" style="font-size:12px">${sub}</div></div><i class="ti ti-chevron-right" style="color:var(--faint)"></i></div>`; }).join('')+`</div>`; });
   v.innerHTML=h;
