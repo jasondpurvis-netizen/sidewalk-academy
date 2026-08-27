@@ -4110,39 +4110,74 @@ window._asRender=function(){
     c.innerHTML='<div style="text-align:center;padding:14px 4px">'
       +'<div style="font-size:34px;line-height:1">✓</div>'
       +'<div style="font-weight:800;font-size:19px;margin-top:8px">Availability is set</div>'
-      +'<div class="muted" style="font-size:13.5px;margin-top:6px;line-height:1.6">'+done+' of '+people.length+' people now have a weekly pattern. Auto-draft will stop scheduling anyone on a day they cannot work.</div>'
+      +'<div class="muted" style="font-size:13.5px;margin-top:6px;line-height:1.6">'+done+' of '+people.length+' people now have a weekly pattern. Auto-draft will not put anyone on a day — or an hour — they cannot work.</div>'
       +'<button onclick="var m=document.getElementById(\'asModal\');if(m)m.remove(); try{go(\'brain\');}catch(e){}" style="margin-top:16px;background:var(--brand,#4a9cad);color:#fff;border:none;border-radius:9px;padding:11px 20px;font-weight:700;cursor:pointer">Back to the Brain</button></div>';
     return;
   }
   const wd=i, dayName=WDAYS[i];
-  const off=people.filter(n=>{ const row=((window._avail||{})[n]||{})[wd]; return row && row.can_work===false; });
+  /* Three states, because two is not enough. "Isabella can work Wednesdays but only
+     9 to 5 because of class" is the normal case, not the exception -- students, parents
+     and second jobs all look like this. A day-level yes/no throws that away and the
+     schedule silently offers her the open. */
+  const stateOf=function(n){
+    const row=((window._avail||{})[n]||{})[wd];
+    if(!row) return {k:'all'};
+    if(row.can_work===false) return {k:'off'};
+    const w=parseWin(row.note||'');
+    return w? {k:'part', from:w[0], to:w[1]} : {k:'all'};
+  };
+  const counts={all:0,part:0,off:0}; people.forEach(n=>counts[stateOf(n).k]++);
   let h='<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">'
     +'<div><div class="muted" style="font-size:11.5px;letter-spacing:.09em;text-transform:uppercase">Day '+(i+1)+' of 7</div>'
-    +'<div style="font-weight:800;font-size:21px;margin-top:3px">Who <u>cannot</u> work '+esc(dayName)+'?</div>'
-    +'<div class="muted" style="font-size:13px;margin-top:3px">Everyone is available unless you tap them. Most weeks that is only a couple of people.</div></div>'
+    +'<div style="font-weight:800;font-size:21px;margin-top:3px">'+esc(dayName)+'</div>'
+    +'<div class="muted" style="font-size:13px;margin-top:3px">Everyone can work all day unless you say otherwise. Tap a name to change it.</div></div>'
     +'<button onclick="var m=document.getElementById(\'asModal\');if(m)m.remove()" style="border:none;background:transparent;font-size:22px;cursor:pointer;line-height:1;color:inherit">&times;</button></div>';
   h+='<div style="height:5px;background:var(--bg,#eef3f4);border-radius:99px;margin:14px 0 4px"><div style="height:5px;width:'+Math.round(i/7*100)+'%;background:var(--brand,#4a9cad);border-radius:99px;transition:width .2s"></div></div>';
-  h+='<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:14px">'
+  h+='<div style="display:flex;flex-direction:column;gap:7px;margin-top:14px">'
     + people.map(function(n){
-        const row=((window._avail||{})[n]||{})[wd];
-        const cannot = row && row.can_work===false;
-        return '<button onclick="_asToggle('+JSON.stringify(n).replace(/"/g,'&quot;')+')" style="border:1.5px solid '+(cannot?'#A8401C':'var(--line2,#d5dde0)')+';background:'+(cannot?'#F7E1DA':'transparent')+';color:'+(cannot?'#A8401C':'inherit')+';border-radius:999px;padding:9px 15px;font-size:13.5px;font-weight:600;cursor:pointer">'+esc(dispName(n))+(cannot?' &times;':'')+'</button>';
+        const st=stateOf(n);
+        const tint = st.k==='off' ? {b:'#A8401C',bg:'#F7E1DA'} : st.k==='part' ? {b:'#7A5B1E',bg:'#F7EEDC'} : {b:'var(--line2,#d5dde0)',bg:'transparent'};
+        const nm=JSON.stringify(n).replace(/"/g,'&quot;');
+        return '<div style="display:flex;gap:9px;align-items:center;flex-wrap:wrap;border:1.5px solid '+tint.b+';background:'+tint.bg+';border-radius:11px;padding:9px 12px">'
+          +'<span style="flex:1;min-width:110px;font-size:13.5px;font-weight:600">'+esc(dispName(n))+'</span>'
+          +'<button onclick="_asSet('+nm+',\'all\')" style="border:none;border-radius:7px;padding:6px 11px;font-size:12px;font-weight:600;cursor:pointer;background:'+(st.k==='all'?'#2C6E4B':'rgba(0,0,0,.06)')+';color:'+(st.k==='all'?'#fff':'inherit')+'">All day</button>'
+          +'<button onclick="_asSet('+nm+',\'part\')" style="border:none;border-radius:7px;padding:6px 11px;font-size:12px;font-weight:600;cursor:pointer;background:'+(st.k==='part'?'#7A5B1E':'rgba(0,0,0,.06)')+';color:'+(st.k==='part'?'#fff':'inherit')+'">Some hours</button>'
+          +'<button onclick="_asSet('+nm+',\'off\')" style="border:none;border-radius:7px;padding:6px 11px;font-size:12px;font-weight:600;cursor:pointer;background:'+(st.k==='off'?'#A8401C':'rgba(0,0,0,.06)')+';color:'+(st.k==='off'?'#fff':'inherit')+'">Can\'t work</button>'
+          + (st.k==='part'
+              ? '<span style="display:flex;gap:5px;align-items:center;width:100%;margin-top:2px"><span class="muted" style="font-size:12px">from</span>'
+                +'<input type="time" value="'+esc(st.from||'')+'" onchange="_asWin('+nm+',this.value,null)" style="padding:6px 8px;border:1px solid var(--line2,#d5dde0);border-radius:7px;font-size:12.5px;background:var(--card,#fff);color:inherit">'
+                +'<span class="muted" style="font-size:12px">to</span>'
+                +'<input type="time" value="'+esc(st.to||'')+'" onchange="_asWin('+nm+',null,this.value)" style="padding:6px 8px;border:1px solid var(--line2,#d5dde0);border-radius:7px;font-size:12.5px;background:var(--card,#fff);color:inherit"></span>'
+              : '')
+          +'</div>';
       }).join('')
     +'</div>';
-  h+='<div class="muted" style="font-size:12.5px;margin-top:12px">'+(off.length? off.length+' cannot work '+esc(dayName) : 'Everyone can work '+esc(dayName))+'</div>';
+  h+='<div class="muted" style="font-size:12.5px;margin-top:12px">'+counts.all+' all day &middot; '+counts.part+' limited &middot; '+counts.off+' off</div>';
   h+='<div style="display:flex;gap:9px;margin-top:18px;align-items:center">'
     +(i>0?'<button onclick="_asGo(-1)" style="background:transparent;border:1px solid var(--line2,#d5dde0);border-radius:9px;padding:11px 16px;cursor:pointer;color:inherit">Back</button>':'')
     +'<button onclick="_asGo(1)" style="background:var(--brand,#4a9cad);color:#fff;border:none;border-radius:9px;padding:11px 20px;font-weight:700;cursor:pointer">'+(i===6?'Finish':'Next day')+'</button></div>';
   c.innerHTML=h;
 };
-window._asToggle=async function(name){
+window._asSet=async function(name,kind){
   const wd=window._asDay;
-  const row=((window._avail||{})[name]||{})[wd];
-  const cannotNow = !(row && row.can_work===false);   // tapping marks them unavailable
-  await _avUpsert(name, wd, {can_work: !cannotNow, note:null});
+  if(kind==='off') await _avUpsert(name,wd,{can_work:false,note:null});
+  else if(kind==='all') await _avUpsert(name,wd,{can_work:true,note:null});
+  else {
+    const row=((window._avail||{})[name]||{})[wd];
+    const w=parseWin((row&&row.note)||'') || ['09:00','17:00'];   // a sensible starting window they can adjust
+    await _avUpsert(name,wd,{can_work:true,note:w[0]+'-'+w[1]});
+  }
   _asRender();
 };
-window._asGo=function(step){ window._asDay=Math.max(0,window._asDay+step); _asRender(); };
+window._asWin=async function(name,from,to){
+  const wd=window._asDay;
+  const row=((window._avail||{})[name]||{})[wd];
+  const cur=parseWin((row&&row.note)||'') || ['09:00','17:00'];
+  const f=from||cur[0], t=to||cur[1];
+  if(f && t && t<=f){ alert('The end time needs to be after the start time.'); _asRender(); return; }
+  await _avUpsert(name,wd,{can_work:true,note:f+'-'+t});
+  _asRender();
+};
 
 async function teamRoster(v){
   v.innerHTML='<div class="muted">Loading…</div>';
