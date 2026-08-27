@@ -3499,6 +3499,7 @@ window._impMap=function(headers){
   });
   return m;
 };
+var RANKW={'Team Member':0,'Trainer':1,'Supervisor':2,'Manager':3,'Owner':4};
 window._impRank=function(utype,dept,role){
   /* Rank comes from the job title, not from the vendor's permission fields. A first
      pass trusted "User type: Admin" and "Department: Manager" and produced 53 managers
@@ -3540,13 +3541,27 @@ window._impParse=function(text){
       hire:(m.hire!=null?(r[m.hire]||''):'').trim()
     });
   }
-  /* Newest hires first. A staff list cannot tell us who still works here -- a real
-     7shifts export marked 114 people active when the restaurant had about 15, because
-     leavers are rarely marked inactive. Hire date is not proof either, but recent hires
-     are the likeliest to still be around, so putting them on top makes the picking
-     quicker. The owner decides; we just order the list helpfully. */
-  out.sort(function(a,b){ return (b.hire||'').localeCompare(a.hire||''); });
-  return {people:out, inactive:inactive, skippedNoName:skippedNoName, total:rows.length-1};
+  /* One row per person PER ROLE, not per person. A real 7shifts export had 114 active
+     rows that were only 16 people -- one of them held 16 roles. Listing someone 16 times
+     is obviously wrong, but the roles themselves are the useful part: they are exactly
+     the stations that person can work. So merge rows by name and keep every role as a
+     skill. That is most of the scheduling brain, imported for free. */
+  var byName={}, order=[];
+  out.forEach(function(p){
+    var k=p.name.toLowerCase();
+    if(!byName[k]){ byName[k]={name:p.name, stations:[], rank:p.rank, wage:p.wage, hire:p.hire, rows:0}; order.push(k); }
+    var g=byName[k]; g.rows++;
+    if(p.station && g.stations.indexOf(p.station)<0) g.stations.push(p.station);
+    if(RANKW[p.rank] > RANKW[g.rank]) g.rank=p.rank;      // keep the most senior title they hold
+    if(p.wage && (!g.wage || p.wage>g.wage)) g.wage=p.wage; // roles can carry different rates; keep the highest
+    if(p.hire && (!g.hire || p.hire<g.hire)) g.hire=p.hire; // earliest hire date is the real start
+  });
+  var merged=order.map(function(k){ var g=byName[k]; g.station=g.stations.join(', '); return g; });
+  /* Newest hires first. A staff list cannot tell us who still works here -- leavers are
+     rarely marked inactive. Hire date is not proof either, but recent hires are the
+     likeliest to still be around, so putting them on top makes the picking quicker. */
+  merged.sort(function(a,b){ return (b.hire||'').localeCompare(a.hire||''); });
+  return {people:merged, inactive:inactive, skippedNoName:skippedNoName, total:rows.length-1, rawRows:out.length};
 };
 
 
@@ -3587,7 +3602,7 @@ window._impRead=function(file){
     var h='<div style="background:var(--bg,#f4f7f8);border-radius:11px;padding:14px 16px">'
       +'<div style="font-weight:800;font-size:15px">'+fresh.length+' people ready to import</div>'
       +'<div class="muted" style="font-size:12.5px;margin-top:5px;line-height:1.6">'
-      +'Your file had '+res.total+' rows. '
+      +'Your file had '+res.total+' rows covering '+res.people.length+' people \u2014 most schedulers write one row per person per role. '
       +(res.inactive? ('<b>'+res.inactive+'</b> are former staff and were left out. ') : '')
       +((res.people.length-fresh.length)? ('<b>'+(res.people.length-fresh.length)+'</b> are already on your roster and will be skipped. ') : '')
       +'</div></div>';
@@ -3656,7 +3671,7 @@ window._impCommit=async function(){
   // Stations become skills, so the scheduling brain starts with real data instead of blanks.
   var withStation=list.filter(function(p){ return p.station; });
   if(withStation.length){
-    var profRows=withStation.map(function(p){ return {kind:'profile',title:p.name,on_date:null,detail:JSON.stringify({roles:[p.station]}),created_by:uid}; });
+    var profRows=withStation.map(function(p){ return {kind:'profile',title:p.name,on_date:null,detail:JSON.stringify({roles:(p.stations&&p.stations.length?p.stations:(p.station?[p.station]:[]))}),created_by:uid}; });
     var pr=await sb.from('day_items').insert(profRows);
     if(pr.error && msg){ msg.style.color='#7A6224'; msg.textContent='People imported, but stations did not save: '+pr.error.message; }
   }
