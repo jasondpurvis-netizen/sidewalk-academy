@@ -2845,7 +2845,7 @@ async function schTeam(v){
     v.innerHTML=h; return;
   }
   const roles={}; team.forEach(p=>{ if(p.name==='__OPEN__'||p.name==='__open__') return; (roles[p.title]=roles[p.title]||[]).push(p); });
-  h+=`${isAdmin?`<div style="display:flex;justify-content:flex-end;margin-bottom:10px"><button onclick="openRosterImport()" style="background:transparent;border:1px solid var(--line2,#d5dde0);border-radius:9px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;color:inherit"><i class="ti ti-upload"></i> Import from another scheduler</button></div>`:''}`;
+  h+=`${isAdmin?`<div style="display:flex;justify-content:flex-end;margin-bottom:10px"><button onclick="openRosterImport()" style="background:transparent;border:1px solid var(--line2,#d5dde0);border-radius:9px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;color:inherit"><i class="ti ti-upload"></i> Import from another scheduler</button><button onclick="openSkillsSetup()" style="margin-left:8px;background:transparent;border:1px solid var(--line2,#d5dde0);border-radius:9px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;color:inherit"><i class="ti ti-checkbox"></i> Set up who works where</button></div>`:''}`;
 h+=`<div class="faint" style="font-size:13px;margin-bottom:14px">${team.length} people${isAdmin?' · positions are set in Onboarding':''}</div>`;
   if(!team.length) h+=`<div class="card" style="padding:24px;text-align:center"><div class="faint">No team yet. Add shifts in the Schedule tab, or share your join code so they sign in.</div></div>`;
   else Object.keys(roles).sort((a,b)=>{const ia=POS_ORDER.indexOf(a),ib=POS_ORDER.indexOf(b);return (ia<0?99:ia)-(ib<0?99:ib)||a.localeCompare(b);}).forEach(role=>{
@@ -3717,6 +3717,79 @@ window._impCommit=async function(){
   try{ await loadPositions(); await loadProfiles(); }catch(e){}
   try{ go('team',{ttab:'roster'}); }catch(e){ location.reload(); }
 };
+
+
+/* ---------- Skills setup, asked by station instead of by person ----------
+   Setting skills person-by-person means opening 15 profiles and ticking 12 boxes in
+   each: 180 interactions across 15 screens, which is where setup gets abandoned.
+   Asked the other way round -- one station, tap everyone who can work it -- it is
+   12 screens and the same data. It also matches how an owner actually thinks: you
+   know who your closers are as a group, you don't recall it one person at a time. */
+window._skillStations=function(){
+  var list=[];
+  try{ if(Array.isArray(state.settings.stations)) list=state.settings.stations.slice(); }catch(e){}
+  // Stations imported onto people may not be in the configured list yet; include them.
+  try{ Object.keys(window._profiles||{}).forEach(function(n){
+    var r=(window._profiles[n]||{}).roles; if(Array.isArray(r)) r.forEach(function(st){ if(st && list.indexOf(st)<0) list.push(st); });
+  }); }catch(e){}
+  return list;
+};
+window._skillPeople=function(){
+  try{ return rosterNames().filter(function(n){ return !isArchived(n) && posOf(n)!=='Owner'; }).sort(); }catch(e){ return []; }
+};
+window.openSkillsSetup=function(){
+  window._ssStations=_skillStations(); window._ssIdx=0;
+  if(!window._ssStations.length){ alert('No stations set up yet. Add them under Settings first, or import a roster — station names come across with it.'); return; }
+  var w=document.createElement('div'); w.id='ssModal';
+  w.style.cssText='position:fixed;inset:0;z-index:10060;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:18px';
+  w.innerHTML='<div id="ssCard" style="background:var(--card,#fff);color:var(--ink,#111);border-radius:16px;max-width:560px;width:100%;max-height:88vh;overflow:auto;padding:22px 24px;box-shadow:0 20px 60px rgba(0,0,0,.3)"></div>';
+  document.body.appendChild(w);
+  _ssRender();
+};
+window._ssRender=function(){
+  var stations=window._ssStations, i=window._ssIdx, st=stations[i];
+  var people=_skillPeople();
+  var card=document.getElementById('ssCard'); if(!card) return;
+  if(i>=stations.length){
+    var counts=people.map(function(n){ return ((window._profiles[n]||{}).roles||[]).length; });
+    var trained=counts.filter(function(c){return c>0;}).length;
+    card.innerHTML='<div style="text-align:center;padding:14px 4px">'
+      +'<div style="font-size:34px;line-height:1">✓</div>'
+      +'<div style="font-weight:800;font-size:19px;margin-top:8px">Skills are set</div>'
+      +'<div class="muted" style="font-size:13.5px;margin-top:6px;line-height:1.6">'+trained+' of '+people.length+' people now have at least one station. The schedule builder will only put someone where they can actually work.</div>'
+      +'<button onclick="var m=document.getElementById(\'ssModal\');if(m)m.remove(); try{go(\'schedule\',{stab:\'team\'});}catch(e){}" style="margin-top:16px;background:var(--brand,#4a9cad);color:#fff;border:none;border-radius:9px;padding:11px 20px;font-weight:700;cursor:pointer">Done</button></div>';
+    return;
+  }
+  var can=people.filter(function(n){ return (((window._profiles[n]||{}).roles)||[]).indexOf(st)>=0; }).length;
+  var h='<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">'
+    +'<div><div class="muted" style="font-size:11.5px;letter-spacing:.09em;text-transform:uppercase">Station '+(i+1)+' of '+stations.length+'</div>'
+    +'<div style="font-weight:800;font-size:21px;margin-top:3px">Who can work '+esc(st)+'?</div>'
+    +'<div class="muted" style="font-size:13px;margin-top:3px">Tap everyone who can be scheduled here on their own.</div></div>'
+    +'<button onclick="var m=document.getElementById(\'ssModal\');if(m)m.remove()" style="border:none;background:transparent;font-size:22px;cursor:pointer;line-height:1;color:inherit">&times;</button></div>';
+  h+='<div style="height:5px;background:var(--bg,#eef3f4);border-radius:99px;margin:14px 0 4px"><div style="height:5px;width:'+Math.round(i/stations.length*100)+'%;background:var(--brand,#4a9cad);border-radius:99px;transition:width .2s"></div></div>';
+  h+='<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:14px">'
+    + people.map(function(n){
+        var on=(((window._profiles[n]||{}).roles)||[]).indexOf(st)>=0;
+        return '<button onclick="_ssToggle('+JSON.stringify(n).replace(/"/g,'&quot;')+')" data-ssname="'+esc(n)+'" style="border:1.5px solid '+(on?'var(--brand,#4a9cad)':'var(--line2,#d5dde0)')+';background:'+(on?'var(--brand,#4a9cad)':'transparent')+';color:'+(on?'#fff':'inherit')+';border-radius:999px;padding:9px 15px;font-size:13.5px;font-weight:600;cursor:pointer">'+esc(n)+'</button>';
+      }).join('')
+    +'</div>';
+  h+='<div class="muted" style="font-size:12.5px;margin-top:12px" id="ssCount">'+can+' selected</div>';
+  h+='<div style="display:flex;gap:9px;margin-top:18px;align-items:center">'
+    +(i>0?'<button onclick="_ssGo(-1)" style="background:transparent;border:1px solid var(--line2,#d5dde0);border-radius:9px;padding:11px 16px;cursor:pointer;color:inherit">Back</button>':'')
+    +'<button onclick="_ssGo(1)" style="background:var(--brand,#4a9cad);color:#fff;border:none;border-radius:9px;padding:11px 20px;font-weight:700;cursor:pointer">'+(i===stations.length-1?'Finish':'Next')+'</button>'
+    +'<button onclick="_ssGo(1)" style="background:transparent;border:none;color:var(--muted,#6b8087);font-size:13px;cursor:pointer">Skip</button></div>';
+  card.innerHTML=h;
+};
+window._ssToggle=function(name){
+  var st=window._ssStations[window._ssIdx];
+  var d=window._profiles[name]||(window._profiles[name]={});
+  var roles=Array.isArray(d.roles)?d.roles:(d.roles=[]);
+  var k=roles.indexOf(st);
+  if(k<0) roles.push(st); else roles.splice(k,1);
+  try{ _saveProfileNow(name); }catch(e){}
+  _ssRender();
+};
+window._ssGo=function(step){ window._ssIdx=Math.max(0,window._ssIdx+step); _ssRender(); };
 
 async function teamRoster(v){
   v.innerHTML='<div class="muted">Loading…</div>';
