@@ -4119,23 +4119,9 @@ async function vBrain(v){
    has never been scheduled on one would be marked unavailable, and a confident wrong
    answer is worse than an empty one. */
 window.WDAYS=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
-window.openAvailSetup=async function(){
-  const people=rosterNames().filter(n=>!isArchived(n)&&posOf(n)!=='Owner').sort();
-  if(!people.length){ alert('Add your team first — there is nobody to set availability for.'); return; }
-  const r=await sb.from('availability').select('*');
-  window._avail={}; (r.data||[]).forEach(row=>{ (window._avail[row.person_name]=window._avail[row.person_name]||{})[row.weekday]=row; });
-  window._asPeople=people; window._asDay=0;
-  let w=document.getElementById('asModal'); if(w) w.remove();
-  w=document.createElement('div'); w.id='asModal';
-  w.style.cssText='position:fixed;inset:0;z-index:10060;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:18px';
-  w.innerHTML='<div id="asCard" style="background:var(--card,#fff);color:var(--ink,#111);border-radius:16px;max-width:580px;width:100%;max-height:88vh;overflow:auto;padding:22px 24px;box-shadow:0 20px 60px rgba(0,0,0,.3)"></div>';
-  document.body.appendChild(w); _asRender();
-};
-
-/* A native <input type="time"> is a poor fit here: on desktop the minutes field needs
-   an exact keystroke and 2:15 is genuinely fiddly. Restaurant hours land on quarter
-   hours anyway, so offer those directly -- one tap, no typing, no wrong minute. */
 window._timeOpts=function(sel){
+  /* Restaurant hours land on quarter hours, and a native time field makes 2:15 needlessly
+     fiddly, so offer the quarter hours directly. */
   var out='';
   for(var m=4*60; m<=23*60+45; m+=15){
     var hh=Math.floor(m/60), mm=m%60;
@@ -4145,101 +4131,133 @@ window._timeOpts=function(sel){
   }
   return out;
 };
+window.openAvailSetup=async function(){
+  const people=rosterNames().filter(n=>!isArchived(n)&&posOf(n)!=='Owner').sort();
+  if(!people.length){ alert('Add your team first — there is nobody to set availability for.'); return; }
+  const r=await sb.from('availability').select('*');
+  window._avail={}; (r.data||[]).forEach(row=>{ (window._avail[row.person_name]=window._avail[row.person_name]||{})[row.weekday]=row; });
+  window._asPeople=people;
+  let w=document.getElementById('asModal'); if(w) w.remove();
+  w=document.createElement('div'); w.id='asModal';
+  w.style.cssText='position:fixed;inset:0;z-index:10060;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:14px';
+  w.innerHTML='<div id="asCard" style="background:var(--card,#fff);color:var(--ink,#111);border-radius:16px;max-width:920px;width:100%;max-height:92vh;overflow:auto;padding:20px 22px;box-shadow:0 20px 60px rgba(0,0,0,.3)"></div>';
+  document.body.appendChild(w); _asRender();
+};
+window._asState=function(n,wd){
+  const row=((window._avail||{})[n]||{})[wd];
+  if(!row) return {k:'all'};
+  if(row.can_work===false) return {k:'off'};
+  const w=parseWin(row.note||'');
+  return w? {k:'part', from:w[0], to:w[1]} : {k:'all'};
+};
 window._asRender=function(){
+  /* A grid, not a wizard. Walking one day at a time meant somebody who only works
+     weekends had to be switched off on five separate screens, and by the fourth you
+     could no longer see which day you were on. Everyone down the side, days across the
+     top, the whole week visible at once -- and a row of one-click patterns for the
+     shapes that actually recur: weekends only, weekdays only, off all week. */
   const c=document.getElementById('asCard'); if(!c) return;
-  const i=window._asDay, people=window._asPeople;
-  if(i>=7){
-    const done=people.filter(n=>Object.keys((window._avail||{})[n]||{}).length>0).length;
-    c.innerHTML='<div style="text-align:center;padding:14px 4px">'
-      +'<div style="font-size:34px;line-height:1">✓</div>'
-      +'<div style="font-weight:800;font-size:19px;margin-top:8px">Availability is set</div>'
-      +'<div class="muted" style="font-size:13.5px;margin-top:6px;line-height:1.6">'+done+' of '+people.length+' people now have a weekly pattern. Auto-draft will not put anyone on a day — or an hour — they cannot work.</div>'
-      +'<button onclick="var m=document.getElementById(\'asModal\');if(m)m.remove(); try{go(\'brain\');}catch(e){}" style="margin-top:16px;background:var(--brand,#4a9cad);color:#fff;border:none;border-radius:9px;padding:11px 20px;font-weight:700;cursor:pointer">Back to the Brain</button></div>';
-    return;
-  }
-  const wd=i, dayName=WDAYS[i];
-  /* Three states, because two is not enough. "Isabella can work Wednesdays but only
-     9 to 5 because of class" is the normal case, not the exception -- students, parents
-     and second jobs all look like this. A day-level yes/no throws that away and the
-     schedule silently offers her the open. */
-  const stateOf=function(n){
-    const row=((window._avail||{})[n]||{})[wd];
-    if(!row) return {k:'all'};
-    if(row.can_work===false) return {k:'off'};
-    const w=parseWin(row.note||'');
-    return w? {k:'part', from:w[0], to:w[1]} : {k:'all'};
+  const people=window._asPeople;
+  const SHORT=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const cell=function(n,wd){
+    const st=_asState(n,wd);
+    const tone = st.k==='off' ? {bg:'#F7E1DA',fg:'#A8401C',t:'Off'}
+              : st.k==='part' ? {bg:'#F7EEDC',fg:'#7A5B1E',t:((+st.from.slice(0,2)%12)||12)+(st.from.slice(3)==='00'?'':':'+st.from.slice(3))+'–'+((+st.to.slice(0,2)%12)||12)+(st.to.slice(3)==='00'?'':':'+st.to.slice(3))}
+              : {bg:'#E1EFE7',fg:'#2C6E4B',t:'All day'};
+    return '<td style="padding:3px"><button onclick="_asOpen('+JSON.stringify(n).replace(/"/g,'&quot;')+','+wd+',event)" style="width:100%;border:none;border-radius:8px;padding:8px 4px;font-size:11.5px;font-weight:700;cursor:pointer;background:'+tone.bg+';color:'+tone.fg+'">'+esc(tone.t)+'</button></td>';
   };
-  const counts={all:0,part:0,off:0}; people.forEach(n=>counts[stateOf(n).k]++);
   let h='<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">'
-    +'<div><div class="muted" style="font-size:11.5px;letter-spacing:.09em;text-transform:uppercase">Day '+(i+1)+' of 7</div>'
-    +'<div style="font-weight:800;font-size:21px;margin-top:3px">'+esc(dayName)+'</div>'
-    +'<div class="muted" style="font-size:13px;margin-top:3px">Everyone can work all day unless you say otherwise. Tap a name to change it.</div></div>'
-    +'<button onclick="var m=document.getElementById(\'asModal\');if(m)m.remove()" style="border:none;background:transparent;font-size:22px;cursor:pointer;line-height:1;color:inherit">&times;</button></div>';
-  h+='<div style="height:5px;background:var(--bg,#eef3f4);border-radius:99px;margin:14px 0 4px"><div style="height:5px;width:'+Math.round(i/7*100)+'%;background:var(--brand,#4a9cad);border-radius:99px;transition:width .2s"></div></div>';
-  h+='<div style="display:flex;flex-direction:column;gap:7px;margin-top:14px">'
-    + people.map(function(n){
-        const st=stateOf(n);
-        const tint = st.k==='off' ? {b:'#A8401C',bg:'#F7E1DA'} : st.k==='part' ? {b:'#7A5B1E',bg:'#F7EEDC'} : {b:'var(--line2,#d5dde0)',bg:'transparent'};
-        const nm=JSON.stringify(n).replace(/"/g,'&quot;');
-        return '<div style="display:flex;gap:9px;align-items:center;flex-wrap:wrap;border:1.5px solid '+tint.b+';background:'+tint.bg+';border-radius:11px;padding:9px 12px">'
-          +'<span style="flex:1;min-width:110px;font-size:13.5px;font-weight:600">'+esc(dispName(n))+'</span>'
-          +'<button onclick="_asSet('+nm+',\'all\')" style="border:none;border-radius:7px;padding:6px 11px;font-size:12px;font-weight:600;cursor:pointer;background:'+(st.k==='all'?'#2C6E4B':'rgba(0,0,0,.06)')+';color:'+(st.k==='all'?'#fff':'inherit')+'">All day</button>'
-          +'<button onclick="_asSet('+nm+',\'part\')" style="border:none;border-radius:7px;padding:6px 11px;font-size:12px;font-weight:600;cursor:pointer;background:'+(st.k==='part'?'#7A5B1E':'rgba(0,0,0,.06)')+';color:'+(st.k==='part'?'#fff':'inherit')+'">Some hours</button>'
-          +'<button onclick="_asSet('+nm+',\'off\')" style="border:none;border-radius:7px;padding:6px 11px;font-size:12px;font-weight:600;cursor:pointer;background:'+(st.k==='off'?'#A8401C':'rgba(0,0,0,.06)')+';color:'+(st.k==='off'?'#fff':'inherit')+'">Can\'t work</button>'
-          + (st.k==='part'
-              ? '<span style="display:flex;gap:5px;align-items:center;width:100%;margin-top:2px;flex-wrap:wrap"><span class="muted" style="font-size:12px">from</span>'
-                +'<select onchange="_asWin('+nm+',this.value,null)" style="padding:6px 8px;border:1px solid var(--line2,#d5dde0);border-radius:7px;font-size:12.5px;background:var(--card,#fff);color:inherit">'+_timeOpts(st.from||'09:00')+'</select>'
-                +'<span class="muted" style="font-size:12px">to</span>'
-                +'<select onchange="_asWin('+nm+',null,this.value)" style="padding:6px 8px;border:1px solid var(--line2,#d5dde0);border-radius:7px;font-size:12.5px;background:var(--card,#fff);color:inherit">'+_timeOpts(st.to||'17:00')+'</select>'
-                +'<button onclick="_asSpread('+nm+')" style="border:none;background:transparent;font-size:12px;font-weight:600;cursor:pointer;color:#2F7F91;padding:0 2px">Use these hours every day</button></span>'
-              : '')
-          +'</div>';
-      }).join('')
-    +'</div>';
-  h+='<div class="muted" style="font-size:12.5px;margin-top:12px">'+counts.all+' all day &middot; '+counts.part+' limited &middot; '+counts.off+' off</div>';
-  h+='<div style="display:flex;gap:9px;margin-top:18px;align-items:center">'
-    +(i>0?'<button onclick="_asGo(-1)" style="background:transparent;border:1px solid var(--line2,#d5dde0);border-radius:9px;padding:11px 16px;cursor:pointer;color:inherit">Back</button>':'')
-    +'<button onclick="_asGo(1)" style="background:var(--brand,#4a9cad);color:#fff;border:none;border-radius:9px;padding:11px 20px;font-weight:700;cursor:pointer">'+(i===6?'Finish':'Next day')+'</button></div>';
+    +'<div><div style="font-weight:800;font-size:20px">Who can work when</div>'
+    +'<div class="muted" style="font-size:13px;margin-top:3px">Everyone can work all day unless you say otherwise. Tap any square to change it.</div></div>'
+    +'<button onclick="var m=document.getElementById(\'asModal\');if(m)m.remove(); try{go(\'brain\');}catch(e){}" style="border:none;background:transparent;font-size:22px;cursor:pointer;line-height:1;color:inherit">&times;</button></div>';
+  h+='<div style="overflow-x:auto;margin-top:14px"><table style="width:100%;border-collapse:collapse;min-width:640px">'
+    +'<thead><tr><th style="text-align:left;padding:6px 8px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);position:sticky;left:0;background:var(--card,#fff)">Person</th>'
+    + SHORT.map(d=>'<th style="padding:6px 4px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">'+d+'</th>').join('')
+    +'<th style="padding:6px 8px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);white-space:nowrap">Quick set</th></tr></thead><tbody>';
+  people.forEach(function(n){
+    const nm=JSON.stringify(n).replace(/"/g,'&quot;');
+    h+='<tr style="border-top:1px solid var(--line,#eef2f3)">'
+      +'<td style="padding:6px 8px;font-size:13px;font-weight:600;white-space:nowrap;position:sticky;left:0;background:var(--card,#fff)">'+esc(dispName(n))+'</td>'
+      + [0,1,2,3,4,5,6].map(function(wd){ return cell(n,wd); }).join('')
+      +'<td style="padding:3px 6px;white-space:nowrap">'
+        +'<button onclick="_asPreset('+nm+',\'weekends\')" title="Weekends only" style="border:1px solid var(--line2,#d5dde0);background:transparent;color:inherit;border-radius:7px;padding:5px 7px;font-size:11px;cursor:pointer;margin-right:3px">Wknd</button>'
+        +'<button onclick="_asPreset('+nm+',\'weekdays\')" title="Weekdays only" style="border:1px solid var(--line2,#d5dde0);background:transparent;color:inherit;border-radius:7px;padding:5px 7px;font-size:11px;cursor:pointer;margin-right:3px">Wkdy</button>'
+        +'<button onclick="_asPreset('+nm+',\'all\')" title="Available every day" style="border:1px solid var(--line2,#d5dde0);background:transparent;color:inherit;border-radius:7px;padding:5px 7px;font-size:11px;cursor:pointer">All</button>'
+      +'</td></tr>';
+  });
+  h+='</tbody></table></div>';
+  h+='<div style="display:flex;gap:9px;margin-top:16px;align-items:center;flex-wrap:wrap">'
+    +'<button onclick="var m=document.getElementById(\'asModal\');if(m)m.remove(); try{go(\'brain\');}catch(e){}" style="background:var(--brand,#4a9cad);color:#fff;border:none;border-radius:9px;padding:11px 20px;font-weight:700;cursor:pointer">Done</button>'
+    +'<span class="muted" style="font-size:12.5px">Saves as you go.</span></div>';
   c.innerHTML=h;
 };
-window._asSet=async function(name,kind){
-  const wd=window._asDay;
+window._asOpen=function(name,wd,ev){
+  if(ev) ev.stopPropagation();
+  const old=document.getElementById('asPop'); if(old) old.remove();
+  const st=_asState(name,wd);
+  const nm=JSON.stringify(name).replace(/"/g,'&quot;');
+  const pop=document.createElement('div'); pop.id='asPop';
+  pop.style.cssText='position:fixed;z-index:10070;background:var(--card,#fff);color:var(--ink,#111);border:1px solid var(--line2,#d5dde0);border-radius:12px;box-shadow:0 12px 34px rgba(0,0,0,.22);padding:12px 13px;min-width:230px';
+  pop.innerHTML='<div style="font-weight:700;font-size:13px;margin-bottom:8px">'+esc(dispName(name))+' &middot; '+['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'][wd]+'</div>'
+    +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
+    +'<button onclick="_asSet('+nm+','+wd+',\'all\')" style="border:none;border-radius:7px;padding:7px 11px;font-size:12px;font-weight:600;cursor:pointer;background:'+(st.k==='all'?'#2C6E4B':'rgba(0,0,0,.06)')+';color:'+(st.k==='all'?'#fff':'inherit')+'">All day</button>'
+    +'<button onclick="_asSet('+nm+','+wd+',\'part\')" style="border:none;border-radius:7px;padding:7px 11px;font-size:12px;font-weight:600;cursor:pointer;background:'+(st.k==='part'?'#7A5B1E':'rgba(0,0,0,.06)')+';color:'+(st.k==='part'?'#fff':'inherit')+'">Some hours</button>'
+    +'<button onclick="_asSet('+nm+','+wd+',\'off\')" style="border:none;border-radius:7px;padding:7px 11px;font-size:12px;font-weight:600;cursor:pointer;background:'+(st.k==='off'?'#A8401C':'rgba(0,0,0,.06)')+';color:'+(st.k==='off'?'#fff':'inherit')+'">Can\'t work</button></div>'
+    + (st.k==='part' ? '<div style="display:flex;gap:5px;align-items:center;margin-top:9px;flex-wrap:wrap"><span class="muted" style="font-size:12px">from</span>'
+        +'<select onchange="_asWin('+nm+','+wd+',this.value,null)" style="padding:6px 7px;border:1px solid var(--line2,#d5dde0);border-radius:7px;font-size:12px;background:var(--card,#fff);color:inherit">'+_timeOpts(st.from)+'</select>'
+        +'<span class="muted" style="font-size:12px">to</span>'
+        +'<select onchange="_asWin('+nm+','+wd+',null,this.value)" style="padding:6px 7px;border:1px solid var(--line2,#d5dde0);border-radius:7px;font-size:12px;background:var(--card,#fff);color:inherit">'+_timeOpts(st.to)+'</select>'
+        +'<button onclick="_asSpread('+nm+','+wd+')" style="border:none;background:transparent;font-size:11.5px;font-weight:600;cursor:pointer;color:#2F7F91;padding:0;margin-top:4px;width:100%;text-align:left">Use these hours every day they work</button></div>' : '')
+    +'<button onclick="var p=document.getElementById(\'asPop\');if(p)p.remove()" style="margin-top:10px;border:none;background:transparent;font-size:12px;cursor:pointer;color:var(--muted,#6b8087);padding:0">Close</button>';
+  document.body.appendChild(pop);
+  try{
+    const r=ev.currentTarget.getBoundingClientRect();
+    pop.style.left=Math.min(window.innerWidth-250, Math.max(8, r.left))+'px';
+    pop.style.top=Math.min(window.innerHeight-210, r.bottom+6)+'px';
+  }catch(e){ pop.style.left='40px'; pop.style.top='120px'; }
+  setTimeout(function(){ document.addEventListener('click', function h(e){ const p=document.getElementById('asPop'); if(p&&!p.contains(e.target)){ p.remove(); document.removeEventListener('click',h); } }); }, 0);
+};
+window._asSet=async function(name,wd,kind){
   if(kind==='off') await _avUpsert(name,wd,{can_work:false,note:null});
   else if(kind==='all') await _avUpsert(name,wd,{can_work:true,note:null});
   else {
     const row=((window._avail||{})[name]||{})[wd];
-    const w=parseWin((row&&row.note)||'') || ['09:00','17:00'];   // a sensible starting window they can adjust
+    const w=parseWin((row&&row.note)||'') || ['09:00','17:00'];
     await _avUpsert(name,wd,{can_work:true,note:w[0]+'-'+w[1]});
   }
-  _asRender();
+  _asRender(); _asOpen(name,wd,null);
 };
-window._asSpread=async function(name){
-  /* Kayla works 6 to 2 most days. Setting that seven times, day by day, is the sort of
-     repetition that makes people abandon setup halfway. Copy it across, then change the
-     one or two days that differ. */
-  const wd=window._asDay;
-  const row=((window._avail||{})[name]||{})[wd];
-  const w=parseWin((row&&row.note)||'');
-  if(!w){ alert('Set the hours first, then copy them across.'); return; }
-  if(!confirm('Give '+dispName(name)+' these hours ('+w[0]+'\u2013'+w[1]+') on every day of the week?\n\nDays you have marked as cannot work stay that way.')) return;
-  for(let d=0; d<7; d++){
-    if(d===wd) continue;
-    const r2=((window._avail||{})[name]||{})[d];
-    if(r2 && r2.can_work===false) continue;           // do not undo a day off
-    await _avUpsert(name, d, {can_work:true, note:w[0]+'-'+w[1]});
-  }
-  _asRender();
-};
-window._asGo=function(step){ window._asDay=Math.max(0,Math.min(7,window._asDay+step)); _asRender(); };
-window._asWin=async function(name,from,to){
-  const wd=window._asDay;
+window._asWin=async function(name,wd,from,to){
   const row=((window._avail||{})[name]||{})[wd];
   const cur=parseWin((row&&row.note)||'') || ['09:00','17:00'];
   const f=from||cur[0], t=to||cur[1];
-  if(f && t && t<=f){ alert('The end time needs to be after the start time.'); _asRender(); return; }
+  if(f&&t&&t<=f){ alert('The end time needs to be after the start time.'); return; }
   await _avUpsert(name,wd,{can_work:true,note:f+'-'+t});
+  _asRender(); _asOpen(name,wd,null);
+};
+window._asPreset=async function(name,kind){
+  /* The shapes that actually recur. Elleen works weekends only -- one click, not five
+     screens. */
+  const off=kind==='weekends'? [0,1,2,3,4] : kind==='weekdays'? [5,6] : [];
+  for(let d=0; d<7; d++){
+    if(off.indexOf(d)>=0) await _avUpsert(name,d,{can_work:false,note:null});
+    else await _avUpsert(name,d,{can_work:true,note:null});
+  }
   _asRender();
 };
+window._asSpread=async function(name,wd){
+  const row=((window._avail||{})[name]||{})[wd];
+  const w=parseWin((row&&row.note)||'');
+  if(!w) return;
+  for(let d=0; d<7; d++){
+    if(d===wd) continue;
+    const r2=((window._avail||{})[name]||{})[d];
+    if(r2 && r2.can_work===false) continue;   // never undo a day off
+    await _avUpsert(name,d,{can_work:true,note:w[0]+'-'+w[1]});
+  }
+  _asRender();
+};
+
 
 
 /* ---------- Telling people things ----------
