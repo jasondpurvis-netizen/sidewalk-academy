@@ -434,7 +434,13 @@ function renderApp(){
     let shut={}; try{ shut=JSON.parse(localStorage.getItem('sw_navshut')||'null')||{}; }catch(e){}
     shut[g]=shut[g]?0:1;
     try{ localStorage.setItem('sw_navshut', JSON.stringify(shut)); }catch(e){}
-    renderApp();
+    /* Show or hide the group's links where they already are. Re-rendering the whole app
+       repainted every page and made the sidebar jump around on each click. */
+    const id='navg-'+g.replace(/[^a-z0-9]/gi,'');
+    const shutNow=!!shut[g];
+    document.querySelectorAll('[data-navgrp="'+id+'"]').forEach(function(a){ a.style.display=shutNow?'none':'flex'; });
+    const chev=document.getElementById(id+'-chev'); if(chev) chev.className='ti ti-chevron-'+(shutNow?'right':'down');
+    const cnt=document.getElementById(id+'-n'); if(cnt) cnt.style.display=shutNow?'':'none';
   };
   let nav = NAV_ALL.map(([g,items])=>[g, items.filter(([p])=>canSee(p))]).filter(([g,items])=>items.length);
   let _pins=[]; try{ _pins=JSON.parse(localStorage.getItem('sw_favpin')||'[]'); }catch(e){}
@@ -457,9 +463,10 @@ function renderApp(){
   const _curGroup=(nav.find(([g,items])=>items.some(([p])=>p===state.page))||[])[0];
   document.getElementById("nav").innerHTML = nav.map(([g,items])=>{
     const _shut = g && g!=='Favorites' && _navShut[g] && g!==_curGroup;
-    const gl=g?`<div class="navgroup" onclick="toggleNavGroup('${esc(g)}')" style="cursor:pointer;display:flex;align-items:center;gap:6px;user-select:none">${esc(g)}<i class="ti ti-chevron-${_shut?'right':'down'}" style="font-size:13px;opacity:.55"></i>${_shut?`<span style="opacity:.5;font-weight:500">${items.length}</span>`:''}</div>`:'';
-    if(_shut) return gl;
-    const _fav=g==='Favorites'; return gl+items.map(([p,l,i])=>{ const _pn=_pins.indexOf(p)>=0; const _drag=_fav?` draggable="true" ondragstart="favDragStart('${p}',event)" ondragover="event.preventDefault()" ondrop="event.preventDefault();favDrop('${p}')"`:''; const _grip=_fav?`<span title="Drag to reorder" style="cursor:grab;color:var(--line2);font-size:13px;flex-shrink:0;padding:0 1px">⠿</span>`:''; return `<a${_drag} style="display:flex;align-items:center;gap:3px;${p==='setup'?'margin-top:auto':''}" class="${state.page===p||(state.page==='lesson'||state.page==='track'||state.page==='acat')&&p==='home'?'active':''}" onclick="go('${p}');toggleNav(false)">${_grip}<i class="ti ${i}" aria-hidden="true"></i><span style="flex:1;min-width:0">${l}</span>${(p==='community'&&window._communityUnread>0)?`<span class="commbadge" style="background:#DC2626;color:#fff;font-size:10.5px;font-weight:800;min-width:18px;height:18px;border-radius:9px;display:inline-flex;align-items:center;justify-content:center;padding:0 5px;flex-shrink:0">${window._communityUnread>99?'99+':window._communityUnread}</span>`:''}<span onclick="event.stopPropagation();toggleFavPin('${p}')" title="${_pn?'Unpin from Favorites':'Pin to Favorites'}" style="cursor:pointer;font-size:13px;line-height:1;color:${_pn?'#E5A800':'var(--line2)'};padding:0 2px;flex-shrink:0">${_pn?'★':'☆'}</span></a>`; }).join(''); }).join("");
+    const _gid0 = g? 'navg-'+g.replace(/[^a-z0-9]/gi,'') : '';
+    const gl=g?`<div class="navgroup" onclick="toggleNavGroup('${esc(g)}')" style="cursor:pointer;display:flex;align-items:center;gap:6px;user-select:none">${esc(g)}<i class="ti ti-chevron-${_shut?'right':'down'}" id="${_gid0}-chev" style="font-size:13px;opacity:.55"></i><span id="${_gid0}-n" style="opacity:.5;font-weight:500;${_shut?'':'display:none'}">${items.length}</span></div>`:'';
+    const _gid = g? 'navg-'+g.replace(/[^a-z0-9]/gi,'') : '';
+    const _fav=g==='Favorites'; return gl+items.map(([p,l,i])=>{ const _pn=_pins.indexOf(p)>=0; const _drag=_fav?` draggable="true" ondragstart="favDragStart('${p}',event)" ondragover="event.preventDefault()" ondrop="event.preventDefault();favDrop('${p}')"`:''; const _grip=_fav?`<span title="Drag to reorder" style="cursor:grab;color:var(--line2);font-size:13px;flex-shrink:0;padding:0 1px">⠿</span>`:''; return `<a${_drag} data-navgrp="${_gid}" style="display:${_shut?'none':'flex'};align-items:center;gap:3px;${p==='setup'?'margin-top:auto':''}" class="${state.page===p||(state.page==='lesson'||state.page==='track'||state.page==='acat')&&p==='home'?'active':''}" onclick="go('${p}');toggleNav(false)">${_grip}<i class="ti ${i}" aria-hidden="true"></i><span style="flex:1;min-width:0">${l}</span>${(p==='community'&&window._communityUnread>0)?`<span class="commbadge" style="background:#DC2626;color:#fff;font-size:10.5px;font-weight:800;min-width:18px;height:18px;border-radius:9px;display:inline-flex;align-items:center;justify-content:center;padding:0 5px;flex-shrink:0">${window._communityUnread>99?'99+':window._communityUnread}</span>`:''}<span onclick="event.stopPropagation();toggleFavPin('${p}')" title="${_pn?'Unpin from Favorites':'Pin to Favorites'}" style="cursor:pointer;font-size:13px;line-height:1;color:${_pn?'#E5A800':'var(--line2)'};padding:0 2px;flex-shrink:0">${_pn?'★':'☆'}</span></a>`; }).join(''); }).join("");
   try{ const _n=document.querySelector('.side .nav'); if(_n&&window._navScroll)_n.scrollTop=window._navScroll; const _s=document.querySelector('.side'); if(_s&&window._sideScroll)_s.scrollTop=window._sideScroll; }catch(e){}
   document.getElementById("out").onclick=signOut;
   const PI={whiteboard:'ti-layout-dashboard',home:'ti-school',summary:'ti-chart-bar',team:'ti-users',onboarding:'ti-user-plus',ask:'ti-bulb',build:'ti-tools',today:'ti-clipboard-list',schedule:'ti-calendar-week',calendar:'ti-calendar-month',community:'ti-messages',resources:'ti-files',downloads:'ti-download',settings:'ti-settings',journal:'ti-notebook',track:'ti-book-2',lesson:'ti-book-2',feedback:'ti-message-2',ownership:'ti-sitemap'};
