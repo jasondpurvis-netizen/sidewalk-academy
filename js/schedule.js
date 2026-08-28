@@ -695,11 +695,7 @@ window.autoDraft=async function(opts){
     if(_lastOf[s.dow]===undefined  || en > _lastOf[s.dow])  _lastOf[s.dow]=en;
   });
   const _wave = s => ((s.start||'')===_firstOf[s.dow] ? 0 : ((s.end||'')===_lastOf[s.dow] ? 1 : 2));
-  slots.sort((a,b)=>
-      _wave(a)-_wave(b)                       // every day's open, then every day's close
-   || (_dem[b.dow]-_dem[a.dow])               // then the busiest days first, as before
-   || (a.start||'').localeCompare(b.start||'')
-   || a.dow-b.dow);
+
   const isRankLabel=s=>POS_ORDER.indexOf(s)>=0; // old template rows carry a RANK as role, not a real station
   const eligible=(n,sl,iso,hrs,ignoreLen)=>{ if(!n) return false; if(onLeave(n,iso)) return false; if(draft.some(d=>d.person_name===n && d.on_date===iso)) return false; if(!fitsAvail(n,sl.dow,sl.start,sl.end)) return false;
     const pr=profileOf(n)||{};
@@ -741,7 +737,36 @@ window.autoDraft=async function(opts){
   // Capabilities: who is trusted to open / close. If a person has caps set, use them; otherwise fall back to their position (leaders) so existing setups keep working.
   const _caps=n=>{ const c=(profileOf(n)||{}).caps; return (c&&typeof c==='object')?c:null; };
   const canOpen=n=>{ const c=_caps(n); return c?(('open'in c)?!!c.open:isLeader(n)):isLeader(n); };
-  const canClose=n=>{ const c=_caps(n); return c?(('close'in c)?!!c.close:isLeader(n)):isLeader(n); };
+  const canClose=n=>{ const c=_caps(n);
+  /* Within the open and close waves, take the HARDEST day first, not the busiest.
+     Filling greedily by demand gave Saturday and Sunday their pick of all three leaders,
+     and by Tuesday the two who can work it had both hit their day caps -- so Tuesday and
+     Wednesday came out with nobody in charge while Friday to Sunday had three each.
+     Saturday is the easy day precisely because everyone can work it. Tuesday is the scarce
+     one, so it has to claim someone while there is still someone to claim. Count how many
+     people could actually cover each anchor and do the thinnest days first. */
+  const _cands = (sl) => {
+    let c=0;
+    Object.keys(window._posMap||{}).forEach(function(n){
+      if(isArchived(n)) return;
+      if(posOf(n)==='Trainee' || posOf(n)==='Owner') return;
+      if(!fitsAvail(n, sl.dow, sl.start, sl.end)) return;
+      const w=_wave(sl);
+      if(w===0 && !canOpen(n)) return;
+      if(w===1 && !canClose(n)) return;
+      c++;
+    });
+    return c;
+  };
+  const _scarce={};
+  slots.forEach(function(sl){ const w=_wave(sl); if(w<2){ const k=w+'|'+sl.dow; if(_scarce[k]===undefined) _scarce[k]=_cands(sl); } });
+  const _sc = sl => { const w=_wave(sl); return w<2 ? (_scarce[w+'|'+sl.dow]||0) : 0; };
+  slots.sort((a,b)=>
+      _wave(a)-_wave(b)                       // every day's open, then every day's close
+   || (_wave(a)<2 ? _sc(a)-_sc(b) : 0)        // hardest-to-staff day first within a wave
+   || (_dem[b.dow]-_dem[a.dow])               // then the busiest days
+   || (a.start||'').localeCompare(b.start||'')
+   || a.dow-b.dow); return c?(('close'in c)?!!c.close:isLeader(n)):isLeader(n); };
   const hasSkill=(n,st)=>{ if(!st) return true; const pr=profileOf(n)||{}; return Array.isArray(pr.roles)?pr.roles.includes(st):true; }; // required-role check; if a person has no skills list yet, don't block them (same rule as station gate)
   const lvlOf=(n,st)=>{ if(!st) return 0; const pr=profileOf(n)||{}; const sl=pr.skillLevels; if(sl&&typeof sl==='object'&&(st in sl)) return +sl[st]||0; return hasSkill(n,st)?2:0; }; // proficiency 1=Learning 2=Solid 3=Expert; legacy "trained" reads as Solid
   const skillDayOk=(n,st,dw)=>{ if(!st) return true; const sd=(profileOf(n)||{}).skillDays; if(!sd||!Array.isArray(sd[st])) return true; return sd[st].indexOf(dw)<0; }; // day-restricted skill: owner keeps this person OFF station 'st' on weekday dw (e.g. off the bar on busy Saturdays) — still schedulable elsewhere that day
