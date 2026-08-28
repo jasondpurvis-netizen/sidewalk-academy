@@ -214,7 +214,7 @@ async function schBoard(v){
      about how many are on at once. They are not the same number: staggered shifts mean
      five people can work a day that caps at four concurrent. Show the peak alongside the
      cap so it can be checked at a glance instead of counted by eye and worried about. */
-  const _capFor = di => { let m=0; try{ (cov.matrix&&cov.matrix.blocks||[]).forEach(b=>{ const v=+(b.n&&b.n[di]); if(v>m) m=v; }); }catch(e){} return m; };
+  const _capFor = di => { let m=0; try{ ((covRules.matrix&&covRules.matrix.blocks)||[]).forEach(b=>{ const v=+(b.n&&b.n[di]); if(v>m) m=v; }); }catch(e){} return m; };
   const peakOf = isoDays.map(function(iso,di){
     const list=(rsh.data||[]).filter(x=>x.on_date===iso && x.start_time && x.end_time && x.person_name && x.person_name!=='__OPEN__' && !isArchived(x.person_name));
     const mn=t=>{ const m=/^(\d{1,2}):(\d{2})/.exec(t||''); return m? +m[1]*60 + +m[2] : null; };
