@@ -4210,12 +4210,19 @@ window._asOpen=function(name,wd,ev){
         +'<button onclick="_asSpread('+nm+','+wd+')" style="border:none;background:transparent;font-size:11.5px;font-weight:600;cursor:pointer;color:#2F7F91;padding:0;margin-top:4px;width:100%;text-align:left">Use these hours every day they work</button></div>' : '')
     +'<button onclick="var p=document.getElementById(\'asPop\');if(p)p.remove()" style="margin-top:10px;border:none;background:transparent;font-size:12px;cursor:pointer;color:var(--muted,#6b8087);padding:0">Close</button>';
   document.body.appendChild(pop);
+  /* Anchor once and remember it. Every change re-renders the grid and reopens this
+     panel, and reopening without the original event used to fall back to a default
+     corner -- so the popover hopped across the screen on each tap. */
   try{
-    const r=ev.currentTarget.getBoundingClientRect();
-    pop.style.left=Math.min(window.innerWidth-250, Math.max(8, r.left))+'px';
-    pop.style.top=Math.min(window.innerHeight-210, r.bottom+6)+'px';
+    if(ev && ev.currentTarget){
+      const r=ev.currentTarget.getBoundingClientRect();
+      window._asPopAt={ left: Math.min(window.innerWidth-250, Math.max(8, r.left)),
+                        top:  Math.min(window.innerHeight-230, r.bottom+6) };
+    }
+    const a=window._asPopAt||{left:40, top:120};
+    pop.style.left=a.left+'px'; pop.style.top=a.top+'px';
   }catch(e){ pop.style.left='40px'; pop.style.top='120px'; }
-  setTimeout(function(){ document.addEventListener('click', function h(e){ const p=document.getElementById('asPop'); if(p&&!p.contains(e.target)){ p.remove(); document.removeEventListener('click',h); } }); }, 0);
+  setTimeout(function(){ document.addEventListener('click', function h(e){ const p=document.getElementById('asPop'); if(p&&!p.contains(e.target)){ p.remove(); window._asPopAt=null; document.removeEventListener('click',h); } }); }, 0);
 };
 window._asSet=async function(name,wd,kind){
   if(kind==='off') await _avUpsert(name,wd,{can_work:false,note:null});
