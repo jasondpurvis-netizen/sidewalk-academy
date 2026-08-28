@@ -168,7 +168,7 @@ function askSearch(q){ const terms=q.toLowerCase().split(/\W+/).filter(w=>w.leng
 function snippet(text,q){ const terms=q.toLowerCase().split(/\W+/).filter(w=>w.length>2); let idx=-1; for(const t of terms){ idx=text.toLowerCase().indexOf(t); if(idx>=0)break; } if(idx<0)idx=0; const start=Math.max(0,idx-70); return (start>0?'…':'')+text.slice(start,start+210).trim()+'…'; }
 function vAsk(v){
   const isAdmin=state.profile&&state.profile.role==='admin';
-  setTitle('Ask','Find the answer in your own training — fast');
+  setTitle('Find an answer','Search your own training');
   let h=`<div class="card" style="padding:16px;margin-bottom:18px"><div class="row" style="gap:8px"><input id="askq" placeholder="How do we open the espresso machine?" value="${esc(state.ctx.q||'')}" onkeydown="if(event.key==='Enter')doAsk()" style="flex:1;padding:11px 13px;border:1px solid var(--line2);border-radius:9px;font-size:14px;background:var(--card);color:var(--ink);font-family:inherit"/><button class="btn pri" style="width:auto" onclick="doAsk()">Ask</button></div><div class="faint" style="font-size:12px;margin-top:8px">Searches every lesson in your academy. Answers come straight from your training — never made up.</div></div><div id="askres"></div>`;
   if(isAdmin) h+=`<div class="card" style="padding:15px 17px;border-left:3px solid var(--brand)"><div class="row" style="align-items:center;gap:10px"><i class="ti ti-tools" style="font-size:20px;color:var(--brand)"></i><div style="flex:1"><div style="font-weight:600;font-size:14px">Turning notes into a lesson?</div><div class="faint" style="font-size:12.5px">That lives in Build now — paste your steps and it saves a real lesson with photos and video.</div></div><button class="btn" style="width:auto" onclick="go('build')">Go to Build</button></div></div>`;
   v.innerHTML=h; if(state.ctx.q) doAsk();
@@ -180,7 +180,7 @@ window.draftLesson=async function(){ const raw=val('proc'); const title=val('pro
 /* ---------- Build (custom tracks) ---------- */
 async function vBuild(v){
   if(!canSee(state.page)){ go('home'); return; }
-  setTitle('Build','Create your own courses, lessons & glossary');
+  setTitle('Create training','Your own courses, lessons and glossary');
   v.innerHTML='<div class="muted">Loading…</div>';
   await loadArchived(); const { data:_pf } = await sb.from('profiles').select('*'); window._team=(_pf||[]).filter(p=>p.role!=='admin' && !isArchived(p.name));
   const PROP=new Set(['fol','positioncert','decisiontoolkit']);

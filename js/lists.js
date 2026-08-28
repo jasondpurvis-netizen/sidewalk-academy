@@ -1,7 +1,7 @@
 
 async function vLists(v){
   if(!canSee('lists')){ go('home'); return; }
-  setTitle('Lists','Running lists your team keeps — supplies, recovery, whatever you need');
+  setTitle('Checklists','Running lists your team keeps — supplies, prep, whatever you need');
   v.innerHTML='<div class="muted">Loading…</div>';
   const isAdmin=(typeof myRank==='function')?myRank()>=3:false;
   const [rl,rit]=await Promise.all([ sb.from('day_items').select('*').eq('kind','list').order('created_at'), sb.from('day_items').select('*').eq('kind','listitem').order('created_at') ]);
@@ -29,7 +29,7 @@ window.listDelete=async function(listId){ if(!confirm('Delete this whole list an
 /* ---------- Customer Recovery: make-it-right log with a sign-off that records who closed it ---------- */
 async function vRecovery(v){
   if(!canSee('recovery')){ go('home'); return; }
-  setTitle('Recovery',"Make it right — guests we owe something, and who signed it off");
+  setTitle('Guest recovery',"Make it right — guests we owe something, and who signed it off");
   v.innerHTML='<div class="muted">Loading…</div>';
   const r=await sb.from('day_items').select('*').eq('kind','recovery').order('created_at',{ascending:false});
   const items=(r.data||[]).map(x=>{ let d={}; try{d=JSON.parse(x.detail||'{}')}catch(e){} return {id:x.id,done:!!x.done,d}; });
