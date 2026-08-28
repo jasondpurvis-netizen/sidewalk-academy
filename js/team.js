@@ -496,6 +496,88 @@ window.dispName=function(n){
    becomes just the schedule, and the setup work gets a visible payoff -- a readiness
    score that climbs as you fill it in, and a plain list of what auto-draft still cannot
    do without you. Nobody finishes a forty-minute setup on faith. */
+
+/* ---------- Set everyone's pay in one place ----------
+   Pay was only editable one person at a time, behind a tap into a profile that also holds
+   birthdays and emergency contacts. Fifteen people meant fifteen round trips, so of course
+   some were missed, some sat below minimum wage, and nobody could see that at a glance.
+   One screen, every rate visible, anything under the legal floor flagged. */
+window.openPayEditor = async function(){
+  await loadPositions(); await loadProfiles(); await loadArchived();
+  const people = rosterNames().filter(n=>!isArchived(n) && posOf(n)!=='Owner').sort();
+  const r = await sb.from('pay_rates').select('person_name,wage');
+  const cur = {}; (r.data||[]).forEach(x=>cur[x.person_name]=+x.wage);
+  window._payCur = cur;
+  window._payPeople = people;
+  let w=document.getElementById('payModal'); if(w) w.remove();
+  w=document.createElement('div'); w.id='payModal';
+  w.style.cssText='position:fixed;inset:0;z-index:10060;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:16px';
+  w.innerHTML='<div id="payCard" style="background:var(--card,#fff);color:var(--ink,#111);border-radius:16px;max-width:560px;width:100%;max-height:90vh;overflow:auto;padding:22px 24px;box-shadow:0 20px 60px rgba(0,0,0,.3)"></div>';
+  document.body.appendChild(w); _payRender();
+};
+window._payRender = function(){
+  const c=document.getElementById('payCard'); if(!c) return;
+  const people=window._payPeople, cur=window._payCur;
+  const MINW = 15.15;   // Arizona
+  let h='<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">'
+    +'<div><div style="font-weight:800;font-size:20px">Pay rates</div>'
+    +'<div class="muted" style="font-size:13px;margin-top:3px">Everyone in one place. Leave someone blank if they are salaried — set the salary on their profile instead.</div></div>'
+    +'<button onclick="var m=document.getElementById(\'payModal\');if(m)m.remove()" style="border:none;background:transparent;font-size:22px;cursor:pointer;line-height:1;color:inherit">&times;</button></div>';
+  h+='<div style="display:flex;gap:8px;align-items:center;margin-top:14px;flex-wrap:wrap">'
+    +'<input id="payAllVal" type="number" step="0.01" placeholder="15.15" style="width:110px;padding:8px 10px;border:1px solid var(--line2,#d5dde0);border-radius:8px;font-size:13.5px;background:transparent;color:inherit">'
+    +'<button onclick="_payFillBlank()" style="border:1px solid var(--line2,#d5dde0);background:transparent;color:inherit;border-radius:8px;padding:8px 12px;font-size:12.5px;cursor:pointer">Fill the blanks with this</button></div>';
+  h+='<div style="display:flex;flex-direction:column;gap:6px;margin-top:14px">';
+  people.forEach(function(n){
+    const pr=(window._profiles||{})[n]||{};
+    const sal=+pr.salary>0;
+    const v=cur[n]!=null? cur[n] : '';
+    const low = !sal && v!=='' && +v < MINW;
+    h+='<div style="display:flex;gap:10px;align-items:center;border:1px solid '+(low?'#E4B8A8':'var(--line2,#d5dde0)')+';background:'+(low?'#F9EDE8':'transparent')+';border-radius:10px;padding:9px 12px">'
+      +'<span style="flex:1;min-width:0;font-size:13.5px;font-weight:600">'+esc(dispName(n))+'</span>'
+      +'<span class="muted" style="font-size:11.5px;min-width:82px">'+esc(posOf(n))+'</span>'
+      + (sal
+          ? '<span class="muted" style="font-size:12.5px;min-width:120px;text-align:right">salaried &middot; $'+Number(pr.salary).toLocaleString()+'</span>'
+          : '<span style="display:flex;align-items:center;gap:4px"><span class="muted" style="font-size:13px">$</span>'
+            +'<input type="number" step="0.01" value="'+esc(String(v))+'" data-payfor="'+esc(n)+'" oninput="_paySet('+JSON.stringify(n).replace(/"/g,'&quot;')+',this.value)" style="width:92px;padding:7px 9px;border:1px solid var(--line2,#d5dde0);border-radius:8px;font-size:13.5px;background:var(--card,#fff);color:inherit"></span>')
+      +'</div>'
+      + (low? '<div style="font-size:11.5px;color:#A8401C;margin:-2px 0 2px 12px">Below the $'+MINW.toFixed(2)+' minimum</div>' : '');
+  });
+  h+='</div>';
+  h+='<div style="display:flex;gap:9px;margin-top:18px;align-items:center;flex-wrap:wrap">'
+    +'<button onclick="_paySave()" id="payGo" style="background:var(--brand,#4a9cad);color:#fff;border:none;border-radius:9px;padding:11px 20px;font-weight:700;cursor:pointer">Save pay rates</button>'
+    +'<button onclick="var m=document.getElementById(\'payModal\');if(m)m.remove()" style="background:transparent;border:1px solid var(--line2,#d5dde0);border-radius:9px;padding:11px 16px;cursor:pointer;color:inherit">Cancel</button>'
+    +'<span id="payMsg" class="muted" style="font-size:12.5px"></span></div>';
+  c.innerHTML=h;
+};
+window._paySet = function(n,v){ window._payCur[n] = v===''? null : +v; };
+window._payFillBlank = function(){
+  const v=+(document.getElementById('payAllVal')||{}).value;
+  if(!(v>0)) { alert('Put a rate in the box first.'); return; }
+  window._payPeople.forEach(function(n){
+    const pr=(window._profiles||{})[n]||{};
+    if(+pr.salary>0) return;                                  // salaried people have no hourly rate
+    if(window._payCur[n]==null || window._payCur[n]==='') window._payCur[n]=v;
+  });
+  _payRender();
+};
+window._paySave = async function(){
+  const go=document.getElementById('payGo'), msg=document.getElementById('payMsg');
+  if(go){ go.disabled=true; go.textContent='Saving…'; }
+  const rows=[], clear=[];
+  window._payPeople.forEach(function(n){
+    const pr=(window._profiles||{})[n]||{};
+    if(+pr.salary>0){ clear.push(n); return; }                 // salaried: no hourly row at all
+    const v=window._payCur[n];
+    if(v==null || v==='' || !(+v>0)) { clear.push(n); return; }
+    rows.push({person_name:n, wage:+v, updated_at:new Date().toISOString()});
+  });
+  if(clear.length){ const d=await sb.from('pay_rates').delete().in('person_name', clear); if(d.error && msg){ msg.style.color='#B32D2D'; msg.textContent=d.error.message; } }
+  if(rows.length){ const u=await sb.from('pay_rates').upsert(rows);
+    if(u.error){ if(msg){ msg.style.color='#B32D2D'; msg.textContent='Not saved: '+u.error.message; } if(go){ go.disabled=false; go.textContent='Try again'; } return; } }
+  const m=document.getElementById('payModal'); if(m) m.remove();
+  try{ vBrain(document.getElementById('view')); }catch(e){}
+};
+
 async function vBrain(v){
   if(!canSee('brain')){ go('home'); return; }
   setTitle('The Brain','What your restaurant knows about itself — everything auto-draft needs, in one place');
@@ -547,7 +629,7 @@ async function vBrain(v){
      why:'Hours, days per week, days off in a row, longest shift. These decide what auto-draft is allowed to do, and they were the hardest thing in the app to find.',
      act:"go('schedule',{stab:'team'})", cta:'Open rules', soft:true},
     {k:'pay',      done: people.length? withPay.length===people.length : false, label:'Pay rates', detail: people.length? withPay.length+' of '+people.length+' people' : 'No team yet',
-     why:'Needed for labour cost and your labour target. Scheduling still works without it.', act:"go('schedule',{stab:'team'})", cta:'Set pay', soft:true}
+     why:'Needed for labour cost and your labour target. Scheduling still works without it.', act:'openPayEditor()', cta:'Set pay', soft:true}
   ];
   const hard = parts.filter(p=>!p.soft);
   const ready = Math.round(hard.filter(p=>p.done).length / hard.length * 100);
