@@ -502,34 +502,62 @@ window.dispName=function(n){
    birthdays and emergency contacts. Fifteen people meant fifteen round trips, so of course
    some were missed, some sat below minimum wage, and nobody could see that at a glance.
    One screen, every rate visible, anything under the legal floor flagged. */
-window.openPayEditor = async function(){
+window._payLoad = async function(){
   await loadPositions(); await loadProfiles(); await loadArchived();
   const people = rosterNames().filter(n=>!isArchived(n) && posOf(n)!=='Owner').sort();
   const r = await sb.from('pay_rates').select('person_name,wage');
   const cur = {}; (r.data||[]).forEach(x=>cur[x.person_name]=+x.wage);
   window._payCur = cur;
   window._payPeople = people;
+  /* Salary used to be a box on the profile while the hourly rate was here, so setting
+     somebody's pay meant knowing which of the two screens applied to them. It is one
+     question -- what do we pay this person -- and it belongs on one screen. */
+  const sal={}; people.forEach(function(n){ const pr=(window._profiles||{})[n]||{}; sal[n]=(+pr.salary>0)?+pr.salary:null; });
+  window._paySal = sal;
+  window._paySal0 = Object.assign({}, sal);
+};
+window.openPayEditor = async function(){
+  window._payInline=false;
+  await _payLoad();
   let w=document.getElementById('payModal'); if(w) w.remove();
   w=document.createElement('div'); w.id='payModal';
   w.style.cssText='position:fixed;inset:0;z-index:10060;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:16px';
   w.innerHTML='<div id="payCard" style="background:var(--card,#fff);color:var(--ink,#111);border-radius:16px;max-width:560px;width:100%;max-height:90vh;overflow:auto;padding:22px 24px;box-shadow:0 20px 60px rgba(0,0,0,.3)"></div>';
   document.body.appendChild(w); _payRender();
 };
+/* The sidebar had its own Pay rates page with a second, worse version of this list -- first
+   names only, no minimum-wage check, no idea who was salaried -- writing to the same table.
+   Two screens for one number is how a rate ends up wrong in the one you did not open. The
+   page and the button now render the same editor. */
+async function vPay(v){
+  if(!canSee(state.page)){ go('home'); return; }
+  setTitle('Pay rates','Leadership only — what you pay, in one place');
+  v.innerHTML='<div class="muted">Loading…</div>';
+  window._payInline=true;
+  await _payLoad();
+  v.innerHTML='<div class="card" style="padding:13px 15px;margin-bottom:14px;display:flex;gap:10px;align-items:center">'
+    +'<i class="ti ti-lock" style="color:var(--brand);font-size:18px"></i>'
+    +'<div class="faint" style="font-size:12.5px">Only leadership sees this page. Pay never appears on the schedule.</div></div>'
+    +'<div class="card" id="payCard" style="padding:20px 22px"></div>';
+  _payRender();
+}
 window._payRender = function(){
   const c=document.getElementById('payCard'); if(!c) return;
   const people=window._payPeople, cur=window._payCur;
   const MINW = 15.15;   // Arizona
+  const inline=!!window._payInline;
   let h='<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">'
-    +'<div><div style="font-weight:800;font-size:20px">Pay rates</div>'
-    +'<div class="muted" style="font-size:13px;margin-top:3px">Everyone in one place. Leave someone blank if they are salaried — set the salary on their profile instead.</div></div>'
-    +'<button onclick="var m=document.getElementById(\'payModal\');if(m)m.remove()" style="border:none;background:transparent;font-size:22px;cursor:pointer;line-height:1;color:inherit">&times;</button></div>';
+    +'<div>'+(inline?'':'<div style="font-weight:800;font-size:20px">Pay rates</div>')
+    +'<div class="muted" style="font-size:13px;margin-top:3px">Everyone in one place — hourly or salaried. Use the button on the right of a row to switch someone between the two.</div></div>'
+    + (inline?'':'<button onclick="var m=document.getElementById(\'payModal\');if(m)m.remove()" style="border:none;background:transparent;font-size:22px;cursor:pointer;line-height:1;color:inherit">&times;</button>')
+    +'</div>';
   h+='<div style="display:flex;gap:8px;align-items:center;margin-top:14px;flex-wrap:wrap">'
     +'<input id="payAllVal" type="number" step="0.01" placeholder="15.15" style="width:110px;padding:8px 10px;border:1px solid var(--line2,#d5dde0);border-radius:8px;font-size:13.5px;background:transparent;color:inherit">'
     +'<button onclick="_payFillBlank()" style="border:1px solid var(--line2,#d5dde0);background:transparent;color:inherit;border-radius:8px;padding:8px 12px;font-size:12.5px;cursor:pointer">Fill the blanks with this</button></div>';
   h+='<div style="display:flex;flex-direction:column;gap:6px;margin-top:14px">';
   people.forEach(function(n){
-    const pr=(window._profiles||{})[n]||{};
-    const sal=+pr.salary>0;
+    const q=JSON.stringify(n).replace(/"/g,'&quot;');
+    const sal=+(window._paySal[n]||0)>0;
     const v=cur[n]!=null? cur[n] : '';
     const low = !sal && v!=='' && +v < MINW;
     h+='<div style="display:flex;gap:10px;align-items:center;border:1px solid '+(low?'#E4B8A8':'var(--line2,#d5dde0)')+';background:'+(low?'#F9EDE8':'transparent')+';border-radius:10px;padding:9px 12px">'
@@ -538,47 +566,210 @@ window._payRender = function(){
       +'<span style="flex:1;min-width:0;font-size:13.5px;font-weight:600">'+esc(n)+'</span>'
       +'<span class="muted" style="font-size:11.5px;min-width:82px">'+esc(posOf(n))+'</span>'
       + (sal
-          ? '<span class="muted" style="font-size:12.5px;min-width:120px;text-align:right">salaried &middot; $'+Number(pr.salary).toLocaleString()+'</span>'
+          ? '<span style="display:flex;align-items:center;gap:4px"><span class="muted" style="font-size:12.5px">salary $</span>'
+            +'<input type="number" step="500" value="'+esc(String(window._paySal[n]||''))+'" oninput="_paySalSet('+q+',this.value)" onblur="_payRender()" style="width:104px;padding:7px 9px;border:1px solid var(--line2,#d5dde0);border-radius:8px;font-size:13.5px;background:var(--card,#fff);color:inherit">'
+            +'<span class="muted" style="font-size:11.5px">/yr</span></span>'
           : '<span style="display:flex;align-items:center;gap:4px"><span class="muted" style="font-size:13px">$</span>'
-            +'<input type="number" step="0.01" value="'+esc(String(v))+'" data-payfor="'+esc(n)+'" oninput="_paySet('+JSON.stringify(n).replace(/"/g,'&quot;')+',this.value)" style="width:92px;padding:7px 9px;border:1px solid var(--line2,#d5dde0);border-radius:8px;font-size:13.5px;background:var(--card,#fff);color:inherit"></span>')
+            +'<input type="number" step="0.01" value="'+esc(String(v))+'" data-payfor="'+esc(n)+'" oninput="_paySet('+q+',this.value)" style="width:92px;padding:7px 9px;border:1px solid var(--line2,#d5dde0);border-radius:8px;font-size:13.5px;background:var(--card,#fff);color:inherit"><span class="muted" style="font-size:11.5px">/hr</span></span>')
+      +'<button onclick="_payToggleSal('+q+')" title="'+(sal?'Switch to an hourly rate':'This person is salaried')+'" style="border:1px solid var(--line2,#d5dde0);background:transparent;color:inherit;border-radius:7px;padding:5px 9px;font-size:11.5px;cursor:pointer;flex:none">'+(sal?'Hourly':'Salaried')+'</button>'
       +'</div>'
       + (low? '<div style="font-size:11.5px;color:#A8401C;margin:-2px 0 2px 12px">Below the $'+MINW.toFixed(2)+' minimum</div>' : '');
   });
   h+='</div>';
   h+='<div style="display:flex;gap:9px;margin-top:18px;align-items:center;flex-wrap:wrap">'
     +'<button onclick="_paySave()" id="payGo" style="background:var(--brand,#4a9cad);color:#fff;border:none;border-radius:9px;padding:11px 20px;font-weight:700;cursor:pointer">Save pay rates</button>'
-    +'<button onclick="var m=document.getElementById(\'payModal\');if(m)m.remove()" style="background:transparent;border:1px solid var(--line2,#d5dde0);border-radius:9px;padding:11px 16px;cursor:pointer;color:inherit">Cancel</button>'
+    + (inline?'':'<button onclick="var m=document.getElementById(\'payModal\');if(m)m.remove()" style="background:transparent;border:1px solid var(--line2,#d5dde0);border-radius:9px;padding:11px 16px;cursor:pointer;color:inherit">Cancel</button>')
     +'<span id="payMsg" class="muted" style="font-size:12.5px"></span></div>';
   c.innerHTML=h;
 };
 window._paySet = function(n,v){ window._payCur[n] = v===''? null : +v; };
+window._paySalSet = function(n,v){ window._paySal[n] = v===''? null : +v; };
+window._payToggleSal = function(n){
+  /* Hourly and salary are the same question answered two ways, so only one can hold a
+     value at a time -- otherwise labour cost has to guess which one you meant. */
+  if(+(window._paySal[n]||0)>0){ window._paySal[n]=null; }
+  else { window._paySal[n]=0.0001; window._payCur[n]=null; }   // placeholder so the row switches; a real figure is required to save
+  _payRender();
+  setTimeout(function(){ const el=document.querySelector('#payCard input[type=number][step="500"]'); },0);
+};
 window._payFillBlank = function(){
   const v=+(document.getElementById('payAllVal')||{}).value;
   if(!(v>0)) { alert('Put a rate in the box first.'); return; }
   window._payPeople.forEach(function(n){
-    const pr=(window._profiles||{})[n]||{};
-    if(+pr.salary>0) return;                                  // salaried people have no hourly rate
+    if(+(window._paySal[n]||0)>0) return;                     // salaried people have no hourly rate
     if(window._payCur[n]==null || window._payCur[n]==='') window._payCur[n]=v;
   });
   _payRender();
 };
 window._paySave = async function(){
   const go=document.getElementById('payGo'), msg=document.getElementById('payMsg');
+  const half=window._payPeople.filter(n=>{ const sv=+(window._paySal[n]||0); return sv>0 && sv<1000; });
+  if(half.length){ if(msg){ msg.style.color='#B32D2D'; msg.textContent='Put a yearly figure in for '+half[0]+', or switch them back to hourly.'; } return; }
   if(go){ go.disabled=true; go.textContent='Saving…'; }
   const rows=[], clear=[];
   window._payPeople.forEach(function(n){
-    const pr=(window._profiles||{})[n]||{};
-    if(+pr.salary>0){ clear.push(n); return; }                 // salaried: no hourly row at all
+    if(+(window._paySal[n]||0)>0){ clear.push(n); return; }     // salaried: no hourly row at all
     const v=window._payCur[n];
     if(v==null || v==='' || !(+v>0)) { clear.push(n); return; }
     rows.push({person_name:n, wage:+v, updated_at:new Date().toISOString()});
   });
+  try{
+    /* Salary lives on the person's profile because that is what the schedule already reads.
+       Only the ones that changed get rewritten. */
+    const S=window._paySal, S0=window._paySal0||{};
+    for(const n of window._payPeople){
+      const now=(+S[n]>0)? +S[n] : null, was=(+S0[n]>0)? +S0[n] : null;
+      if(now===was) continue;
+      const d=(window._profiles||{})[n]||(window._profiles[n]={});
+      if(now==null) delete d.salary; else d.salary=now;
+      await _saveProfileImmediate(n);
+    }
+  }catch(e){
+    if(msg){ msg.style.color='#B32D2D'; msg.textContent='Not saved: '+(e.message||e); }
+    if(go){ go.disabled=false; go.textContent='Try again'; } return;
+  }
   if(clear.length){ const d=await sb.from('pay_rates').delete().in('person_name', clear); if(d.error && msg){ msg.style.color='#B32D2D'; msg.textContent=d.error.message; } }
   if(rows.length){ const u=await sb.from('pay_rates').upsert(rows);
     if(u.error){ if(msg){ msg.style.color='#B32D2D'; msg.textContent='Not saved: '+u.error.message; } if(go){ go.disabled=false; go.textContent='Try again'; } return; } }
   const m=document.getElementById('payModal'); if(m) m.remove();
+  if(state.page==='pay'){ try{ vPay(document.getElementById('view')); }catch(e){} }
+  else { try{ vBrain(document.getElementById('view')); }catch(e){} }
+};
+
+/* ---------- Contact details in one place ----------
+   The app records every notification -- schedule published, availability approved -- and
+   then has nowhere to send it. Four of seventeen people had an email on file and eleven
+   had no account at all, which nothing in the app showed you. Delivery is worthless before
+   this is filled in: a schedule that reaches a quarter of the team is worse than one that
+   reaches nobody, because you stop telling people in person. Same shape as pay: one screen,
+   everybody visible, gaps flagged. */
+window.openContactEditor = async function(){
+  await loadSettings(); await loadPositions(); await loadProfiles(); await loadArchived();
+  const people = rosterNames().filter(n=>!isArchived(n)).sort();
+  let accts=[];
+  try{ const r=await sb.from('profiles').select('name'); accts=(r.data||[]).map(x=>x.name); }catch(e){}
+  window._ctAcct = new Set(accts);
+  window._ctPeople = people;
+  window._ctVals = {};
+  people.forEach(function(n){
+    const pr=(window._profiles||{})[n]||{};
+    window._ctVals[n] = { email:(pr.email||'').trim(), mobile:(pr.mobile||'').trim(),
+                          _e0:(pr.email||'').trim(), _m0:(pr.mobile||'').trim() };
+  });
+  let w=document.getElementById('ctModal'); if(w) w.remove();
+  w=document.createElement('div'); w.id='ctModal';
+  w.style.cssText='position:fixed;inset:0;z-index:10060;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:16px';
+  w.innerHTML='<div id="ctCard" style="background:var(--card,#fff);color:var(--ink,#111);border-radius:16px;max-width:620px;width:100%;max-height:90vh;overflow:auto;padding:22px 24px;box-shadow:0 20px 60px rgba(0,0,0,.3)"></div>';
+  document.body.appendChild(w); _ctRender();
+};
+window._ctIsEmail = function(s){ return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test((s||'').trim()); };
+window._ctDigits  = function(s){ return (s||'').replace(/\D/g,''); };
+window._ctIsPhone = function(s){ const d=_ctDigits(s); return d.length===10 || (d.length===11 && d[0]==='1'); };
+window._ctRender = function(){
+  const c=document.getElementById('ctCard'); if(!c) return;
+  const people=window._ctPeople, V=window._ctVals, A=window._ctAcct;
+  const nEmail = people.filter(n=>_ctIsEmail(V[n].email)).length;
+  const nAcct  = people.filter(n=>A.has(n)).length;
+  const code   = (state.settings&&state.settings.join_code)||'';
+  let h='<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">'
+    +'<div><div style="font-weight:800;font-size:20px">Contact details</div>'
+    +'<div class="muted" style="font-size:13px;margin-top:3px">How your team hears about a new schedule. Without an email address, they do not.</div></div>'
+    +'<button onclick="var m=document.getElementById(\'ctModal\');if(m)m.remove()" style="border:none;background:transparent;font-size:22px;cursor:pointer;line-height:1;color:inherit">&times;</button></div>';
+
+  h+='<div style="display:flex;gap:18px;flex-wrap:wrap;margin-top:14px;padding:12px 14px;border:1px solid var(--line2,#d5dde0);border-radius:11px">'
+    +'<div><div style="font-size:19px;font-weight:800;font-variant-numeric:tabular-nums">'+nEmail+' / '+people.length+'</div>'
+      +'<div class="faint" style="font-size:11.5px">can be emailed</div></div>'
+    +'<div><div style="font-size:19px;font-weight:800;font-variant-numeric:tabular-nums">'+nAcct+' / '+people.length+'</div>'
+      +'<div class="faint" style="font-size:11.5px">have signed in</div></div>'
+    + (code? '<div style="flex:1;min-width:150px;display:flex;align-items:center;justify-content:flex-end">'
+        +'<button onclick="copyInvite('+JSON.stringify(code).replace(/"/g,'&quot;')+')" style="border:1px solid var(--line2,#d5dde0);background:transparent;color:inherit;border-radius:8px;padding:8px 12px;font-size:12.5px;cursor:pointer"><i class="ti ti-copy"></i> Copy the invite</button></div>' : '')
+    +'</div>';
+
+  h+='<div style="display:flex;flex-direction:column;gap:6px;margin-top:14px">';
+  people.forEach(function(n){
+    const v=V[n];
+    const badEmail = v.email!=='' && !_ctIsEmail(v.email);
+    const badPhone = v.mobile!=='' && !_ctIsPhone(v.mobile);
+    const missing  = !_ctIsEmail(v.email);
+    const bord = (badEmail||badPhone) ? '#E4B8A8' : (missing? '#E4CFA3' : 'var(--line2,#d5dde0)');
+    const bg   = (badEmail||badPhone) ? '#F9EDE8' : 'transparent';
+    const q=JSON.stringify(n).replace(/"/g,'&quot;');
+    h+='<div style="border:1px solid '+bord+';background:'+bg+';border-radius:10px;padding:10px 12px">'
+      +'<div style="display:flex;gap:9px;align-items:baseline;flex-wrap:wrap">'
+        +'<span style="font-size:13.5px;font-weight:600">'+esc(n)+'</span>'
+        +'<span class="muted" style="font-size:11.5px">'+esc(posOf(n))+'</span>'
+        + (A.has(n) ? '<span style="font-size:10.5px;font-weight:700;color:#2C6E4B;border:1px solid #B9D6C4;border-radius:99px;padding:1px 7px">signed in</span>'
+                    : '<span style="font-size:10.5px;font-weight:700;color:#7A5B1E;border:1px solid #E4CFA3;border-radius:99px;padding:1px 7px">no account yet</span>')
+      +'</div>'
+      +'<div style="display:flex;gap:8px;margin-top:7px;flex-wrap:wrap">'
+        +'<input type="email" value="'+esc(v.email)+'" placeholder="email address" autocomplete="off"'
+          +' oninput="_ctSet('+q+',\'email\',this.value)" onblur="_ctRender()"'
+          +' style="flex:1;min-width:180px;padding:7px 9px;border:1px solid var(--line2,#d5dde0);border-radius:8px;font-size:13px;background:var(--card,#fff);color:inherit">'
+        +'<input type="tel" value="'+esc(v.mobile)+'" placeholder="mobile (optional)" autocomplete="off"'
+          +' oninput="_ctSet('+q+',\'mobile\',this.value)" onblur="_ctRender()"'
+          +' style="width:150px;padding:7px 9px;border:1px solid var(--line2,#d5dde0);border-radius:8px;font-size:13px;background:var(--card,#fff);color:inherit">'
+      +'</div>'
+      + (badEmail? '<div style="font-size:11.5px;color:#A8401C;margin-top:5px">That does not look like an email address</div>':'')
+      + (badPhone? '<div style="font-size:11.5px;color:#A8401C;margin-top:5px">A mobile number should be 10 digits</div>':'')
+      +'</div>';
+  });
+  h+='</div>';
+  h+='<div style="display:flex;gap:9px;margin-top:18px;align-items:center;flex-wrap:wrap">'
+    +'<button onclick="_ctSave()" id="ctGo" style="background:var(--brand,#4a9cad);color:#fff;border:none;border-radius:9px;padding:11px 20px;font-weight:700;cursor:pointer">Save contacts</button>'
+    +'<button onclick="var m=document.getElementById(\'ctModal\');if(m)m.remove()" style="background:transparent;border:1px solid var(--line2,#d5dde0);border-radius:9px;padding:11px 16px;cursor:pointer;color:inherit">Cancel</button>'
+    +'<span id="ctMsg" class="muted" style="font-size:12.5px"></span></div>';
+  c.innerHTML=h;
+};
+window._ctSet = function(n,k,val){ const v=window._ctVals[n]; if(v) v[k]=val; };
+window._ctSave = async function(){
+  const go=document.getElementById('ctGo'), msg=document.getElementById('ctMsg');
+  const V=window._ctVals;
+  const bad=window._ctPeople.filter(function(n){
+    return (V[n].email!=='' && !_ctIsEmail(V[n].email)) || (V[n].mobile!=='' && !_ctIsPhone(V[n].mobile));
+  });
+  if(bad.length){ if(msg){ msg.style.color='#B32D2D'; msg.textContent='Fix the flagged rows first.'; } return; }
+  if(go){ go.disabled=true; go.textContent='Saving…'; }
+  /* Only people whose details actually changed get written -- a blind seventeen-person
+     rewrite is slow and gives seventeen chances to lose something. */
+  const changed=window._ctPeople.filter(function(n){
+    return V[n].email.trim()!==V[n]._e0 || V[n].mobile.trim()!==V[n]._m0;
+  });
+  try{
+    for(const n of changed){
+      const d=(window._profiles||{})[n]||(window._profiles[n]={});
+      d.email  = V[n].email.trim();
+      d.mobile = V[n].mobile.trim();
+      await _saveProfileImmediate(n);
+    }
+  }catch(e){
+    if(msg){ msg.style.color='#B32D2D'; msg.textContent='Not saved: '+(e.message||e); }
+    if(go){ go.disabled=false; go.textContent='Try again'; }
+    return;
+  }
+  const m=document.getElementById('ctModal'); if(m) m.remove();
   try{ vBrain(document.getElementById('view')); }catch(e){}
 };
+/* The debounced writer is right for a checkbox nobody waits on. A Save button is waited on,
+   so this is the same merge without the timer -- and it throws, so the caller can say so. */
+async function _saveProfileImmediate(name){
+  const d=(window._profiles||{})[name]; if(!d) return;
+  const cur=await sb.from('day_items').select('id,detail').eq('kind','profile').eq('title',name)
+              .order('id',{ascending:false}).limit(1).maybeSingle();
+  if(cur.error) throw cur.error;
+  let stored={}; try{ stored=JSON.parse((cur.data&&cur.data.detail)||'{}')||{}; }catch(e){ stored={}; }
+  const merged=Object.assign({}, stored, d);
+  const del=await sb.from('day_items').delete().eq('kind','profile').eq('title',name);
+  if(del.error) throw del.error;
+  const ins=await sb.from('day_items').insert({kind:'profile',title:name,on_date:null,
+              detail:JSON.stringify(merged),created_by:state.user.id});
+  if(ins.error){
+    /* Put it back rather than leave the person with no profile at all. */
+    if(cur.data) await sb.from('day_items').insert({kind:'profile',title:name,on_date:null,
+                    detail:cur.data.detail,created_by:state.user.id});
+    throw ins.error;
+  }
+  window._profiles[name]=merged;
+}
 
 async function vBrain(v){
   if(!canSee('brain')){ go('home'); return; }
@@ -606,6 +797,11 @@ async function vBrain(v){
     const d=JSON.parse((rrev.data&&rrev.data.detail)||'null');
     if(d && Array.isArray(d.people)){ avReviewed=true; avNew=people.filter(n=>d.people.indexOf(n)<0); }
   }catch(e){}
+  /* Reachability. Everyone on the roster counts here, owners included -- the point is
+     whether a published schedule can actually get to a person, and that is not a question
+     about their job title. */
+  const allPeople = rosterNames().filter(n=>!isArchived(n));
+  const reachable = allPeople.filter(n=>{ const e=(((window._profiles||{})[n]||{}).email||'').trim(); return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e); });
   const paid = new Set((rpay.data||[]).filter(r=>+r.wage>0).map(r=>r.person_name));
   const withPay = people.filter(n=>paid.has(n));
   let cov=null; try{ cov=JSON.parse((rcov.data&&rcov.data.detail)||'null'); }catch(e){}
@@ -631,7 +827,11 @@ async function vBrain(v){
      why:'Hours, days per week, days off in a row, longest shift. These decide what auto-draft is allowed to do, and they were the hardest thing in the app to find.',
      act:"go('schedule',{stab:'team'})", cta:'Open rules', soft:true},
     {k:'pay',      done: people.length? withPay.length===people.length : false, label:'Pay rates', detail: people.length? withPay.length+' of '+people.length+' people' : 'No team yet',
-     why:'Needed for labour cost and your labour target. Scheduling still works without it.', act:'openPayEditor()', cta:'Set pay', soft:true}
+     why:'Needed for labour cost and your labour target. Scheduling still works without it.', act:'openPayEditor()', cta:'Set pay', soft:true},
+    {k:'contact',  done: allPeople.length? reachable.length===allPeople.length : false, label:'Reaching your team',
+     detail: allPeople.length? reachable.length+' of '+allPeople.length+' have an email on file' : 'No team yet',
+     why:'Auto-draft does not need this, but a published schedule is only useful if people find out about it. Without an email address there is no way to tell them.',
+     act:'openContactEditor()', cta:'Add contacts', soft:true}
   ];
   const hard = parts.filter(p=>!p.soft);
   const ready = Math.round(hard.filter(p=>p.done).length / hard.length * 100);
@@ -1320,6 +1520,21 @@ async function boot(){
   }
   render();
   try{ updateBillingBanner(); }catch(e){}
+  /* Everyone who signs up gives Supabase an email address -- that is how auth works -- but
+     the roster never looked at it, so six people who could already be emailed showed as
+     unreachable. Copy it across after the app is on screen: it is housekeeping, and nobody
+     should wait on it or be asked for something the app is already holding. */
+  setTimeout(async function(){
+    try{
+      const _addr=String((state.user&&state.user.email)||'').trim();
+      if(!_addr) return;
+      if(!window._profiles) await loadProfiles();
+      const _mine=myRosterName(); if(!_mine) return;
+      const _pr=window._profiles[_mine]||(window._profiles[_mine]={});
+      if(String(_pr.email||'').trim()) return;
+      _pr.email=_addr; _saveProfileNow(_mine);
+    }catch(e){}
+  }, 1500);
 }
 function updateBillingBanner(){ let el=document.getElementById('billingBanner'); if(!BILLING_LIVE){ if(el)el.remove(); return; } const bs=billingState(); const admin=(state.profile&&state.profile.role==='admin'); let msg='',bg='',fg='',act=''; if(bs.status==='trialing'){ const d=bs.daysLeft; if(d==null||d>5){ if(el)el.remove(); return; } msg=(d<=0?'Your trial ends today':('Trial ends in '+d+' day'+(d===1?'':'s')))+'.'; bg='#FFF7E6'; fg='#8A5A00'; if(admin)act='<button class="btn pri" style="width:auto;padding:4px 12px;font-size:12px;margin-left:10px" onclick="startCheckout(\'month\')">Add payment</button>'; }
   else if(bs.status==='past_due'){ msg='Payment didn’t go through — update your card to avoid losing access.'; bg='#FCEBEB'; fg='#8A1C1C'; if(admin)act='<button class="btn" style="width:auto;padding:4px 12px;font-size:12px;margin-left:10px" onclick="openBillingPortal()">Update card</button>'; }
