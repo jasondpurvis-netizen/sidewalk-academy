@@ -480,16 +480,23 @@ async function vBrain(v){
   setTitle('The Brain','What your restaurant knows about itself — everything auto-draft needs, in one place');
   v.innerHTML='<div class="muted">Loading…</div>';
   await loadSettings(); await loadPositions(); await loadProfiles(); await loadArchived();
-  const [rcov, rav, rpay] = await Promise.all([
+  const [rcov, rav, rpay, rrev] = await Promise.all([
     sb.from('day_items').select('detail').eq('kind','covrules').order('id',{ascending:false}).limit(1).maybeSingle(),
     sb.from('availability').select('person_name'),
-    sb.from('pay_rates').select('person_name,wage')
+    sb.from('pay_rates').select('person_name,wage'),
+    sb.from('day_items').select('detail').eq('kind','avreview').order('id',{ascending:false}).limit(1).maybeSingle()
   ]);
   const people = rosterNames().filter(n=>!isArchived(n) && posOf(n)!=='Owner');
   const stations = (state.settings && Array.isArray(state.settings.stations)) ? state.settings.stations : [];
   const skilled = people.filter(n=>(((window._profiles||{})[n]||{}).roles||[]).length>0);
-  const avail = new Set((rav.data||[]).map(r=>r.person_name));
-  const withAvail = people.filter(n=>avail.has(n));
+  /* Availability is judged by whether the team has been reviewed, not by how many rows
+     exist -- somebody free all week legitimately has none. Anyone hired since the last
+     review is flagged, so a new starter is caught without invalidating the whole pass. */
+  let avReviewed=false, avNew=[];
+  try{
+    const d=JSON.parse((rrev.data&&rrev.data.detail)||'null');
+    if(d && Array.isArray(d.people)){ avReviewed=true; avNew=people.filter(n=>d.people.indexOf(n)<0); }
+  }catch(e){}
   const paid = new Set((rpay.data||[]).filter(r=>+r.wage>0).map(r=>r.person_name));
   const withPay = people.filter(n=>paid.has(n));
   let cov=null; try{ cov=JSON.parse((rcov.data&&rcov.data.detail)||'null'); }catch(e){}
@@ -505,7 +512,10 @@ async function vBrain(v){
      why:'This is how many people you need, hour by hour. Without it there is nothing to staff against.', act:"go('schedule',{stab:'schedule'}); setTimeout(function(){try{localStorage.setItem('sch_setup_open','1');var b=document.getElementById('schSetup');if(b)b.style.display='block';var e=document.getElementById('schSetup');if(e)e.scrollIntoView({behavior:'smooth',block:'center'});}catch(err){}},1200)", cta:'Set coverage'},
     {k:'leaders',  done: leaders.length>0,         label:'Leadership',      detail: leaders.length? leaders.length+' leader'+(leaders.length>1?'s':'') : 'Nobody assigned',
      why:'Every shift needs someone in charge. Auto-draft protects open and close first.', act:"go('team',{ttab:'roster'})", cta:'Set positions'},
-    {k:'avail',    done: people.length? withAvail.length===people.length : false, label:'Availability', detail: people.length? withAvail.length+' of '+people.length+' people' : 'No team yet',
+    {k:'avail',    done: avReviewed && !avNew.length, label:'Availability',
+     detail: !avReviewed ? 'Not reviewed yet'
+             : avNew.length ? avNew.length+' new '+(avNew.length===1?'person needs':'people need')+' checking'
+             : 'Reviewed for all '+people.length,
      why:'Auto-draft will schedule people when they cannot work until it knows their hours.', act:'openAvailSetup()', cta:'Set availability'},
     {k:'pay',      done: people.length? withPay.length===people.length : false, label:'Pay rates', detail: people.length? withPay.length+' of '+people.length+' people' : 'No team yet',
      why:'Needed for labour cost and your labour target. Scheduling still works without it.', act:"go('schedule',{stab:'team'})", cta:'Set pay', soft:true}
@@ -587,15 +597,15 @@ window.openAvailSetup=async function(){
   document.body.appendChild(w); _asRender();
 };
 window._asFinish=async function(){
-  const people=window._asPeople||[];
-  const untouched=people.filter(n=>!Object.keys((window._avail||{})[n]||{}).length);
-  if(untouched.length){
-    const ok=confirm(untouched.length+' '+(untouched.length===1?'person has':'people have')+' nothing set:\n\n'
-      +untouched.map(n=>dispName(n)).join(', ')
-      +'\n\nRecord them as available all day, every day?\n\nPress Cancel to go back and set them.');
-    if(!ok) return;
-    for(const n of untouched){ for(let d=0; d<7; d++){ await _avUpsert(n,d,{can_work:true,note:null}); } }
-  }
+  /* Somebody available all week needs no records at all -- a blank square already means
+     that. Counting records therefore punished the easy cases: a person with nothing to
+     declare looked unfinished until you clicked something at them, which is busywork.
+     So record the review itself, along with who was on the team when it happened. A
+     blank stays a blank; the pass is what gets marked done. New hires afterwards are
+     detected by name and asked for, rather than resetting the whole thing. */
+  const people=(window._asPeople||[]).slice().sort();
+  await window._replaceKind('avreview', {kind:'avreview', title:'avreview', on_date:null,
+    detail: JSON.stringify({at:new Date().toISOString(), people:people}), created_by:state.user.id});
   const m=document.getElementById('asModal'); if(m) m.remove();
   try{ go('brain'); }catch(e){}
 };
@@ -642,21 +652,12 @@ window._asRender=function(){
       +'</td></tr>';
   });
   h+='</tbody></table></div>';
-  /* A blank square means "available all day", which is the right default -- but it is
-     also what an untouched person looks like. The schedule cannot tell "I checked, they
-     are free" from "I never got to them", and it will happily place the second sort on
-     any shift at any hour. Finishing makes the blanks explicit, so from then on a blank
-     really does mean confirmed. */
-  const untouched = people.filter(n=>!Object.keys((window._avail||{})[n]||{}).length);
+  /* Finishing records that the review happened. A blank square legitimately means
+     "available all day", so there is nothing to fill in for most people. */
   h+='<div style="display:flex;gap:9px;margin-top:16px;align-items:center;flex-wrap:wrap">'
     +'<button onclick="_asFinish()" style="background:var(--brand,#4a9cad);color:#fff;border:none;border-radius:9px;padding:11px 20px;font-weight:700;cursor:pointer">Done</button>'
     +'<span class="muted" style="font-size:12.5px">Saves as you go.</span></div>';
-  if(untouched.length){
-    h+='<div style="margin-top:12px;background:#F7EEDC;border-left:3px solid #7A5B1E;border-radius:9px;padding:12px 14px">'
-      +'<div style="font-weight:700;font-size:13.5px;color:#7A5B1E">'+untouched.length+' '+(untouched.length===1?'person has':'people have')+' nothing set</div>'
-      +'<div style="font-size:12.5px;line-height:1.55;color:#7A5B1E;margin-top:4px">'+untouched.map(n=>esc(dispName(n))).join(', ')
-      +'. They will be treated as available every day, any hour. If that is right, press Done and it gets recorded as their pattern.</div></div>';
-  }
+
   c.innerHTML=h;
 };
 window._asOpen=function(name,wd,ev){
