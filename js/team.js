@@ -23,7 +23,28 @@ async function vTeamSkills(v){
   v.innerHTML=h;
 }
 window._roleSaveTmr={};
-function _saveProfileNow(name){ clearTimeout(window._roleSaveTmr[name]); window._roleSaveTmr[name]=setTimeout(async()=>{ const d=window._profiles[name]; if(!d)return; try{ await sb.from('day_items').delete().eq('kind','profile').eq('title',name); await sb.from('day_items').insert({kind:'profile',title:name,on_date:null,detail:JSON.stringify(d),created_by:state.user.id}); }catch(e){} },500); }
+function _saveProfileNow(name){
+  /* This deletes the stored profile and writes whatever is in memory. If memory holds a
+     partial object -- a screen that only ever loaded someone's stations, say, or code that
+     created a blank profile to add one field to -- everything else on that person is
+     destroyed: hours, wage, contact details, emergency contact. That is how a co-owner's
+     profile ended up containing nothing but a station list.
+     Now it reads the stored record first and merges over it, so a screen that knows about
+     one field can only ever change that field. Keys explicitly set to undefined or null in
+     memory are still removed, so deleting a value on purpose still works. */
+  clearTimeout(window._roleSaveTmr[name]);
+  window._roleSaveTmr[name]=setTimeout(async()=>{
+    const d=window._profiles[name]; if(!d)return;
+    try{
+      const cur=await sb.from('day_items').select('id,detail').eq('kind','profile').eq('title',name).order('id',{ascending:false}).limit(1).maybeSingle();
+      let stored={}; try{ stored=JSON.parse((cur.data&&cur.data.detail)||'{}')||{}; }catch(e){ stored={}; }
+      const merged=Object.assign({}, stored, d);
+      await sb.from('day_items').delete().eq('kind','profile').eq('title',name);
+      await sb.from('day_items').insert({kind:'profile',title:name,on_date:null,detail:JSON.stringify(merged),created_by:state.user.id});
+      window._profiles[name]=merged;
+    }catch(e){}
+  },500);
+}
 window.toggleRole=function(name,station,checked){ const d=window._profiles[name]||(window._profiles[name]={}); const roles=Array.isArray(d.roles)?d.roles:(d.roles=[]); const i=roles.indexOf(station); if(checked&&i<0) roles.push(station); if(!checked&&i>=0) roles.splice(i,1); _saveProfileNow(name); const c=document.querySelector('#teambody'); };
 window.cycleLevel=function(name,station,btn){ const d=window._profiles[name]||(window._profiles[name]={}); const sl=(d.skillLevels&&typeof d.skillLevels==='object')?d.skillLevels:(d.skillLevels={}); const roles=Array.isArray(d.roles)?d.roles:(d.roles=[]); let cur=(station in sl)?(+sl[station]||0):(roles.indexOf(station)>=0?2:0); const nx=(cur+1)%4; if(nx===0) delete sl[station]; else sl[station]=nx; const i=roles.indexOf(station); if(nx>=1&&i<0) roles.push(station); if(nx===0&&i>=0) roles.splice(i,1); _saveProfileNow(name); if(btn){ const LV=[['—','var(--muted)','var(--card)'],['L','#fff','#B7791F'],['S','#fff','var(--brand)'],['E','#fff','#1B7B3F']]; btn.textContent=LV[nx][0]; btn.style.color=LV[nx][1]; btn.style.background=LV[nx][2]; } };
 window.toggleCap=function(name,cap,checked){ const d=window._profiles[name]||(window._profiles[name]={}); const caps=(d.caps&&typeof d.caps==='object')?d.caps:(d.caps={}); caps[cap]=!!checked; _saveProfileNow(name); };
