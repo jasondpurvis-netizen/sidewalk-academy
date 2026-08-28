@@ -516,15 +516,6 @@ window._payLoad = async function(){
   window._paySal = sal;
   window._paySal0 = Object.assign({}, sal);
 };
-window.openPayEditor = async function(){
-  window._payInline=false;
-  await _payLoad();
-  let w=document.getElementById('payModal'); if(w) w.remove();
-  w=document.createElement('div'); w.id='payModal';
-  w.style.cssText='position:fixed;inset:0;z-index:10060;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:16px';
-  w.innerHTML='<div id="payCard" style="background:var(--card,#fff);color:var(--ink,#111);border-radius:16px;max-width:560px;width:100%;max-height:90vh;overflow:auto;padding:22px 24px;box-shadow:0 20px 60px rgba(0,0,0,.3)"></div>';
-  document.body.appendChild(w); _payRender();
-};
 /* The sidebar had its own Pay rates page with a second, worse version of this list -- first
    names only, no minimum-wage check, no idea who was salaried -- writing to the same table.
    Two screens for one number is how a rate ends up wrong in the one you did not open. The
@@ -771,6 +762,16 @@ async function _saveProfileImmediate(name){
   window._profiles[name]=merged;
 }
 
+/* The Brain used to open its own pay editor and its own availability grid, on top of the
+   real ones. That is two doors to one room, and which door you came through decided what
+   you could do once inside. It points now, and edits nothing: every row hands you to the
+   screen that owns that fact. When something moves, it moves here and nowhere else. */
+window.goEdit=function(what){
+  if(what==='pay'){ go('pay'); return; }
+  /* The grid lives on that tab now, so this only has to get you there. Opening a modal
+     on arrival would put a second copy on top of the one already on the page. */
+  if(what==='avail'){ go('schedule',{stab:'availability'}); return; }
+};
 async function vBrain(v){
   if(!canSee('brain')){ go('home'); return; }
   setTitle('The Brain','What your restaurant knows about itself — everything auto-draft needs, in one place');
@@ -821,21 +822,22 @@ async function vBrain(v){
      detail: !avReviewed ? 'Not reviewed yet'
              : avNew.length ? avNew.length+' new '+(avNew.length===1?'person needs':'people need')+' checking'
              : 'Reviewed for all '+people.length,
-     why:'Auto-draft will schedule people when they cannot work until it knows their hours.', act:'openAvailSetup()', cta:'Set availability'},
+     why:'Auto-draft will schedule people when they cannot work until it knows their hours.', act:"goEdit('avail')", cta:'Set availability'},
     {k:'rules',    done: ruleCount>0, label:'Scheduling rules',
      detail: ruleCount? ruleCount+' of '+people.length+' people have limits set' : 'Nobody has limits set',
      why:'Hours, days per week, days off in a row, longest shift. These decide what auto-draft is allowed to do, and they were the hardest thing in the app to find.',
      act:"go('schedule',{stab:'team'})", cta:'Open rules', soft:true},
-    {k:'pay',      done: people.length? withPay.length===people.length : false, label:'Pay rates', detail: people.length? withPay.length+' of '+people.length+' people' : 'No team yet',
-     why:'Needed for labour cost and your labour target. Scheduling still works without it.', act:'openPayEditor()', cta:'Set pay', soft:true},
+    {k:'pay',      skip: !canSee('pay'), done: people.length? withPay.length===people.length : false, label:'Pay rates', detail: people.length? withPay.length+' of '+people.length+' people' : 'No team yet',
+     why:'Needed for labour cost and your labour target. Scheduling still works without it.', act:"goEdit('pay')", cta:'Set pay', soft:true},
     {k:'contact',  done: allPeople.length? reachable.length===allPeople.length : false, label:'Reaching your team',
      detail: allPeople.length? reachable.length+' of '+allPeople.length+' have an email on file' : 'No team yet',
      why:'Auto-draft does not need this, but a published schedule is only useful if people find out about it. Without an email address there is no way to tell them.',
      act:'openContactEditor()', cta:'Add contacts', soft:true}
   ];
-  const hard = parts.filter(p=>!p.soft);
+  const shown = parts.filter(p=>!p.skip);
+  const hard = shown.filter(p=>!p.soft);
   const ready = Math.round(hard.filter(p=>p.done).length / hard.length * 100);
-  const blocking = parts.filter(p=>!p.done && !p.soft);
+  const blocking = shown.filter(p=>!p.done && !p.soft);
 
   let h = '';
 
@@ -853,7 +855,7 @@ async function vBrain(v){
   </div>`;
 
   h += `<div class="sec">What it knows</div><div class="card" style="padding:0;overflow:hidden">`;
-  parts.forEach((p,i)=>{
+  shown.forEach((p,i)=>{
     h += `<div style="display:flex;gap:13px;align-items:flex-start;padding:15px 17px;${i?'border-top:1px solid var(--line)':''}">
       <i class="ti ${p.done?'ti-circle-check':'ti-circle-dashed'}" style="font-size:20px;flex:none;margin-top:1px;color:${p.done?'#2C6E4B':'var(--muted)'}"></i>
       <div style="flex:1;min-width:0">
@@ -897,18 +899,24 @@ window._timeOpts=function(sel){
   }
   return out;
 };
-window.openAvailSetup=async function(){
+window._asLoad=async function(){
   const people=rosterNames().filter(n=>!isArchived(n)&&posOf(n)!=='Owner').sort();
-  if(!people.length){ alert('Add your team first — there is nobody to set availability for.'); return; }
+  if(!people.length) return false;
   const r=await sb.from('availability').select('*');
   window._avail={}; (r.data||[]).forEach(row=>{ (window._avail[row.person_name]=window._avail[row.person_name]||{})[row.weekday]=row; });
   window._asPeople=people;
-  let w=document.getElementById('asModal'); if(w) w.remove();
-  w=document.createElement('div'); w.id='asModal';
-  w.style.cssText='position:fixed;inset:0;z-index:10060;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:14px';
-  w.innerHTML='<div id="asCard" style="background:var(--card,#fff);color:var(--ink,#111);border-radius:16px;max-width:920px;width:100%;max-height:92vh;overflow:auto;padding:20px 22px;box-shadow:0 20px 60px rgba(0,0,0,.3)"></div>';
-  document.body.appendChild(w); _asRender();
+  return true;
 };
+/* Team availability is rendered straight onto the Availability tab now. It used to be a
+   read-only grid there with a button that opened a second, different-looking grid on top
+   of it -- the same seven days twice, and only one of them could be typed into. */
+window.renderAvailInline=async function(el){
+  if(!await _asLoad()){ el.innerHTML='<div class="card" style="padding:20px;text-align:center"><div class="faint">No team yet.</div></div>'; return; }
+  el.innerHTML='<div id="asCard"></div>';
+  _asRender();
+};
+/* The modal version is gone. Availability had a grid on the Availability tab and a second
+   grid in a pop-up, and keeping both meant every change here had to be made twice. */
 window._asFinish=async function(){
   /* Somebody available all week needs no records at all -- a blank square already means
      that. Counting records therefore punished the easy cases: a person with nothing to
@@ -919,8 +927,7 @@ window._asFinish=async function(){
   const people=(window._asPeople||[]).slice().sort();
   await window._replaceKind('avreview', {kind:'avreview', title:'avreview', on_date:null,
     detail: JSON.stringify({at:new Date().toISOString(), people:people}), created_by:state.user.id});
-  const m=document.getElementById('asModal'); if(m) m.remove();
-  try{ go('brain'); }catch(e){}
+  const b=document.getElementById('asDoneMsg'); if(b){ b.textContent='Marked as reviewed ✓'; }
 };
 window._asState=function(n,wd){
   const row=((window._avail||{})[n]||{})[wd];
@@ -945,10 +952,7 @@ window._asRender=function(){
               : {bg:'#E1EFE7',fg:'#2C6E4B',t:'All day'};
     return '<td style="padding:3px"><button onclick="_asOpen('+JSON.stringify(n).replace(/"/g,'&quot;')+','+wd+',event)" style="width:100%;border:none;border-radius:8px;padding:8px 4px;font-size:11.5px;font-weight:700;cursor:pointer;background:'+tone.bg+';color:'+tone.fg+'">'+esc(tone.t)+'</button></td>';
   };
-  let h='<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">'
-    +'<div><div style="font-weight:800;font-size:20px">Who can work when</div>'
-    +'<div class="muted" style="font-size:13px;margin-top:3px">Everyone can work all day unless you say otherwise. Tap any square to change it.</div></div>'
-    +'<button onclick="var m=document.getElementById(\'asModal\');if(m)m.remove(); try{go(\'brain\');}catch(e){}" style="border:none;background:transparent;font-size:22px;cursor:pointer;line-height:1;color:inherit">&times;</button></div>';
+  let h='<div class="muted" style="font-size:13px;margin:-4px 0 2px">Everyone can work all day unless you say otherwise. Tap any square to change it.</div>';
   h+='<div style="overflow-x:auto;margin-top:14px"><table style="width:100%;border-collapse:collapse;min-width:640px">'
     +'<thead><tr><th style="text-align:left;padding:6px 8px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);position:sticky;left:0;background:var(--card,#fff)">Person</th>'
     + SHORT.map(d=>'<th style="padding:6px 4px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">'+d+'</th>').join('')
@@ -968,8 +972,8 @@ window._asRender=function(){
   /* Finishing records that the review happened. A blank square legitimately means
      "available all day", so there is nothing to fill in for most people. */
   h+='<div style="display:flex;gap:9px;margin-top:16px;align-items:center;flex-wrap:wrap">'
-    +'<button onclick="_asFinish()" style="background:var(--brand,#4a9cad);color:#fff;border:none;border-radius:9px;padding:11px 20px;font-weight:700;cursor:pointer">Done</button>'
-    +'<span class="muted" style="font-size:12.5px">Saves as you go.</span></div>';
+    +'<button onclick="_asFinish()" style="background:var(--brand,#4a9cad);color:#fff;border:none;border-radius:9px;padding:11px 20px;font-weight:700;cursor:pointer">Mark as reviewed</button>'
+    +'<span class="muted" style="font-size:12.5px" id="asDoneMsg">Saves as you go.</span></div>';
 
   c.innerHTML=h;
 };
