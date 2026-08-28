@@ -738,35 +738,7 @@ window.autoDraft=async function(opts){
   const _caps=n=>{ const c=(profileOf(n)||{}).caps; return (c&&typeof c==='object')?c:null; };
   const canOpen=n=>{ const c=_caps(n); return c?(('open'in c)?!!c.open:isLeader(n)):isLeader(n); };
   const canClose=n=>{ const c=_caps(n);
-  /* Within the open and close waves, take the HARDEST day first, not the busiest.
-     Filling greedily by demand gave Saturday and Sunday their pick of all three leaders,
-     and by Tuesday the two who can work it had both hit their day caps -- so Tuesday and
-     Wednesday came out with nobody in charge while Friday to Sunday had three each.
-     Saturday is the easy day precisely because everyone can work it. Tuesday is the scarce
-     one, so it has to claim someone while there is still someone to claim. Count how many
-     people could actually cover each anchor and do the thinnest days first. */
-  const _cands = (sl) => {
-    let c=0;
-    Object.keys(window._posMap||{}).forEach(function(n){
-      if(isArchived(n)) return;
-      if(posOf(n)==='Trainee' || posOf(n)==='Owner') return;
-      if(!fitsAvail(n, sl.dow, sl.start, sl.end)) return;
-      const w=_wave(sl);
-      if(w===0 && !canOpen(n)) return;
-      if(w===1 && !canClose(n)) return;
-      c++;
-    });
-    return c;
-  };
-  const _scarce={};
-  slots.forEach(function(sl){ const w=_wave(sl); if(w<2){ const k=w+'|'+sl.dow; if(_scarce[k]===undefined) _scarce[k]=_cands(sl); } });
-  const _sc = sl => { const w=_wave(sl); return w<2 ? (_scarce[w+'|'+sl.dow]||0) : 0; };
-  slots.sort((a,b)=>
-      _wave(a)-_wave(b)                       // every day's open, then every day's close
-   || (_wave(a)<2 ? _sc(a)-_sc(b) : 0)        // hardest-to-staff day first within a wave
-   || (_dem[b.dow]-_dem[a.dow])               // then the busiest days
-   || (a.start||'').localeCompare(b.start||'')
-   || a.dow-b.dow); return c?(('close'in c)?!!c.close:isLeader(n)):isLeader(n); };
+ return c?(('close'in c)?!!c.close:isLeader(n)):isLeader(n); };
   const hasSkill=(n,st)=>{ if(!st) return true; const pr=profileOf(n)||{}; return Array.isArray(pr.roles)?pr.roles.includes(st):true; }; // required-role check; if a person has no skills list yet, don't block them (same rule as station gate)
   const lvlOf=(n,st)=>{ if(!st) return 0; const pr=profileOf(n)||{}; const sl=pr.skillLevels; if(sl&&typeof sl==='object'&&(st in sl)) return +sl[st]||0; return hasSkill(n,st)?2:0; }; // proficiency 1=Learning 2=Solid 3=Expert; legacy "trained" reads as Solid
   const skillDayOk=(n,st,dw)=>{ if(!st) return true; const sd=(profileOf(n)||{}).skillDays; if(!sd||!Array.isArray(sd[st])) return true; return sd[st].indexOf(dw)<0; }; // day-restricted skill: owner keeps this person OFF station 'st' on weekday dw (e.g. off the bar on busy Saturdays) — still schedulable elsewhere that day
@@ -807,7 +779,36 @@ window.autoDraft=async function(opts){
   Object.keys(daySlots).forEach(dw=>{ const arr=daySlots[dw]; if(!arr.length) return; let mn=Infinity,mx=-Infinity; arr.forEach(sl=>{ const a=parseClock(sl.start),b=parseClock(sl.end); if(a!=null&&a<mn)mn=a; if(b!=null&&b>mx)mx=b; }); const span=mx-mn; if(!(span>0)) return; const third=span/3; arr.forEach(sl=>{ const a=parseClock(sl.start),b=parseClock(sl.end); sl._earlyLean=(a!=null&&a<=mn+third+1e-9); sl._lateLean=(b!=null&&b>=mx-third-1e-9); }); });
   // longest shifts first (so anchors + full shifts go to top priority), then busiest day
   // Fill the BUSIEST days first (so weekend peaks claim their people before a slow weekday uses them up), then longest-shift-first within each day (anchors full-timers to the long shifts). Fixes: at a low shift-minimum, short peak shifts used to sort last and go open once the roster hit its day/hour caps.
-  const orderSlots=slots.slice().sort((a,b)=> ((_dem[b.dow]||0)-(_dem[a.dow]||0)) || (hrsOf(b)-hrsOf(a)) || a.dow-b.dow || (a.start||'').localeCompare(b.start||''));
+  /* Leader anchors first, and among them the day that is hardest to staff.
+     Sorting purely by demand let Saturday and Sunday take their pick of all three leaders,
+     and by the time Tuesday came up both people who can work it had hit their day caps --
+     so Friday to Sunday carried three leaders each and Tuesday and Wednesday had none.
+     Saturday is easy precisely because everyone can work it; Tuesday is scarce, so it has
+     to claim someone while there is still someone to claim. Count who could actually
+     cover each anchor and take the thinnest days first. */
+  const _anchCands=(sl)=>{
+    if(!sl._leadReq) return 99;
+    let c=0;
+    Object.keys(window._posMap||{}).forEach(function(n){
+      if(isArchived(n)) return;
+      if(!canCover(n)) return;
+      if(sl._leadReq==='opening' ? !canOpen(n) : !canClose(n)) return;
+      if(prefOff(n, sl.dow)) return;
+      if(!fitsAvail(n, sl.dow, sl.start, sl.end)) return;
+      c++;
+    });
+    return c;
+  };
+  const _anchScarce={};
+  slots.forEach(function(sl){ if(sl._leadReq){ const k=sl._leadReq+'|'+sl.dow; if(_anchScarce[k]===undefined) _anchScarce[k]=_anchCands(sl); } });
+  const _scOf=sl=>sl._leadReq ? (_anchScarce[sl._leadReq+'|'+sl.dow]||0) : 99;
+  const orderSlots=slots.slice().sort((a,b)=>
+      ((b._leadReq?1:0)-(a._leadReq?1:0))                 // every leader anchor before anything else
+   || (_scOf(a)-_scOf(b))                                  // hardest-to-staff day first
+   || ((_dem[b.dow]||0)-(_dem[a.dow]||0))
+   || (hrsOf(b)-hrsOf(a))
+   || a.dow-b.dow
+   || (a.start||'').localeCompare(b.start||''));
   const reqStOf=sl=>sl._needSkill||(sl.station&&!isRankLabel(sl.station)?sl.station:'');
   // Days off are a HARD rule: the draft never schedules someone on a day they've said they're off. Schedulers would rather it hold the line and let them override by hand than quietly break it.
   const eligForSlot=(n,sl,iso,hrs,ignoreLen)=>{ const needLeader=!!sl._leadReq; return canCover(n)&&!prefOff(n,sl.dow)&&(!needLeader||(sl._leadReq==='opening'?canOpen(n):canClose(n)))&&(!sl._needSkill||hasSkill(n,sl._needSkill))&&(!sl._needSkill||skillDayOk(n,sl._needSkill,sl.dow))&&(!sl._minLevel||lvlOf(n,reqStOf(sl))>=sl._minLevel)&&eligible(n,sl,iso,hrs,ignoreLen); };
