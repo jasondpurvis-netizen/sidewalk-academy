@@ -3668,7 +3668,13 @@ window._impParse=function(text){
     var k=p.name.toLowerCase();
     if(!byName[k]){ byName[k]={name:p.name, stations:[], rank:p.rank, wage:p.wage, hire:p.hire, rows:0}; order.push(k); }
     var g=byName[k]; g.rows++;
-    if(p.station && g.stations.indexOf(p.station)<0) g.stations.push(p.station);
+    /* A vendor's "Role" list is not a station list. It mixes real stations (Roller,
+       Cashier) with ranks (Manager, Supervisor/Leader, OJR) and catch-all categories
+       (BOH, FOH). Ranks are already handled by _impRank and belong on the roster; broad
+       categories are unanswerable as a skill -- "who can work BOH" covers Baker, Roller
+       and dishes at once. Import the real ones and leave the rest out. */
+    if(p.station && !/^(manager|supervisor|leader|supervisor\/leader|gm|owner|ojr|ojr am|ojr pm|trainer|trainee|boh|foh|back of house|front of house|kitchen)$/i.test(p.station.trim())
+       && g.stations.indexOf(p.station)<0) g.stations.push(p.station);
     if(RANKW[p.rank] > RANKW[g.rank]) g.rank=p.rank;      // keep the most senior title they hold
     if(p.wage && (!g.wage || p.wage>g.wage)) g.wage=p.wage; // roles can carry different rates; keep the highest
     if(p.hire && (!g.hire || p.hire<g.hire)) g.hire=p.hire; // earliest hire date is the real start
@@ -4044,7 +4050,7 @@ async function vBrain(v){
 
   const parts = [
     {k:'stations', done: stations.length>0,        label:'Stations',        detail: stations.length? stations.length+' set up' : 'None yet',
-     why:'Auto-draft cannot place anyone until it knows what jobs exist.', act:'openConceptSetup()', cta: stations.length?'Edit stations':'Set up stations'},
+     why:'Auto-draft cannot place anyone until it knows what jobs exist.', act: stations.length?'openStationClean()':'openConceptSetup()', cta: stations.length?'Tidy up stations':'Set up stations'},
     {k:'skills',   done: people.length? skilled.length===people.length : false, label:'Who works where', detail: people.length? skilled.length+' of '+people.length+' people' : 'No team yet',
      why:'Without skills, auto-draft will put people on stations they cannot run.', act:'openSkillsSetup()', cta:'Set skills'},
     {k:'coverage', done: covSet,                   label:'Coverage rules',  detail: covSet? 'Matrix set' : 'Not set',
@@ -4187,6 +4193,7 @@ window._asSet=async function(name,kind){
   }
   _asRender();
 };
+window._asGo=function(step){ window._asDay=Math.max(0,Math.min(7,window._asDay+step)); _asRender(); };
 window._asWin=async function(name,from,to){
   const wd=window._asDay;
   const row=((window._avail||{})[name]||{})[wd];
@@ -4242,6 +4249,94 @@ window.markNotifsSeen=function(){
     (window._notifs||[]).forEach(function(n){ seen[n.id]=1; });
     localStorage.setItem('notif_seen', JSON.stringify(seen));
   }catch(e){}
+};
+
+
+/* ---------- Cleaning up stations ----------
+   The roster import turned every 7shifts "Role" into a station, which was wrong: that
+   list mixes real stations (Roller, Cashier), broad categories (BOH, FOH) and ranks
+   (Manager, Supervisor/Leader, OJR am/PM). Categories are not stations -- "who can work
+   BOH" is unanswerable when BOH contains Baker, Roller and dishes -- and ranks belong on
+   the roster, not the skills matrix. And some are plain duplicates: Coffee is Barista.
+   So: rename, merge or drop stations, and carry everyone's skills across as you go.
+   Merging is the important one -- deleting Coffee would lose who can run the bar. */
+window.openStationClean=async function(){
+  await loadProfiles(); await loadPositions(); await loadArchived();
+  const people=rosterNames().filter(n=>!isArchived(n));
+  const list=(state.settings&&Array.isArray(state.settings.stations))?state.settings.stations.slice():[];
+  const seen={}; people.forEach(n=>{ (((window._profiles||{})[n]||{}).roles||[]).forEach(st=>{ if(st&&list.indexOf(st)<0) list.push(st); }); });
+  window._scList=list.map(function(st){
+    const n=people.filter(p=>((((window._profiles||{})[p]||{}).roles)||[]).indexOf(st)>=0).length;
+    return {name:st, orig:st, count:n, drop:false, mergeTo:''};
+  });
+  let w=document.getElementById('scModal'); if(w) w.remove();
+  w=document.createElement('div'); w.id='scModal';
+  w.style.cssText='position:fixed;inset:0;z-index:10060;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:18px';
+  w.innerHTML='<div id="scCard" style="background:var(--card,#fff);color:var(--ink,#111);border-radius:16px;max-width:640px;width:100%;max-height:88vh;overflow:auto;padding:22px 24px;box-shadow:0 20px 60px rgba(0,0,0,.3)"></div>';
+  document.body.appendChild(w); _scRender();
+};
+window._scRender=function(){
+  const c=document.getElementById('scCard'); if(!c) return;
+  const L=window._scList;
+  const RANKY=/^(manager|supervisor|leader|supervisor\/leader|gm|owner|ojr|ojr am|ojr pm|trainer|trainee)$/i;
+  const BROAD=/^(boh|foh|back of house|front of house|kitchen)$/i;
+  let h='<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">'
+    +'<div><div style="font-weight:800;font-size:20px">Tidy up your stations</div>'
+    +'<div class="muted" style="font-size:13px;margin-top:4px;line-height:1.55">Rename anything to what your team actually calls it. Merge duplicates so nobody loses a skill. Drop the ones that are ranks or catch-alls rather than a job someone stands at.</div></div>'
+    +'<button onclick="var m=document.getElementById(\'scModal\');if(m)m.remove()" style="border:none;background:transparent;font-size:22px;cursor:pointer;line-height:1;color:inherit">&times;</button></div>';
+  h+='<div style="display:flex;flex-direction:column;gap:8px;margin-top:16px">';
+  L.forEach(function(r,i){
+    const flag = RANKY.test(r.orig) ? 'This is a rank, not a station' : (BROAD.test(r.orig) ? 'This is a catch-all, not a station' : '');
+    h+='<div style="border:1px solid '+(r.drop?'#E4B8A8':'var(--line2,#d5dde0)')+';background:'+(r.drop?'#F9EDE8':'transparent')+';border-radius:11px;padding:11px 13px">'
+      +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
+      +'<input value="'+esc(r.name)+'" oninput="_scName('+i+',this.value)" '+(r.drop?'disabled':'')+' style="flex:1;min-width:150px;padding:8px 11px;border:1px solid var(--line2,#d5dde0);border-radius:8px;font-size:13.5px;background:transparent;color:inherit">'
+      +'<span class="muted" style="font-size:12px;white-space:nowrap">'+r.count+' '+(r.count===1?'person':'people')+'</span>'
+      +'<select onchange="_scMerge('+i+',this.value)" style="padding:8px 9px;border:1px solid var(--line2,#d5dde0);border-radius:8px;font-size:12.5px;background:transparent;color:inherit">'
+        +'<option value="">Keep separate</option>'
+        + L.map(function(o,j){ return j===i||o.drop? '' : '<option value="'+esc(o.name)+'"'+(r.mergeTo===o.name?' selected':'')+'>Merge into '+esc(o.name)+'</option>'; }).join('')
+      +'</select>'
+      +'<button onclick="_scDrop('+i+')" style="border:none;background:transparent;font-size:12.5px;font-weight:600;cursor:pointer;color:'+(r.drop?'#2C6E4B':'#A8401C')+'">'+(r.drop?'Keep':'Drop')+'</button>'
+      +'</div>'
+      + (flag && !r.drop ? '<div style="font-size:11.5px;margin-top:6px;color:#7A5B1E">'+esc(flag)+'</div>' : '')
+      + (r.mergeTo ? '<div style="font-size:11.5px;margin-top:6px;color:#2F7F91">Everyone here keeps the skill as <b>'+esc(r.mergeTo)+'</b>.</div>' : '')
+      +'</div>';
+  });
+  h+='</div>';
+  h+='<div style="display:flex;gap:9px;margin-top:18px;align-items:center;flex-wrap:wrap">'
+    +'<button onclick="_scSave()" id="scGo" style="background:var(--brand,#4a9cad);color:#fff;border:none;border-radius:9px;padding:11px 20px;font-weight:700;cursor:pointer">Save stations</button>'
+    +'<button onclick="var m=document.getElementById(\'scModal\');if(m)m.remove()" style="background:transparent;border:1px solid var(--line2,#d5dde0);border-radius:9px;padding:11px 16px;cursor:pointer;color:inherit">Cancel</button>'
+    +'<span id="scMsg" class="muted" style="font-size:12.5px"></span></div>';
+  c.innerHTML=h;
+};
+window._scName=function(i,v){ window._scList[i].name=v; };
+window._scMerge=function(i,v){ window._scList[i].mergeTo=v; if(v) window._scList[i].drop=false; _scRender(); };
+window._scDrop=function(i){ const r=window._scList[i]; r.drop=!r.drop; if(r.drop) r.mergeTo=''; _scRender(); };
+window._scSave=async function(){
+  const L=window._scList, msg=document.getElementById('scMsg'), go=document.getElementById('scGo');
+  if(go){ go.disabled=true; go.textContent='Saving…'; }
+  // what each old station becomes: itself renamed, something else, or nothing
+  const map={};
+  L.forEach(function(r){
+    if(r.drop) map[r.orig]=null;
+    else if(r.mergeTo) map[r.orig]=r.mergeTo;
+    else map[r.orig]=String(r.name||'').trim()||r.orig;
+  });
+  const finalList=[]; L.forEach(function(r){ const to=map[r.orig]; if(to && finalList.indexOf(to)<0) finalList.push(to); });
+  const rk=await window._replaceKind('stations', finalList.length? {kind:'stations',title:'stations',on_date:null,detail:JSON.stringify(finalList),created_by:state.user.id} : []);
+  if(!rk.ok){ if(msg){ msg.style.color='#B32D2D'; msg.textContent=window._replaceMsg(rk); } if(go){ go.disabled=false; go.textContent='Try again'; } return; }
+  state.settings.stations=finalList;
+  // carry everyone's skills across, so a rename or merge never silently loses one
+  let moved=0;
+  const people=rosterNames().filter(n=>!isArchived(n));
+  for(const n of people){
+    const d=(window._profiles||{})[n]; if(!d||!Array.isArray(d.roles)||!d.roles.length) continue;
+    const next=[];
+    d.roles.forEach(function(st){ const to=Object.prototype.hasOwnProperty.call(map,st)? map[st] : st; if(to && next.indexOf(to)<0) next.push(to); });
+    if(next.join('|')!==d.roles.join('|')){ d.roles=next; try{ _saveProfileNow(n); moved++; }catch(e){} }
+  }
+  const m=document.getElementById('scModal'); if(m) m.remove();
+  alert('Stations saved.\n\n'+finalList.length+' station'+(finalList.length===1?'':'s')+' kept'+(moved?', and '+moved+' '+(moved===1?'person\'s skills were':'people\'s skills were')+' carried across.':'.'));
+  try{ vBrain(document.getElementById('view')); }catch(e){}
 };
 
 async function teamRoster(v){
