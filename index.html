@@ -4131,6 +4131,20 @@ window.openAvailSetup=async function(){
   w.innerHTML='<div id="asCard" style="background:var(--card,#fff);color:var(--ink,#111);border-radius:16px;max-width:580px;width:100%;max-height:88vh;overflow:auto;padding:22px 24px;box-shadow:0 20px 60px rgba(0,0,0,.3)"></div>';
   document.body.appendChild(w); _asRender();
 };
+
+/* A native <input type="time"> is a poor fit here: on desktop the minutes field needs
+   an exact keystroke and 2:15 is genuinely fiddly. Restaurant hours land on quarter
+   hours anyway, so offer those directly -- one tap, no typing, no wrong minute. */
+window._timeOpts=function(sel){
+  var out='';
+  for(var m=4*60; m<=23*60+45; m+=15){
+    var hh=Math.floor(m/60), mm=m%60;
+    var v=(hh<10?'0':'')+hh+':'+(mm<10?'0':'')+mm;
+    var lbl=((hh%12)||12)+':'+(mm<10?'0':'')+mm+(hh<12?'a':'p');
+    out+='<option value="'+v+'"'+(v===sel?' selected':'')+'>'+lbl+'</option>';
+  }
+  return out;
+};
 window._asRender=function(){
   const c=document.getElementById('asCard'); if(!c) return;
   const i=window._asDay, people=window._asPeople;
@@ -4173,10 +4187,11 @@ window._asRender=function(){
           +'<button onclick="_asSet('+nm+',\'part\')" style="border:none;border-radius:7px;padding:6px 11px;font-size:12px;font-weight:600;cursor:pointer;background:'+(st.k==='part'?'#7A5B1E':'rgba(0,0,0,.06)')+';color:'+(st.k==='part'?'#fff':'inherit')+'">Some hours</button>'
           +'<button onclick="_asSet('+nm+',\'off\')" style="border:none;border-radius:7px;padding:6px 11px;font-size:12px;font-weight:600;cursor:pointer;background:'+(st.k==='off'?'#A8401C':'rgba(0,0,0,.06)')+';color:'+(st.k==='off'?'#fff':'inherit')+'">Can\'t work</button>'
           + (st.k==='part'
-              ? '<span style="display:flex;gap:5px;align-items:center;width:100%;margin-top:2px"><span class="muted" style="font-size:12px">from</span>'
-                +'<input type="time" value="'+esc(st.from||'')+'" onchange="_asWin('+nm+',this.value,null)" style="padding:6px 8px;border:1px solid var(--line2,#d5dde0);border-radius:7px;font-size:12.5px;background:var(--card,#fff);color:inherit">'
+              ? '<span style="display:flex;gap:5px;align-items:center;width:100%;margin-top:2px;flex-wrap:wrap"><span class="muted" style="font-size:12px">from</span>'
+                +'<select onchange="_asWin('+nm+',this.value,null)" style="padding:6px 8px;border:1px solid var(--line2,#d5dde0);border-radius:7px;font-size:12.5px;background:var(--card,#fff);color:inherit">'+_timeOpts(st.from||'09:00')+'</select>'
                 +'<span class="muted" style="font-size:12px">to</span>'
-                +'<input type="time" value="'+esc(st.to||'')+'" onchange="_asWin('+nm+',null,this.value)" style="padding:6px 8px;border:1px solid var(--line2,#d5dde0);border-radius:7px;font-size:12.5px;background:var(--card,#fff);color:inherit"></span>'
+                +'<select onchange="_asWin('+nm+',null,this.value)" style="padding:6px 8px;border:1px solid var(--line2,#d5dde0);border-radius:7px;font-size:12.5px;background:var(--card,#fff);color:inherit">'+_timeOpts(st.to||'17:00')+'</select>'
+                +'<button onclick="_asSpread('+nm+')" style="border:none;background:transparent;font-size:12px;font-weight:600;cursor:pointer;color:#2F7F91;padding:0 2px">Use these hours every day</button></span>'
               : '')
           +'</div>';
       }).join('')
@@ -4195,6 +4210,23 @@ window._asSet=async function(name,kind){
     const row=((window._avail||{})[name]||{})[wd];
     const w=parseWin((row&&row.note)||'') || ['09:00','17:00'];   // a sensible starting window they can adjust
     await _avUpsert(name,wd,{can_work:true,note:w[0]+'-'+w[1]});
+  }
+  _asRender();
+};
+window._asSpread=async function(name){
+  /* Kayla works 6 to 2 most days. Setting that seven times, day by day, is the sort of
+     repetition that makes people abandon setup halfway. Copy it across, then change the
+     one or two days that differ. */
+  const wd=window._asDay;
+  const row=((window._avail||{})[name]||{})[wd];
+  const w=parseWin((row&&row.note)||'');
+  if(!w){ alert('Set the hours first, then copy them across.'); return; }
+  if(!confirm('Give '+dispName(name)+' these hours ('+w[0]+'\u2013'+w[1]+') on every day of the week?\n\nDays you have marked as cannot work stay that way.')) return;
+  for(let d=0; d<7; d++){
+    if(d===wd) continue;
+    const r2=((window._avail||{})[name]||{})[d];
+    if(r2 && r2.can_work===false) continue;           // do not undo a day off
+    await _avUpsert(name, d, {can_work:true, note:w[0]+'-'+w[1]});
   }
   _asRender();
 };
