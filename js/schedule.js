@@ -865,6 +865,31 @@ window.autoDraft=async function(opts){
        Adding them as scored terms rather than more sort order means the existing search
        finds the fixes itself, including ones needing two or three moves to reach. */
     const covRulesMatrixBlocks = (cov && cov.matrix && Array.isArray(cov.matrix.blocks)) ? cov.matrix.blocks : [];
+
+    /* ---------- Keep people on their usual days ----------
+       The loudest complaint about every auto-scheduler is not that it breaks rules, it is
+       that it feels random: "the software distributes the shifts based on people's
+       availability seems very random -- it would be better if it took into consideration
+       the employees schedule from last week." Somebody who has worked Tue/Thu/Sat for six
+       months expects Tue/Thu/Sat, and a draft that reshuffles everyone -- even to a better
+       answer -- gets thrown away and the week gets copied instead.
+       Copying is familiar but stale: it keeps shifts for people who have left, ignores time
+       off booked since, and staffs a $3,300 Sunday like a $1,200 Tuesday. Anchoring gets
+       both -- last week's pattern where it still holds, re-solved where it does not.
+       Last week is already loaded as 'tmpl' for shift shapes; this uses who actually
+       worked them. Weighted below the hard rules, so it is a preference, never a cage. */
+    const ANCHOR_PEN = 18;
+    const _usualDays = {};   // person -> Set of weekday indexes they worked last week
+    (tmpl||[]).forEach(function(e){
+      if(!e.person_name || e.person_name==='__OPEN__') return;
+      const wd=(new Date(e.on_date+'T00:00').getDay()+6)%7;
+      (_usualDays[e.person_name]=_usualDays[e.person_name]||new Set()).add(wd);
+    });
+    const _anchorTerm = (n, iso) => {
+      const u=_usualDays[n]; if(!u || !u.size) return 0;          // new starter: no pattern to keep
+      const wd=(new Date(iso+'T00:00').getDay()+6)%7;
+      return u.has(wd) ? 0 : ANCHOR_PEN;                          // off their usual day costs a little
+    };
     const _isLead = n => LEADER.has(posOf(n));
     const _volOf = {};            // how heavy each day is, from what the matrix asks for
     isoDays.forEach((iso,di)=>{ let v=0; (covRulesMatrixBlocks||[]).forEach(b=>{ v+=(+b.n[di]||0); }); _volOf[iso]=v; });
@@ -902,6 +927,10 @@ window.autoDraft=async function(opts){
       let v=0;
       isos.forEach(iso=>{ v += _leadTerm(iso) + _overTerm(iso); });
       names.forEach(n=>{ if(n && n!=='__OPEN__') v += _offRunTerm(n); });
+      // continuity: whoever is on a day, prefer it to be someone who usually works it
+      isos.forEach(iso=>{
+        draft.forEach(e=>{ if(e.on_date===iso && e.person_name && e.person_name!=='__OPEN__') v += _anchorTerm(e.person_name, iso); });
+      });
       return v;
     };
 
