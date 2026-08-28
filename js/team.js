@@ -586,6 +586,19 @@ window.openAvailSetup=async function(){
   w.innerHTML='<div id="asCard" style="background:var(--card,#fff);color:var(--ink,#111);border-radius:16px;max-width:920px;width:100%;max-height:92vh;overflow:auto;padding:20px 22px;box-shadow:0 20px 60px rgba(0,0,0,.3)"></div>';
   document.body.appendChild(w); _asRender();
 };
+window._asFinish=async function(){
+  const people=window._asPeople||[];
+  const untouched=people.filter(n=>!Object.keys((window._avail||{})[n]||{}).length);
+  if(untouched.length){
+    const ok=confirm(untouched.length+' '+(untouched.length===1?'person has':'people have')+' nothing set:\n\n'
+      +untouched.map(n=>dispName(n)).join(', ')
+      +'\n\nRecord them as available all day, every day?\n\nPress Cancel to go back and set them.');
+    if(!ok) return;
+    for(const n of untouched){ for(let d=0; d<7; d++){ await _avUpsert(n,d,{can_work:true,note:null}); } }
+  }
+  const m=document.getElementById('asModal'); if(m) m.remove();
+  try{ go('brain'); }catch(e){}
+};
 window._asState=function(n,wd){
   const row=((window._avail||{})[n]||{})[wd];
   if(!row) return {k:'all'};
@@ -629,9 +642,21 @@ window._asRender=function(){
       +'</td></tr>';
   });
   h+='</tbody></table></div>';
+  /* A blank square means "available all day", which is the right default -- but it is
+     also what an untouched person looks like. The schedule cannot tell "I checked, they
+     are free" from "I never got to them", and it will happily place the second sort on
+     any shift at any hour. Finishing makes the blanks explicit, so from then on a blank
+     really does mean confirmed. */
+  const untouched = people.filter(n=>!Object.keys((window._avail||{})[n]||{}).length);
   h+='<div style="display:flex;gap:9px;margin-top:16px;align-items:center;flex-wrap:wrap">'
-    +'<button onclick="var m=document.getElementById(\'asModal\');if(m)m.remove(); try{go(\'brain\');}catch(e){}" style="background:var(--brand,#4a9cad);color:#fff;border:none;border-radius:9px;padding:11px 20px;font-weight:700;cursor:pointer">Done</button>'
+    +'<button onclick="_asFinish()" style="background:var(--brand,#4a9cad);color:#fff;border:none;border-radius:9px;padding:11px 20px;font-weight:700;cursor:pointer">Done</button>'
     +'<span class="muted" style="font-size:12.5px">Saves as you go.</span></div>';
+  if(untouched.length){
+    h+='<div style="margin-top:12px;background:#F7EEDC;border-left:3px solid #7A5B1E;border-radius:9px;padding:12px 14px">'
+      +'<div style="font-weight:700;font-size:13.5px;color:#7A5B1E">'+untouched.length+' '+(untouched.length===1?'person has':'people have')+' nothing set</div>'
+      +'<div style="font-size:12.5px;line-height:1.55;color:#7A5B1E;margin-top:4px">'+untouched.map(n=>esc(dispName(n))).join(', ')
+      +'. They will be treated as available every day, any hour. If that is right, press Done and it gets recorded as their pattern.</div></div>';
+  }
   c.innerHTML=h;
 };
 window._asOpen=function(name,wd,ev){
