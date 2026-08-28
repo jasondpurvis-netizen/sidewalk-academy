@@ -3843,8 +3843,13 @@ window._impCommit=async function(){
 window._skillStations=function(){
   var list=[];
   try{ if(Array.isArray(state.settings.stations)) list=state.settings.stations.slice(); }catch(e){}
-  // Stations imported onto people may not be in the configured list yet; include them.
+  /* Stations imported onto people may not be in the configured list yet, so include
+     them -- but only from people who still work here. Archived staff keep whatever they
+     were imported with, and folding those back in resurrects every station the owner
+     just cleaned up: a tidied list of 10 came back as 16 because eight former employees
+     still carried BOH, FOH, Coffee and Cashier. */
   try{ Object.keys(window._profiles||{}).forEach(function(n){
+    if(typeof isArchived==='function' && isArchived(n)) return;
     var r=(window._profiles[n]||{}).roles; if(Array.isArray(r)) r.forEach(function(st){ if(st && list.indexOf(st)<0) list.push(st); });
   }); }catch(e){}
   return list;
