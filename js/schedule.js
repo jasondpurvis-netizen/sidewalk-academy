@@ -621,7 +621,52 @@ window.readMyWeek=async function(){
   }catch(e){ const out=document.getElementById('rmwOut'); if(out) out.innerHTML='<div class="faint">Couldn\'t read the week: '+esc(String((e&&e.message)||e))+'</div>'; }
 };
 window.copyLastWeek=async function(){ const base=state.ctx.wk?wkDate(state.ctx.wk):weekStart(new Date()); const cur=weekStart(base); const start=new Date(cur); start.setDate(start.getDate()-7*8); const end=new Date(cur); end.setDate(end.getDate()-1); const r=await sb.from('shifts').select('on_date').gte('on_date',isoDate(start)).lte('on_date',isoDate(end)); const byWk={}; (r.data||[]).forEach(s=>{ const ws=isoDate(weekStart(new Date(s.on_date+'T00:00:00'))); byWk[ws]=(byWk[ws]||0)+1; }); const weeks=Object.keys(byWk).sort().reverse(); if(!weeks.length){ alert('No past week with shifts to copy from (I looked back 8 weeks). Build a week first, or use Auto-draft.'); return; } const ov=document.createElement('div'); ov.id='cwOv'; ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.42);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px'; const card=document.createElement('div'); card.style.cssText='background:var(--card);color:var(--ink);border-radius:14px;padding:22px;max-width:400px;width:100%;box-shadow:0 12px 44px rgba(0,0,0,.32);max-height:80vh;overflow:auto'; card.innerHTML=`<div style="font-weight:700;font-size:16px;margin-bottom:4px">Copy a week into this one</div><div class="faint" style="font-size:13px;margin-bottom:14px">Pick which week to copy. Its shifts drop straight onto the week you're viewing — edit from there.</div>`+weeks.map(ws=>{ const d=new Date(ws+'T00:00:00'); const e=new Date(d); e.setDate(e.getDate()+6); const lbl=d.toLocaleDateString(undefined,{month:'short',day:'numeric'})+' – '+e.toLocaleDateString(undefined,{month:'short',day:'numeric'}); return `<button class="btn" style="width:100%;justify-content:space-between;margin-bottom:8px" onclick="cwDo('${ws}')"><span>${lbl}</span><span class="faint" style="font-size:12px">${byWk[ws]} shift${byWk[ws]===1?'':'s'}</span></button>`; }).join('')+`<button class="btn" style="width:100%;margin-top:6px;color:var(--muted)" onclick="document.getElementById('cwOv').remove()">Cancel</button>`; ov.appendChild(card); ov.onclick=e=>{ if(e.target===ov) ov.remove(); }; document.body.appendChild(ov); };
-window.cwDo=async function(fromWs){ const ov=document.getElementById('cwOv'); if(ov) ov.remove(); const base=state.ctx.wk?wkDate(state.ctx.wk):weekStart(new Date()); const cur=weekStart(base); const from=new Date(fromWs+'T00:00:00'); const fromEnd=new Date(from); fromEnd.setDate(fromEnd.getDate()+6); const diffDays=Math.round((cur-from)/86400000); const r=await sb.from('shifts').select('*').gte('on_date',isoDate(from)).lte('on_date',isoDate(fromEnd)); const rows=(r.data||[]).map(s=>{ const nd=new Date(s.on_date+'T00:00:00'); nd.setDate(nd.getDate()+diffDays); return {person_name:s.person_name,role:s.role,on_date:isoDate(nd),start_time:s.start_time,end_time:s.end_time,kind:s.kind,user_id:s.user_id,note:s.note}; }); if(!rows.length){ alert('That week had no shifts.'); return; } await sb.from('shifts').insert(rows); vSchedule(document.getElementById('view')); };
+window.cwDo=async function(fromWs){ const ov=document.getElementById('cwOv'); if(ov) ov.remove(); const base=state.ctx.wk?wkDate(state.ctx.wk):weekStart(new Date()); const cur=weekStart(base); const from=new Date(fromWs+'T00:00:00'); const fromEnd=new Date(from); fromEnd.setDate(fromEnd.getDate()+6); const diffDays=Math.round((cur-from)/86400000); const r=await sb.from('shifts').select('*').gte('on_date',isoDate(from)).lte('on_date',isoDate(fromEnd)); /* Copy is what most schedulers actually reach for every week, so it should not be a
+     photocopy. A straight duplicate brings across shifts for people who have left, books
+     people who have since had time off approved, and ignores availability that changed in
+     between -- so the manager spends the time they just saved hunting for what is now wrong.
+     Copy the shape; drop what is no longer true; say plainly what was changed. */
+  let rows=(r.data||[]).map(s=>{ const nd=new Date(s.on_date+'T00:00:00'); nd.setDate(nd.getDate()+diffDays); return {person_name:s.person_name,role:s.role,on_date:isoDate(nd),start_time:s.start_time,end_time:s.end_time,kind:s.kind,user_id:s.user_id,note:s.note}; });
+  if(!rows.length){ alert('That week had no shifts.'); return; }
+  try{
+    await loadPositions(); await loadArchived();
+    const isoTo=rows.map(x=>x.on_date).sort();
+    const [rto, rav] = await Promise.all([
+      sb.from('time_off').select('person_name,start_date,end_date,status').eq('status','approved'),
+      sb.from('availability').select('person_name,weekday,can_work,note')
+    ]);
+    const avMap={}; (rav.data||[]).forEach(a=>{ (avMap[a.person_name]=avMap[a.person_name]||{})[a.weekday]={can_work:a.can_work,note:a.note}; });
+    const onLeaveNow=(n,iso)=>(rto.data||[]).some(t=>t.person_name===n && iso>=t.start_date && iso<=(t.end_date||t.start_date));
+    const fits=(n,iso,st,en)=>{
+      const wd=(new Date(iso+'T00:00').getDay()+6)%7;
+      const a=avMap[n]&&avMap[n][wd]; if(!a) return true;
+      if(a.can_work===false) return false;
+      const w=parseWin(a.note); if(!w) return true;
+      const p=t=>{ const m=/^(\d{1,2}):(\d{2})/.exec(t||''); return m? +m[1]*60 + +m[2] : null; };
+      const ws=p(w[0]), we=p(w[1]), ss=p(st), se=p(en);
+      if([ws,we,ss,se].some(v=>v==null)) return true;
+      return ss>=ws && se<=we;
+    };
+    const gone=[], off=[], unavail=[];
+    rows = rows.filter(x=>{
+      const n=x.person_name;
+      if(!n || n==='__OPEN__') return true;
+      if(isArchived(n)){ gone.push(n); return false; }
+      if(onLeaveNow(n,x.on_date)){ off.push(n+' on '+fmtDay(_d(x.on_date))); return false; }
+      if(!fits(n,x.on_date,x.start_time,x.end_time)){ unavail.push(n+' on '+fmtDay(_d(x.on_date))); return false; }
+      return true;
+    });
+    const uniq=a=>[...new Set(a)];
+    const notes=[];
+    if(gone.length)    notes.push('\u2022 Left out '+uniq(gone).length+' '+(uniq(gone).length===1?'person':'people')+' no longer on the team: '+uniq(gone).join(', '));
+    if(off.length)     notes.push('\u2022 Skipped '+off.length+' shift'+(off.length>1?'s':'')+' where time off is approved: '+uniq(off).slice(0,4).join(', ')+(uniq(off).length>4?'\u2026':''));
+    if(unavail.length) notes.push('\u2022 Skipped '+unavail.length+' shift'+(unavail.length>1?'s':'')+" where availability has changed since: "+uniq(unavail).slice(0,4).join(', ')+(uniq(unavail).length>4?'\u2026':''));
+    if(notes.length){
+      if(!confirm('Copying that week, with '+(gone.length+off.length+unavail.length)+' shift'+((gone.length+off.length+unavail.length)>1?'s':'')+' left out because they are no longer true:\n\n'+notes.join('\n')+'\n\nThose slots will be empty for you to fill. Go ahead?')) return;
+    }
+  }catch(e){ /* if any of that fails, fall back to a plain copy rather than blocking the week */ }
+  if(!rows.length){ alert('Nothing from that week still applies \u2014 everyone on it has left, is off, or is no longer available. Try Auto-draft instead.'); return; }
+  await sb.from('shifts').insert(rows); vSchedule(document.getElementById('view')); };
 window.autoDraft=async function(opts){
   opts=opts||{};
   const base=opts.week?wkDate(opts.week):(state.ctx.wk?wkDate(state.ctx.wk):weekStart(new Date()));
