@@ -335,7 +335,11 @@ h+=`<div class="board"><div class="board-grid"><div class="bh bh-team">Team</div
          week and each day still add up correctly. */
       const _sal=(profileOf(p.name)||{}).salary; const _salWk=(+_sal>0)? (+_sal)/52 : 0;
       let _rate = wage[p.name]||0;
-      if(_salWk){ const _h=list.reduce((a,s)=>a+shiftHours(s),0); _rate = _h>0 ? _salWk/_h : 0; }
+      if(_salWk){
+        // their whole week, not one day -- 'list' below is a single day's shifts
+        let _h=0; isoDays.forEach(function(_iso){ (byPD[p.name+'|'+_iso]||[]).forEach(function(_s){ _h+=shiftHours(_s); }); });
+        _rate = _h>0 ? _salWk/_h : 0;
+      }
       const cells=isoDays.map((iso,di)=>{ const list=byPD[p.name+'|'+iso]||[]; let cell=''; const isOjr=ojrByDay[iso]===p.name; const offRec=offMap[p.name]&&offMap[p.name][iso];
         // can this person work this day at all? drives the red flag on the chip and the red drop target
         const _av=avMapB[p.name]&&avMapB[p.name][di]; const _unavail=!!(_av&&_av.can_work===false);
