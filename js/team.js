@@ -513,6 +513,10 @@ async function vBrain(v){
   /* Availability is judged by whether the team has been reviewed, not by how many rows
      exist -- somebody free all week legitimately has none. Anyone hired since the last
      review is flagged, so a new starter is caught without invalidating the whole pass. */
+  /* How many people actually carry a scheduling limit. Someone with none is not wrong --
+     it means auto-draft may use them any day, any hours, up to the defaults. */
+  const RULE_KEYS=['minHrs','maxHrs','maxDays','maxRun','offRun','maxShift','salary'];
+  const ruleCount = people.filter(n=>{ const pr=(window._profiles||{})[n]||{}; return RULE_KEYS.some(k=>pr[k]!=null && pr[k]!==''); }).length;
   let avReviewed=false, avNew=[];
   try{
     const d=JSON.parse((rrev.data&&rrev.data.detail)||'null');
@@ -538,6 +542,10 @@ async function vBrain(v){
              : avNew.length ? avNew.length+' new '+(avNew.length===1?'person needs':'people need')+' checking'
              : 'Reviewed for all '+people.length,
      why:'Auto-draft will schedule people when they cannot work until it knows their hours.', act:'openAvailSetup()', cta:'Set availability'},
+    {k:'rules',    done: ruleCount>0, label:'Scheduling rules',
+     detail: ruleCount? ruleCount+' of '+people.length+' people have limits set' : 'Nobody has limits set',
+     why:'Hours, days per week, days off in a row, longest shift. These decide what auto-draft is allowed to do, and they were the hardest thing in the app to find.',
+     act:"go('schedule',{stab:'team'})", cta:'Open rules', soft:true},
     {k:'pay',      done: people.length? withPay.length===people.length : false, label:'Pay rates', detail: people.length? withPay.length+' of '+people.length+' people' : 'No team yet',
      why:'Needed for labour cost and your labour target. Scheduling still works without it.', act:"go('schedule',{stab:'team'})", cta:'Set pay', soft:true}
   ];
