@@ -2372,7 +2372,13 @@ async function schBoard(v){
             ? `<div style="font-size:12.5px;color:#7A2E2E;opacity:.9">These are in the past, so they stay on the record. Nothing upcoming to remove.</div>`
             : `<button class="btn" style="width:auto;padding:6px 12px;font-size:12.5px" onclick="clearFormerShifts()"><i class="ti ti-trash"></i> Remove ${_up} upcoming shift${_up>1?'s':''}</button>`)
         + `</div>`; } }
-  if(window._draftSummary){ const ds=window._draftSummary; window._draftSummary=null; h+=`<div class="card" style="padding:14px 16px;margin-bottom:14px;background:var(--brand-soft);border-color:var(--brand-line)"><div style="font-weight:700;margin-bottom:3px">✨ Auto-draft ready — ${ds.made} shift${ds.made!==1?'s':''} placed${ds.unfilled?', '+ds.unfilled+' still open':''}</div><div class="faint" style="font-size:12.5px">Review below, tweak anything, then Publish. Nothing reaches the team until you publish.</div>${ds.flags.length?`<div style="margin-top:9px;font-size:13px;line-height:1.7;border-top:1px solid var(--brand-line);padding-top:8px">${ds.flags.map(f=>`<div style="white-space:pre-line;margin-bottom:5px">${esc(f)}</div>`).join('')}</div>`:''}</div>`; }
+  if(window._draftSummary){ const ds=window._draftSummary; window._draftSummary=null;
+    if(ds.noAvail && ds.noAvail.length){
+      h+=`<div class="card" style="padding:13px 16px;margin-bottom:14px;background:#F7EEDC;border-color:#E4CFA3">
+        <div style="font-weight:700;font-size:14px;color:#7A5B1E">${ds.noAvail.length} ${ds.noAvail.length===1?'person has':'people have'} no availability set</div>
+        <div style="font-size:12.5px;line-height:1.6;color:#7A5B1E;margin-top:4px">${ds.noAvail.slice(0,8).map(n=>esc(dispName(n))).join(', ')}${ds.noAvail.length>8?' and '+(ds.noAvail.length-8)+' more':''} were treated as available any day, any hour \u2014 which is why this draft may put people on shifts they cannot work.</div>
+        <button class="btn" style="width:auto;padding:7px 13px;font-size:12.5px;margin-top:9px" onclick="openAvailSetup()">Set availability</button></div>`;
+    } h+=`<div class="card" style="padding:14px 16px;margin-bottom:14px;background:var(--brand-soft);border-color:var(--brand-line)"><div style="font-weight:700;margin-bottom:3px">✨ Auto-draft ready — ${ds.made} shift${ds.made!==1?'s':''} placed${ds.unfilled?', '+ds.unfilled+' still open':''}</div><div class="faint" style="font-size:12.5px">Review below, tweak anything, then Publish. Nothing reaches the team until you publish.</div>${ds.flags.length?`<div style="margin-top:9px;font-size:13px;line-height:1.7;border-top:1px solid var(--brand-line);padding-top:8px">${ds.flags.map(f=>`<div style="white-space:pre-line;margin-bottom:5px">${esc(f)}</div>`).join('')}</div>`:''}</div>`; }
   if(!shifts.length) h+=`<div class="card" style="padding:30px 22px;text-align:center;margin-bottom:14px"><div style="font-size:30px;color:var(--brand);margin-bottom:8px"><i class="ti ti-calendar-plus"></i></div><div style="font-weight:600;margin-bottom:3px">No shifts this week</div><div class="faint" style="font-size:13px">${isAdmin?'Add one below, tap Copy week, or ✨ Auto-draft to build it from a past week.':'Your shifts show here once leadership posts the schedule.'}</div></div>`;
   h+=`<div style="margin:0 2px 10px"><button class="btn" style="width:auto;padding:6px 12px;font-size:12.5px" onclick="addMyShiftsToCal()"><i class="ti ti-calendar-plus"></i> Add my shifts to my calendar</button></div>`;
   
@@ -2879,7 +2885,17 @@ window.autoDraft=async function(opts){
     if(typeof csRenderPreview==='function') csRenderPreview();
     return;
   }
-  window._draftSummary={made:draft.length, unfilled:unfilled.length, flags};
+  /* Anyone with no availability record is treated as always available -- the only sane
+     default, since assuming the opposite would produce an empty schedule. But it is also
+     the reason a draft can look wrong for no visible reason: with 2 of 14 people on
+     record, twelve were being placed on any shift at any hour. Say so, rather than
+     letting the owner conclude auto-draft is simply bad at its job. */
+  let _noAvail=[];
+  try{
+    const _pool=Object.keys(window._posMap||{}).filter(n=>!isArchived(n)&&posOf(n)!=='Trainee'&&posOf(n)!=='Owner');
+    _noAvail=_pool.filter(n=>!avMap[n] || !Object.keys(avMap[n]).length);
+  }catch(e){}
+  window._draftSummary={made:draft.length, unfilled:unfilled.length, flags, noAvail:_noAvail};
   vSchedule(document.getElementById('view'));
 };
 const _d=iso=>new Date(iso+'T00:00');
