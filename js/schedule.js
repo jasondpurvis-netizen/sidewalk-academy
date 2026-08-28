@@ -54,6 +54,25 @@ window.restorePerson=async function(name){
   _reRenderPeople();
 };
 function _reRenderPeople(){ const v=document.getElementById('view'); if(state.page==='schedule') vSchedule(v); else if(state.page==='onboarding') vOnboarding(v); else vTeam(v); }
+/* Every row read 'Tap to set their scheduling rules' whether somebody had seven rules or
+   none, so the constraints driving the entire schedule were invisible until you opened each
+   person one at a time. That is why the owner who built this could not find where his GM's
+   hours were set. Show what is actually there. */
+window._ruleSummary=function(name){
+  const p=profileOf(name)||{}; const bits=[];
+  if(+p.salary>0) bits.push('salaried');
+  if(p.minHrs&&p.maxHrs) bits.push(p.minHrs+'\u2013'+p.maxHrs+'h');
+  else if(p.maxHrs) bits.push('max '+p.maxHrs+'h');
+  else if(p.minHrs) bits.push('min '+p.minHrs+'h');
+  if(p.maxDays) bits.push('max '+p.maxDays+' days');
+  if(p.maxRun) bits.push('\u2264'+p.maxRun+' in a row');
+  if(p.offRun) bits.push(p.offRun+' off together');
+  if(p.maxShift) bits.push('\u2264'+p.maxShift+'h shifts');
+  if(Array.isArray(p.daysOff)&&p.daysOff.length){ const D=['Mon','Tue','Wed','Thu','Fri','Sat','Sun']; bits.push('off '+p.daysOff.map(d=>D[d]||d).join('/')); }
+  if(p.timePref==='early') bits.push('mornings');
+  if(p.timePref==='late') bits.push('closings');
+  return bits.length? esc(bits.join(' \u00b7 ')) : '';
+};
 window.openProfile=function(name){
   const p=profileOf(name); const pos=posOf(name);
   const myRoles=Array.isArray(p.roles)?p.roles:[];
@@ -1119,7 +1138,7 @@ h+=`<div class="faint" style="font-size:13px;margin-bottom:14px">${team.length} 
   if(!team.length) h+=`<div class="card" style="padding:24px;text-align:center"><div class="faint">No team yet. Add shifts in the Schedule tab, or share your join code so they sign in.</div></div>`;
   else Object.keys(roles).sort((a,b)=>{const ia=POS_ORDER.indexOf(a),ib=POS_ORDER.indexOf(b);return (ia<0?99:ia)-(ib<0?99:ib)||a.localeCompare(b);}).forEach(role=>{
     const _bc=POS_COL[role]||'#94A3B8';
-    h+=`<div class="band" style="background:${_bc}14;color:${_bc};border-left:4px solid ${_bc};margin:16px 0 0">${esc(role)} <span style="opacity:.7;font-weight:500">· ${roles[role].length}</span></div><div class="card" style="margin-top:0">`+roles[role].map(p=>{ const inits=(p.name||'?').split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase(); return `<div class="row" style="padding:11px 15px;border-bottom:1px solid var(--line)${isAdmin?';cursor:pointer':''}"${isAdmin?` onclick='openProfile(${JSON.stringify(p.name)})'`:''}><span class="av">${esc(inits)}</span><div style="flex:1;min-width:0"><div style="font-weight:600;font-size:14px">${esc(p.name)}</div><div class="faint" style="font-size:12px">${isAdmin?'Tap to set their scheduling rules':(p.member?(p.email?esc(p.email):'On the academy'):'Not on the academy yet')}</div></div>${isAdmin&&wage[p.name]?`<div class="faint" style="font-size:12.5px;margin-right:8px">${money(wage[p.name])}/hr</div>`:''}${isAdmin?'<i class="ti ti-chevron-right" style="color:var(--faint)"></i>':''}</div>`; }).join('')+`</div>`;
+    h+=`<div class="band" style="background:${_bc}14;color:${_bc};border-left:4px solid ${_bc};margin:16px 0 0">${esc(role)} <span style="opacity:.7;font-weight:500">· ${roles[role].length}</span></div><div class="card" style="margin-top:0">`+roles[role].map(p=>{ const inits=(p.name||'?').split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase(); return `<div class="row" style="padding:11px 15px;border-bottom:1px solid var(--line)${isAdmin?';cursor:pointer':''}"${isAdmin?` onclick='openProfile(${JSON.stringify(p.name)})'`:''}><span class="av">${esc(inits)}</span><div style="flex:1;min-width:0"><div style="font-weight:600;font-size:14px">${esc(p.name)}</div><div class="faint" style="font-size:12px">${isAdmin?(_ruleSummary(p.name)||'Tap to set their scheduling rules'):(p.member?(p.email?esc(p.email):'On the academy'):'Not on the academy yet')}</div></div>${isAdmin&&wage[p.name]?`<div class="faint" style="font-size:12.5px;margin-right:8px">${money(wage[p.name])}/hr</div>`:''}${isAdmin?'<i class="ti ti-chevron-right" style="color:var(--faint)"></i>':''}</div>`; }).join('')+`</div>`;
   });
   v.innerHTML=h;
 }
