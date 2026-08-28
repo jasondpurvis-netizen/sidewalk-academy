@@ -466,19 +466,12 @@ window.resetFcAdj=async function(iso){ try{ await sb.from('day_items').delete().
 // Snap the whole visible week back to the forecast.
 window.resetAllFcAdj=async function(a,b){ if(!confirm('Clear the forecast numbers you typed for this week and go back to the auto forecast?')) return; try{ await sb.from('day_items').delete().eq('kind','fcadj').gte('on_date',a).lte('on_date',b); }catch(e){} const _b=document.getElementById('schbody'); if(_b&&typeof schBoard==='function') schBoard(_b); };
 window.weekShift=function(n){ if(n===0){ state.ctx.wk=isoDate(weekStart(new Date())); } else { const base=state.ctx.wk?wkDate(state.ctx.wk):weekStart(new Date()); base.setDate(base.getDate()+n*7); state.ctx.wk=isoDate(base); } try{localStorage.setItem('sched_wk',state.ctx.wk);}catch(e){} const _b=document.getElementById('schbody'); if(_b&&typeof schBoard==='function'){ schBoard(_b); } else { vSchedule(document.getElementById('view')); } };
-/* NOTE: addShift() below is dead code -- it is never called and the form ids it reads
-   (shname/shdate/shstart/shkind) do not exist anywhere in this file. Shifts are added
-   through the quick-add on the board and edited through editShift(). Left in place
-   rather than deleted so nothing that might reference it later breaks silently. */
-window.addShift=async function(){ const nm=val('shname'); const on=document.getElementById('shdate').value; if(!nm||!on){ alert('Pick a person and a date.'); return; } const prof=(window._team||[]).find(p=>p.name===nm);
-  /* A person can have more than one block on a day -- a manager works 6 to 12, comes back
-     3 to 4 for a leadership meeting. Both are real shifts. The optional label says what the
-     block IS, so the schedule reads "Manager Meeting" rather than an unexplained second bar. */
-  const _lbl=(document.getElementById('shnote')?document.getElementById('shnote').value.trim():'');
-  const _st=document.getElementById('shstart').value, _en=document.getElementById('shend').value;
-  const _r=await sb.from('shifts').insert({person_name:nm,role:val('shrole')||(prof&&prof.title)||'',on_date:on,start_time:_st,end_time:_en,kind:document.getElementById('shkind').value,note:_lbl||null,user_id:prof?prof.id:null});
-  if(_r&&_r.error){ alert('That shift was not saved.\n\n'+_r.error.message); return; }
-  state.ctx.wk=isoDate(weekStart(wkDate(on))); schRefresh(); };
+/* addShift() was removed here. It was never called from anywhere, and the form ids it
+   read (shname, shdate, shstart, shend, shkind) do not exist in this app -- so it could
+   only ever have thrown. Shifts are added by tapping an empty cell on the board and
+   edited through editShift(). Removing it takes five unguarded reads of missing elements
+   out of the file. */
+
 // Refresh ONLY the schedule board, never the whole schedule page. Rebuilding the page is what made every edit feel like a reload.
 window.schRefresh=function(){
   var b=document.getElementById('schbody');
@@ -1688,7 +1681,13 @@ async function vSetup(v){
   });
   v.innerHTML=h;
 }
-window.setupSaveGoal=async function(){ const val=+((document.getElementById('setupGoal')||{}).value)||0; const r=await sb.from('day_items').select('detail').eq('kind','covrules').order('id',{ascending:false}).limit(1).maybeSingle(); let cd={}; try{cd=JSON.parse((r.data&&r.data.detail)||'{}');}catch(e){} cd.targetPct=val>0?val:''; await sb.from('day_items').delete().eq('kind','covrules'); await sb.from('day_items').insert({kind:'covrules',title:'coverage',on_date:null,detail:JSON.stringify(cd),created_by:state.user.id}); go('setup'); };
+window.setupSaveGoal=async function(){ const val=+((document.getElementById('setupGoal')||{}).value)||0; const r=await sb.from('day_items').select('detail').eq('kind','covrules').order('id',{ascending:false}).limit(1).maybeSingle(); let cd={}; try{cd=JSON.parse((r.data&&r.data.detail)||'{}');}catch(e){} cd.targetPct=val>0?val:'';
+  /* This deleted every covrules row before writing the replacement. A failure between the
+     two loses the entire coverage matrix -- the most laboriously built thing in the app,
+     and the one auto-draft cannot work without -- to change a single labour percentage. */
+  const _rk=await window._replaceKind('covrules',{kind:'covrules',title:'coverage',on_date:null,detail:JSON.stringify(cd),created_by:state.user.id});
+  if(!_rk.ok){ alert(window._replaceMsg(_rk)); return; }
+  go('setup'); };
 
 async function teamCerts(v){
   v.innerHTML='<div class="muted">Loading…</div>';

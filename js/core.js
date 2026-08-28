@@ -621,7 +621,10 @@ window.schDrop=async function(e){
   if(r&&r.error){ if(chip&&from) from.appendChild(chip); alert('Could not move that shift: '+r.error.message); return; }
   var b=document.getElementById('schbody'); if(b&&typeof schBoard==='function') schBoard(b);
 };
-window.saveMV=async function(){ const m=(document.getElementById('wbmission')||{}).value||''; const vv=(document.getElementById('wbvision')||{}).value||''; for(const [k,val] of [['mission',m.trim()],['vision',vv.trim()]]){ await sb.from('day_items').delete().eq('kind',k); if(val) await sb.from('day_items').insert({kind:k,detail:val,title:k,created_by:state.user.id}); } go('today'); };
+window.saveMV=async function(){ const m=(document.getElementById('wbmission')||{}).value||''; const vv=(document.getElementById('wbvision')||{}).value||''; for(const [k,val] of [['mission',m.trim()],['vision',vv.trim()]]){
+    const _rk=await window._replaceKind(k, val? {kind:k,detail:val,title:k,created_by:state.user.id} : []);
+    if(!_rk.ok){ alert(window._replaceMsg(_rk)); return; }
+  } go('today'); };
 async function vCostSmart(v){
   const today=new Date();
   setTitle('Cost-Smart Schedule','Staff to your real demand, hour by hour');

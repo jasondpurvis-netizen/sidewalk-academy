@@ -533,7 +533,9 @@ window._payRender = function(){
     const v=cur[n]!=null? cur[n] : '';
     const low = !sal && v!=='' && +v < MINW;
     h+='<div style="display:flex;gap:10px;align-items:center;border:1px solid '+(low?'#E4B8A8':'var(--line2,#d5dde0)')+';background:'+(low?'#F9EDE8':'transparent')+';border-radius:10px;padding:9px 12px">'
-      +'<span style="flex:1;min-width:0;font-size:13.5px;font-weight:600">'+esc(dispName(n))+'</span>'
+      /* Full names here, not the shortened form used elsewhere. This is a payroll decision:
+         getting the wrong Jessica costs somebody real money, and the screen has room. */
+      +'<span style="flex:1;min-width:0;font-size:13.5px;font-weight:600">'+esc(n)+'</span>'
       +'<span class="muted" style="font-size:11.5px;min-width:82px">'+esc(posOf(n))+'</span>'
       + (sal
           ? '<span class="muted" style="font-size:12.5px;min-width:120px;text-align:right">salaried &middot; $'+Number(pr.salary).toLocaleString()+'</span>'
