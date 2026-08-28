@@ -210,6 +210,21 @@ async function schBoard(v){
      whether the shift will actually be run, and a leader who left will not be running it. */
   const _isLead = n => !isArchived(n) && LEAD_POS.indexOf(posOf(n)) >= 0;
   const _mins = t => { const m=/^(\d{1,2}):(\d{2})/.exec(t||''); return m ? (+m[1])*60 + (+m[2]) : null; };
+  /* Five names in Monday's column reads as "five people" when the rule being checked is
+     about how many are on at once. They are not the same number: staggered shifts mean
+     five people can work a day that caps at four concurrent. Show the peak alongside the
+     cap so it can be checked at a glance instead of counted by eye and worried about. */
+  const _capFor = di => { let m=0; try{ (cov.matrix&&cov.matrix.blocks||[]).forEach(b=>{ const v=+(b.n&&b.n[di]); if(v>m) m=v; }); }catch(e){} return m; };
+  const peakOf = isoDays.map(function(iso,di){
+    const list=(rsh.data||[]).filter(x=>x.on_date===iso && x.start_time && x.end_time && x.person_name && x.person_name!=='__OPEN__' && !isArchived(x.person_name));
+    const mn=t=>{ const m=/^(\d{1,2}):(\d{2})/.exec(t||''); return m? +m[1]*60 + +m[2] : null; };
+    let peak=0;
+    for(let t=4*60; t<=23*60; t+=15){
+      let on=0; list.forEach(x=>{ const a=mn(x.start_time), b=mn(x.end_time); if(a!=null&&b!=null&&a<=t&&b>t) on++; });
+      if(on>peak) peak=on;
+    }
+    return {peak:peak, cap:_capFor(di), people:list.length};
+  });
   const dayVerdict = isoDays.map(function(iso){
     const list = (rsh.data||[]).filter(s => s.on_date===iso && s.start_time && s.end_time && !isArchived(s.person_name) && s.person_name!=='__OPEN__' && s.person_name!=='__open__');
     if(!list.length) return {level:'none', label:'Nobody on', why:'No shifts scheduled for this day.'};
@@ -297,7 +312,7 @@ async function schBoard(v){
   if(!shifts.length) h+=`<div class="card" style="padding:30px 22px;text-align:center;margin-bottom:14px"><div style="font-size:30px;color:var(--brand);margin-bottom:8px"><i class="ti ti-calendar-plus"></i></div><div style="font-weight:600;margin-bottom:3px">No shifts this week</div><div class="faint" style="font-size:13px">${isAdmin?'Add one below, tap Copy week, or ✨ Auto-draft to build it from a past week.':'Your shifts show here once leadership posts the schedule.'}</div></div>`;
   h+=`<div style="margin:0 2px 10px"><button class="btn" style="width:auto;padding:6px 12px;font-size:12.5px" onclick="addMyShiftsToCal()"><i class="ti ti-calendar-plus"></i> Add my shifts to my calendar</button></div>`;
   
-h+=`<div class="board"><div class="board-grid"><div class="bh bh-team">Team</div>`+days.map((d,di)=>`<div class="bh ${isoDate(d)===todayIso?'bh-today':''}">${d.toLocaleDateString(undefined,{weekday:'short'})}<span>${d.getDate()}</span>${dayVerdict[di].label?`<span title="${esc(dayVerdict[di].why)}" style="display:block;margin-top:4px;font-size:9.5px;font-weight:700;letter-spacing:.03em;text-transform:none;padding:2px 6px;border-radius:999px;background:${_VC[dayVerdict[di].level].bg};color:${_VC[dayVerdict[di].level].fg};white-space:nowrap">${esc(dayVerdict[di].label)}</span>`:''}${(isAdmin&&lyForDay[di])?`<span title="Same day last year" style="display:block;margin-top:3px;font-size:9.5px;font-weight:600;text-transform:none;letter-spacing:0;color:var(--muted);white-space:nowrap">LY ${money(lyForDay[di].total)}${lyForDay[di].peakH!=null?` &middot; peak ${((lyForDay[di].peakH%12)||12)+(lyForDay[di].peakH<12?'a':'p')}`:''}</span>`:''}</div>`).join('');
+h+=`<div class="board"><div class="board-grid"><div class="bh bh-team">Team</div>`+days.map((d,di)=>`<div class="bh ${isoDate(d)===todayIso?'bh-today':''}">${d.toLocaleDateString(undefined,{weekday:'short'})}<span>${d.getDate()}</span>${dayVerdict[di].label?`<span title="${esc(dayVerdict[di].why)}" style="display:block;margin-top:4px;font-size:9.5px;font-weight:700;letter-spacing:.03em;text-transform:none;padding:2px 6px;border-radius:999px;background:${_VC[dayVerdict[di].level].bg};color:${_VC[dayVerdict[di].level].fg};white-space:nowrap">${esc(dayVerdict[di].label)}</span>`:''}${(isAdmin&&peakOf[di]&&peakOf[di].cap)?`<span title="Most people on at once, against what your coverage matrix allows" style="display:block;margin-top:3px;font-size:9.5px;font-weight:600;text-transform:none;letter-spacing:0;color:${peakOf[di].peak>peakOf[di].cap?'#A8401C':'var(--muted)'};white-space:nowrap">${peakOf[di].peak}/${peakOf[di].cap} at once${peakOf[di].people!==peakOf[di].peak?` &middot; ${peakOf[di].people} people`:''}</span>`:''}${(isAdmin&&lyForDay[di])?`<span title="Same day last year" style="display:block;margin-top:3px;font-size:9.5px;font-weight:600;text-transform:none;letter-spacing:0;color:var(--muted);white-space:nowrap">LY ${money(lyForDay[di].total)}${lyForDay[di].peakH!=null?` &middot; peak ${((lyForDay[di].peakH%12)||12)+(lyForDay[di].peakH<12?'a':'p')}`:''}</span>`:''}</div>`).join('');
   /* Meetings & events row: 1-on-1s, interviews, leadership meetings, other meetings. RLS decides who sees what (admins all; staff only events they're on). */
   { const _EK={one_on_one:{l:'1-on-1',c:'#4A9CAD'},interview:{l:'Interview',c:'#7C3AED'},leadership:{l:'Leadership',c:'#2563EB'},meeting:{l:'Meeting',c:'#64748B'}};
     const _eBy={}; (_evList||[]).forEach(function(e){ (_eBy[e.on_date]=_eBy[e.on_date]||[]).push(e); });
