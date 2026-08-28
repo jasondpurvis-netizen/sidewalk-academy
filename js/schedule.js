@@ -1132,7 +1132,39 @@ async function schAvail(v){
   const [ra,rpf,rsh]=await Promise.all([ sb.from('availability').select('*'), sb.from('profiles').select('name,role'), sb.from('shifts').select('person_name'), loadPositions(), loadArchived() ]);
   const byPerson={}; (ra.data||[]).forEach(r=>{ const p=byPerson[r.person_name]=byPerson[r.person_name]||{}; p[r.weekday]=r; });
   window._avail=byPerson;
-  let h=`<div class="sec">My availability</div><div class="faint" style="font-size:12.5px;margin:-4px 0 11px">For each day pick <b style="color:#1B7B3F">Available</b> (all day), <b style="color:#B7791F">Limited</b> (only certain hours), or <b style="color:#A32D2D">Off</b>. On Limited, enter the hours you can actually work — e.g. 10:00 to 2:00. Leadership uses this to build the schedule.</div>`;
+  let h='';
+  /* Managers see what is waiting on them before their own availability -- it is somebody
+     else's shift that is blocked, and it should not be buried under a personal setting. */
+  if(mgr){
+    const rq=await sb.from('day_items').select('id,title,detail,on_date').eq('kind','avreq').order('id',{ascending:true});
+    const reqs=(rq.data||[]);
+    if(reqs.length){
+      const D=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+      h+=`<div class="sec">Availability to approve &middot; ${reqs.length}</div><div class="card" style="padding:0;overflow:hidden;margin-bottom:22px">`;
+      reqs.forEach((x,i)=>{
+        let d={}; try{ d=JSON.parse(x.detail||'{}'); }catch(e){}
+        const ch=d.changes||{};
+        const lines=Object.keys(ch).map(wd=>{
+          const f=ch[wd];
+          return '<div style="font-size:13px;padding:2px 0"><b>'+esc(D[wd])+'</b> &mdash; '+(f.can_work===false? 'cannot work' : (f.note? esc(String(f.note).replace('-','\u2013')) : 'available all day'))+'</div>';
+        }).join('');
+        h+=`<div style="padding:14px 16px;${i?'border-top:1px solid var(--line)':''}">
+          <div style="font-weight:700;font-size:14.5px">${esc(dispName(x.title))}</div>
+          <div class="faint" style="font-size:11.5px;margin-bottom:6px">asked ${esc(x.on_date||'')}</div>
+          ${lines}
+          <div class="row" style="gap:8px;margin-top:10px">
+            <button class="btn pri" style="width:auto;padding:7px 14px;font-size:12.5px" onclick="avDecide(${x.id},true)">Approve</button>
+            <button class="btn" style="width:auto;padding:7px 14px;font-size:12.5px" onclick="avDecide(${x.id},false)">Decline</button>
+          </div></div>`;
+      });
+      h+=`</div>`;
+    }
+  }
+  h+=`<div class="sec">My availability</div><div class="faint" style="font-size:12.5px;margin:-4px 0 11px">For each day pick <b style="color:#1B7B3F">Available</b> (all day), <b style="color:#B7791F">Limited</b> (only certain hours), or <b style="color:#A32D2D">Off</b>. On Limited, enter the hours you can actually work — e.g. 10:00 to 2:00. Leadership uses this to build the schedule.</div>`;
+  if(!mgr) h+=`<div id="avReqBar" style="display:none;gap:11px;align-items:center;flex-wrap:wrap;background:var(--bg);border-radius:11px;padding:12px 14px;margin-bottom:12px">
+      <span id="avReqCount" style="font-weight:700;font-size:13.5px">Changes not sent yet</span>
+      <span class="faint" style="font-size:12.5px;flex:1;min-width:150px">Your manager approves changes before they take effect.</span>
+      <button class="btn pri" style="width:auto;padding:9px 16px;font-size:13px" onclick="avSubmitRequest()">Send for approval</button></div>`;
   h+=`<div class="card" style="padding:4px 2px;margin-bottom:26px">`+AV_DOW.map((d,i)=>{ const row=(byPerson[me]||{})[i]; const can=row?row.can_work!==false:true; const note=row?(row.note||''):''; const win=parseWin(note); const status=!can?'off':((win||note==='limited')?'limited':'avail');
     return `<div style="padding:9px 12px;${i<6?'border-bottom:1px solid var(--line)':''}"><div class="row" style="gap:9px"><div style="width:38px;font-weight:600;font-size:14px">${d}</div><div class="avseg"><button class="avbtn${status==='avail'?' on':''}" onclick="avMe(${i},'avail',this)">Available</button><button class="avbtn${status==='limited'?' lim':''}" onclick="avMe(${i},'limited',this)">Limited</button><button class="avbtn${status==='off'?' off':''}" onclick="avMe(${i},'off',this)">Off</button></div></div><div class="avwin" data-wd="${i}" style="display:${status==='limited'?'flex':'none'};gap:7px;align-items:center;margin:9px 0 2px 47px;flex-wrap:wrap"><span class="faint" style="font-size:12px">Can work</span><input type="time" class="avfrom" value="${win?win[0]:''}" onchange="avWin(${i})" style="padding:7px;border:1px solid var(--line2);border-radius:8px;background:var(--card);color:var(--ink);font-family:inherit;font-size:13px"/><span class="faint" style="font-size:12px">to</span><input type="time" class="avto" value="${win?win[1]:''}" onchange="avWin(${i})" style="padding:7px;border:1px solid var(--line2);border-radius:8px;background:var(--card);color:var(--ink);font-family:inherit;font-size:13px"/></div></div>`; }).join('')+`</div>`;
   if(mgr){
@@ -1155,8 +1187,68 @@ async function _avUpsert(person,wd,fields){
   else { const ins=await sb.from('availability').insert({person_name:person,weekday:wd,user_id:state.user.id,...fields}).select(); const row=ins.data&&ins.data[0]; if(row){ (window._avail[person]=window._avail[person]||{})[wd]=row; } }
 }
 function parseWin(note){ const m=(note||'').match(/^(\d{1,2}:\d{2})-(\d{1,2}:\d{2})/); return m?[m[1],m[2]]:null; }
-window.avMe=function(wd,status,btn){ const seg=btn.parentNode; seg.querySelectorAll('.avbtn').forEach(b=>b.classList.remove('on','lim','off')); btn.classList.add(status==='avail'?'on':status==='limited'?'lim':'off'); const winDiv=[...document.querySelectorAll('.avwin')].find(x=>+x.getAttribute('data-wd')===wd); if(winDiv) winDiv.style.display=status==='limited'?'flex':'none'; if(status==='off') _avUpsert(myRosterName()||state.profile.name,wd,{can_work:false,note:null}); else if(status==='avail') _avUpsert(myRosterName()||state.profile.name,wd,{can_work:true,note:null}); else avWin(wd); };
-window.avWin=function(wd){ const winDiv=[...document.querySelectorAll('.avwin')].find(x=>+x.getAttribute('data-wd')===wd); if(!winDiv)return; const from=winDiv.querySelector('.avfrom').value, to=winDiv.querySelector('.avto').value; const note=(from&&to)?from+'-'+to:'limited'; _avUpsert(myRosterName()||state.profile.name,wd,{can_work:true,note}); };
+
+/* ---------- Staff change their own availability, a manager approves it ----------
+   Every competing platform lets staff enter their own, and owners specifically praise it --
+   it removes the setup wall entirely and keeps it current without anyone chasing people.
+   But it cannot write straight through. Availability is not a fact an employee reports, it
+   is a term of the job: "I can't do Sundays any more" is a conversation, not a form field.
+   Software that changes it silently removes the manager from a discussion they need to be
+   in, and by the time it shows up it is in a published schedule.
+   So a team member's edits become a request. A manager sees it, approves or declines, and
+   only then does it become real. Managers editing anyone (including themselves) still write
+   directly -- they are the approval. */
+window._avIsManager = () => { try{ return myRank()>=3 || hasGrant('schedule'); }catch(e){ return false; } };
+window._avMyName = () => myRosterName() || (state.profile && state.profile.name) || '';
+
+window._avStage = function(wd, fields){
+  window._avPending = window._avPending || {};
+  window._avPending[wd] = fields;
+  const bar=document.getElementById('avReqBar');
+  if(bar){ bar.style.display='flex'; const n=Object.keys(window._avPending).length; const lbl=document.getElementById('avReqCount'); if(lbl) lbl.textContent=n+' change'+(n>1?'s':'')+' not sent yet'; }
+};
+window.avSubmitRequest = async function(){
+  const me=_avMyName(); const pend=window._avPending||{};
+  const wds=Object.keys(pend);
+  if(!wds.length){ alert('Nothing changed yet.'); return; }
+  const D=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+  const lines=wds.map(wd=>{
+    const f=pend[wd];
+    return D[wd]+': '+(f.can_work===false ? 'cannot work' : (f.note? f.note.replace('-','–') : 'available all day'));
+  });
+  if(!confirm('Send this to your manager for approval?\n\n'+lines.join('\n')+'\n\nIt does not change your schedule until they approve it.')) return;
+  const r=await sb.from('day_items').insert({
+    kind:'avreq', title:me, on_date:isoDate(new Date()),
+    detail:JSON.stringify({at:new Date().toISOString(), changes:pend}),
+    created_by: state.user.id
+  });
+  if(r&&r.error){ alert('That did not send.\n\n'+r.error.message); return; }
+  try{ await notify({title:'Availability change to approve', body:me+' has asked to change their availability.', act:"go('schedule',{stab:'availability'})"}); }catch(e){}
+  window._avPending={};
+  alert('Sent. Your manager will see it on the schedule.');
+  vSchedule(document.getElementById('view'));
+};
+window.avDecide = async function(id, ok){
+  const r=await sb.from('day_items').select('title,detail').eq('id',id).maybeSingle();
+  if(!r.data){ alert('That request is no longer there.'); return; }
+  let d={}; try{ d=JSON.parse(r.data.detail||'{}'); }catch(e){}
+  const who=r.data.title;
+  if(ok){
+    const ch=d.changes||{};
+    for(const wd of Object.keys(ch)){ await _avUpsert(who, +wd, ch[wd]); }
+  }
+  await sb.from('day_items').delete().eq('id', id);
+  try{ await notify({title: ok?'Availability approved':'Availability not approved',
+        body: ok? 'Your availability change has been approved.' : 'Your manager did not approve that availability change — have a word with them.',
+        who: who, act:"go('schedule',{stab:'availability'})"}); }catch(e){}
+  vSchedule(document.getElementById('view'));
+};
+window.avMe=function(wd,status,btn){ const seg=btn.parentNode; seg.querySelectorAll('.avbtn').forEach(b=>b.classList.remove('on','lim','off')); btn.classList.add(status==='avail'?'on':status==='limited'?'lim':'off'); const winDiv=[...document.querySelectorAll('.avwin')].find(x=>+x.getAttribute('data-wd')===wd); if(winDiv) winDiv.style.display=status==='limited'?'flex':'none'; const _mgr=_avIsManager();
+  if(status==='off'){ const f={can_work:false,note:null}; _mgr? _avUpsert(_avMyName(),wd,f) : _avStage(wd,f); }
+  else if(status==='avail'){ const f={can_work:true,note:null}; _mgr? _avUpsert(_avMyName(),wd,f) : _avStage(wd,f); }
+  else avWin(wd); };
+window.avWin=function(wd){ const winDiv=[...document.querySelectorAll('.avwin')].find(x=>+x.getAttribute('data-wd')===wd); if(!winDiv)return; const from=winDiv.querySelector('.avfrom').value, to=winDiv.querySelector('.avto').value; const note=(from&&to)?from+'-'+to:'limited'; const f={can_work:true,note};
+  _avIsManager()? _avUpsert(_avMyName(),wd,f) : _avStage(wd,f); };
 window.avToggle=function(el){ const person=el.getAttribute('data-person'); const wd=+el.getAttribute('data-wd'); const isOff=el.classList.contains('off'); const nowOn=isOff; el.classList.remove('on','off','lim'); el.classList.add(nowOn?'on':'off'); el.innerHTML=nowOn?'✓':'✕'; _avUpsert(person,wd,{can_work:nowOn,note:null}); };
 async function schPool(v){
   const isAdmin=state.profile&&state.profile.role==='admin';
