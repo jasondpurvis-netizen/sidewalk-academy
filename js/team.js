@@ -1341,16 +1341,9 @@ async function vSettings(v){
   const ci=document.getElementById('setcolor'); if(ci) ci.addEventListener('input',e=>applyBrand(e.target.value));
   if(typeof grantSel==='function') grantSel();
 }
-function _addStationPill(v){ const list=document.getElementById('stationList'); if(!list||!v)return; const span=document.createElement('span'); span.setAttribute('data-st',v); span.style.cssText='background:var(--bg);border:1px solid var(--line2);border-radius:8px;padding:6px 10px;font-size:13px;display:inline-flex;align-items:center;gap:6px'; span.textContent=v; const x=document.createElement('span'); x.textContent='×'; x.style.cssText='cursor:pointer;color:#B32D2D;font-weight:700;margin-left:2px'; x.onclick=function(){ span.remove(); }; span.appendChild(x); list.appendChild(span); }
-window.addStation=function(){ const inp=document.getElementById('stationNew'); const v=(inp.value||'').trim(); if(!v)return; if([...document.querySelectorAll('#stationList [data-st]')].some(e=>(e.getAttribute('data-st')||'').toLowerCase()===v.toLowerCase())){ inp.value=''; return; } _addStationPill(v); inp.value=''; inp.focus(); };
-window.saveStations=async function(){ window.clearDirty&&window.clearDirty(); const arr=[...document.querySelectorAll('#stationList [data-st]')].map(e=>e.getAttribute('data-st')).filter(Boolean);
-  /* The editor this belonged to has moved to the Brain. If it is ever called without that
-     editor on screen it would read an empty list and save it, wiping every station and the
-     skills attached to them. Refuse rather than destroy. */
-  if(!document.getElementById('stationList')) return; const m=document.getElementById('stmsg'); if(m){m.style.color='';m.textContent='Saving…';}
-  const _rk=await window._replaceKind('stations', arr.length?{kind:'stations',title:'stations',on_date:null,detail:JSON.stringify(arr),created_by:state.user.id}:[]);
-  if(!_rk.ok){ if(m){m.style.color='#B32D2D';m.textContent=window._replaceMsg(_rk);} return; }
-  state.settings.stations=arr; if(m){m.style.color='';m.textContent='Saved ✓';} };
+/* The Settings station editor is gone -- stations are set up in The Brain, where the skills
+   that depend on them live. Its helpers went with it rather than sitting here able to write
+   the station list from a form nothing renders. */
 window.saveScheduleRules=async function(){ window.clearDirty&&window.clearDirty(); const law=(document.getElementById('setlaw')||{}).value||'AZ'; const floor=(document.getElementById('setfloor')||{}).value||'05:30'; const m=document.getElementById('schrulemsg'); if(m)m.textContent='Saving…'; try{ if(state.profile && state.profile.tenant_id){ const r=await sb.from('tenants').update({law_jurisdiction:law, open_floor:floor}).eq('id',state.profile.tenant_id); if(r&&r.error){ if(m)m.textContent='Could not save: '+r.error.message; return; } } else { const r=await sb.from('settings').update({law_jurisdiction:law, open_floor:floor, updated_at:new Date().toISOString()}).eq('id',1); if(r&&r.error){ if(m)m.textContent='Could not save: '+r.error.message; return; } } }catch(e){ if(m)m.textContent='Could not save.'; return; } state.settings=Object.assign({}, state.settings, {law_jurisdiction:law, open_floor:floor}); if(m)m.textContent='Saved ✓'; };
 /* ---------- Unsaved-changes guard ----------
    A save button you have to scroll to find is the same as no save button. Any card marked

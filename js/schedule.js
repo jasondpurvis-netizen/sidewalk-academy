@@ -1215,11 +1215,11 @@ async function schAvail(v){
   if(mgr){
     const set=new Set(); rosterNames().forEach(n=>set.add(n)); (rsh.data||[]).forEach(s=>{ if(s.person_name)set.add(s.person_name); }); set.delete(me);
     const people=[...set].filter(n=>n&&!isArchived(n)).sort((a,b)=>{const pa=POS_ORDER.indexOf(posOf(a)),pb=POS_ORDER.indexOf(posOf(b));return (pa<0?99:pa)-(pb<0?99:pb)||a.localeCompare(b);});
-    h+=`<div class="sec">Team availability</div><div class="faint" style="font-size:12.5px;margin:-4px 0 11px">Green ✓ = available, amber <b style="color:#B7791F">L</b> = limited hours (hover for the window), red ✕ = off. Tap a cell to flip available/off. People set their own limited hours in My availability. This is what the auto-draft reads.</div>`;
+    h+=`<div class="sec">Team availability</div><div class="faint" style="font-size:12.5px;margin:-4px 0 11px">Green ✓ = available, amber <b style="color:#B7791F">L</b> = limited hours (hover for the window), red ✕ = off. To change someone's availability, use the grid where you can set their hours.</div><div style="margin:-4px 0 12px"><button class="btn" style="width:auto" onclick="openAvailSetup()"><i class="ti ti-calendar-cog"></i> Change availability</button></div>`;
     if(!people.length) h+=`<div class="card" style="padding:20px;text-align:center"><div class="faint">No team yet.</div></div>`;
     else { h+=`<div class="avgrid-wrap"><div class="avgrid"><div class="avgh avgh-name">Team</div>`+AV_DOW.map(d=>`<div class="avgh">${d}</div>`).join('');
       people.forEach(person=>{ const pos=posOf(person); const c=POS_COL[pos]||'#94A3B8'; const inits=(person||'?').split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
-        h+=`<div class="avgn"><span class="av" style="background:${c}22;color:${c}">${esc(inits)}</span><span class="nm" style="font-size:13px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(person)}</span></div>`+AV_DOW.map((d,i)=>{ const row=(byPerson[person]||{})[i]; const can=row?row.can_work!==false:true; const note=row?(row.note||''):''; const win=parseWin(note); const lim=can&&(win||note==='limited'); return `<div class="avg${lim?' lim':(can?' on':' off')}" data-person="${esc(person)}" data-wd="${i}" onclick="avToggle(this)" title="${lim?(win?win[0]+'–'+win[1]:'Limited hours'):(can?'Available':'Off')}">${lim?'L':(can?'✓':'✕')}</div>`; }).join('');
+        h+=`<div class="avgn"><span class="av" style="background:${c}22;color:${c}">${esc(inits)}</span><span class="nm" style="font-size:13px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(person)}</span></div>`+AV_DOW.map((d,i)=>{ const row=(byPerson[person]||{})[i]; const can=row?row.can_work!==false:true; const note=row?(row.note||''):''; const win=parseWin(note); const lim=can&&(win||note==='limited'); return `<div class="avg${lim?' lim':(can?' on':' off')}" title="${esc(person)} · ${lim?(win?win[0]+'–'+win[1]:'Limited hours'):(can?'Available':'Off')}">${lim?'L':(can?'✓':'✕')}</div>`; }).join('');
       });
       h+=`</div></div>`;
     }
@@ -1294,7 +1294,11 @@ window.avMe=function(wd,status,btn){ const seg=btn.parentNode; seg.querySelector
   else avWin(wd); };
 window.avWin=function(wd){ const winDiv=[...document.querySelectorAll('.avwin')].find(x=>+x.getAttribute('data-wd')===wd); if(!winDiv)return; const from=winDiv.querySelector('.avfrom').value, to=winDiv.querySelector('.avto').value; const note=(from&&to)?from+'-'+to:'limited'; const f={can_work:true,note};
   _avIsManager()? _avUpsert(_avMyName(),wd,f) : _avStage(wd,f); };
-window.avToggle=function(el){ const person=el.getAttribute('data-person'); const wd=+el.getAttribute('data-wd'); const isOff=el.classList.contains('off'); const nowOn=isOff; el.classList.remove('on','off','lim'); el.classList.add(nowOn?'on':'off'); el.innerHTML=nowOn?'✓':'✕'; _avUpsert(person,wd,{can_work:nowOn,note:null}); };
+/* This grid used to be editable, and tapping a cell wrote {can_work, note:null} -- so one
+   tap on somebody set to 11a-3p in the availability grid quietly threw the hours away and
+   left them looking available all day. Two editors for one fact, and the weaker one
+   destroyed the stronger one's work. It reads now; editing happens in the one grid that
+   can actually express hours. */
 async function schPool(v){
   const isAdmin=state.profile&&state.profile.role==='admin';
   const mgr=myRank()>=3||hasGrant('schedule'); // approving trades is a scheduling job — any manager, not just the owner
