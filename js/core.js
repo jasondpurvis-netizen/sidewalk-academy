@@ -243,8 +243,10 @@ async function applyAppIdentity(){
     /* A restaurant that has not changed anything keeps the crisp file shipped with the app.
        Redrawing the default logo onto a canvas only makes it slightly worse, and the file
        is the one Safari can actually see when somebody adds the app. */
-    const _stock = (brand===DEFAULT_BRAND) && (name===DEFAULT_NAME) &&
-                   (!st.logo_url || st.logo_url===DEFAULT_LOGO);
+    /* A restaurant that has uploaded its own logo gets its own icon. One that has not keeps
+       the product's mark -- this is Heard, not one restaurant's app, and the default should
+       say so. */
+    const _stock = (!st.logo_url || st.logo_url===DEFAULT_LOGO);
     if(_stock){ const t=document.getElementById('mAppTitle'); if(t) t.setAttribute('content',name); document.title=name; return; }
     const icon=(await _iconFromLogo(st.logo_url, brand)) || _iconLetter(name, brand);
     window._appIconUrl=icon;
