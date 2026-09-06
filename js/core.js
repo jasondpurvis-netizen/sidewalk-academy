@@ -142,6 +142,83 @@ window._writeFailed=function(table,op,err){
 const root = document.getElementById("root");
 let state = { user:null, profile:null, tracks:[], lessons:{}, progress:new Set(), responses:{}, settings:{}, glossary:[], assignments:[], page:"home", ctx:{}, authMode:"in", busy:false };
 function hexRgb(h){ h=(h||'').replace('#',''); if(h.length===3)h=h.split('').map(c=>c+c).join(''); const n=parseInt(h||'C04A28',16)||12602920; return {r:(n>>16)&255,g:(n>>8)&255,b:n&255}; }
+/* ---------- The icon a phone puts on the home screen ----------
+   Saved to a home screen, the app arrived as a grey screenshot called "Academy". Every
+   restaurant sets a name, a logo and a brand colour already, so there is nothing to ask
+   for -- draw the icon from what they have. iOS wants a real raster image for
+   apple-touch-icon, so the fallback is painted on a canvas and exported as a PNG rather
+   than handed over as an SVG it would ignore.
+
+   One thing worth knowing: iOS copies the icon at the moment somebody adds the app, and
+   never looks again. Change the logo afterwards and existing home screens keep the old
+   one until they remove it and add it back. */
+function _iconLetter(name, brand){
+  const c=document.createElement('canvas'); c.width=c.height=180;
+  const x=c.getContext('2d');
+  const r=40;                                   // iOS masks its own corners; this keeps the fill honest on Android
+  x.fillStyle=brand||'#4A9CAD';
+  x.beginPath();
+  if(x.roundRect) x.roundRect(0,0,180,180,r); else x.rect(0,0,180,180);
+  x.fill();
+  x.fillStyle='#fff';
+  x.font='700 96px -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif';
+  x.textAlign='center'; x.textBaseline='middle';
+  x.fillText(String(name||'A').trim().charAt(0).toUpperCase(), 90, 98);
+  return c.toDataURL('image/png');
+}
+function _iconFromLogo(url, brand){
+  /* An uploaded logo is usually transparent and rarely square, so it gets centred on the
+     brand colour rather than stretched. If the image cannot be read back off the canvas
+     -- a cross-origin logo without the right headers -- fall back to the letter. */
+  return new Promise(function(resolve){
+    if(!url){ resolve(null); return; }
+    const img=new Image(); img.crossOrigin='anonymous';
+    img.onload=function(){
+      try{
+        const c=document.createElement('canvas'); c.width=c.height=180;
+        const x=c.getContext('2d');
+        x.fillStyle=brand||'#4A9CAD';
+        x.beginPath();
+        if(x.roundRect) x.roundRect(0,0,180,180,40); else x.rect(0,0,180,180);
+        x.fill();
+        const pad=26, box=180-pad*2;
+        const sc=Math.min(box/img.width, box/img.height);
+        const w=img.width*sc, h=img.height*sc;
+        x.drawImage(img, (180-w)/2, (180-h)/2, w, h);
+        resolve(c.toDataURL('image/png'));
+      }catch(e){ resolve(null); }
+    };
+    img.onerror=function(){ resolve(null); };
+    img.src=url;
+  });
+}
+window._appIconUrl=null;
+async function applyAppIdentity(){
+  try{
+    const st=state.settings||{};
+    const name=st.academy_name||DEFAULT_NAME;
+    const brand=st.brand_color||DEFAULT_BRAND;
+    const icon=(await _iconFromLogo(st.logo_url, brand)) || _iconLetter(name, brand);
+    window._appIconUrl=icon;
+    const set=(id,attr,val)=>{ const el=document.getElementById(id); if(el) el.setAttribute(attr,val); };
+    set('lAppIcon','href',icon);
+    set('lFavicon','href',icon);
+    set('mAppTitle','content',name);
+    set('mTheme','content',brand);
+    document.title=name;
+    /* Android and desktop Chrome read the manifest instead. Built here rather than shipped
+       as a file, because the name and colour differ for every restaurant. */
+    const man={ name:name, short_name:name.length>12?name.slice(0,12).trim():name,
+      start_url:location.origin+'/', scope:'/', display:'standalone',
+      background_color:'#FFFFFF', theme_color:brand,
+      icons:[{src:icon, sizes:'180x180', type:'image/png', purpose:'any'}] };
+    const blob=new Blob([JSON.stringify(man)],{type:'application/manifest+json'});
+    if(window._manUrl){ try{ URL.revokeObjectURL(window._manUrl); }catch(e){} }
+    window._manUrl=URL.createObjectURL(blob);
+    set('lManifest','href',window._manUrl);
+  }catch(e){}
+}
+window.applyAppIdentity=applyAppIdentity;
 function applyBrand(color){ if(!color) return; const {r,g,b}=hexRgb(color); const s=document.documentElement.style; s.setProperty('--brand',color); s.setProperty('--brand-soft',`rgba(${r},${g},${b},0.10)`); s.setProperty('--brand-line',`rgba(${r},${g},${b},0.30)`); const dk=c=>Math.round(c*0.62), lt=c=>Math.round(c+(255-c)*0.42); s.setProperty('--tealmid',color); s.setProperty('--tealdark',`rgb(${dk(r)},${dk(g)},${dk(b)})`); s.setProperty('--teallite',`rgb(${lt(r)},${lt(g)},${lt(b)})`); }
 const STALL_DAYS=5;
 const DEFAULT_BRAND='#4A9CAD';
@@ -149,7 +226,7 @@ const DEFAULT_NAME='Sidewalk Academy';
 const DEFAULT_LOGO="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%234A9CAD'/%3E%3Ctext x='50' y='71' font-family='Georgia,serif' font-style='italic' font-size='60' fill='white' text-anchor='middle'%3ES%3C/text%3E%3C/svg%3E";
 async function loadSettings(){ const { data } = await sb.from('settings').select('*').eq('id',1).maybeSingle(); const s=data||{}; let _tn=null,_tjc=null,_tan=null,_tbc=null,_tlg=null,_tlj=null,_tof=null; const _isSW=!!(state.profile && state.profile.tenant_id==='11111111-1111-1111-1111-111111111111'); if(state.profile && state.profile.tenant_id){ try{ const _tr=await sb.from('tenants').select('*').maybeSingle(); if(_tr.data){ state.tenant=_tr.data; _tn=_tr.data.name; _tjc=_tr.data.join_code; _tan=_tr.data.academy_name; _tbc=_tr.data.brand_color; _tlg=_tr.data.logo_url; _tlj=_tr.data.law_jurisdiction; _tof=_tr.data.open_floor; } }catch(e){} try{ const _su=await sb.from('subscriptions').select('*').maybeSingle(); if(_su.data) state.sub=_su.data; }catch(e){} } state.settings = Object.assign({}, s, { academy_name: _tan||_tn||(_isSW?s.academy_name:null)||DEFAULT_NAME, brand_color: _tbc||(_isSW?s.brand_color:null)||DEFAULT_BRAND, logo_url: (_tlg!=null&&_tlg!=='')?_tlg:(_isSW?(s.logo_url||(data?DEFAULT_LOGO:'')):''), join_code: _tjc||s.join_code||'', law_jurisdiction: _tlj||s.law_jurisdiction||'AZ', open_floor: _tof||s.open_floor||'05:30' }); try{ const rs=await sb.from('day_items').select('detail').eq('kind','stations').maybeSingle(); const arr=JSON.parse((rs.data&&rs.data.detail)||'[]'); if(Array.isArray(arr)) state.settings.stations=arr; }catch(e){} try{ const rp=await sb.from('day_items').select('detail').eq('kind','perms').maybeSingle(); state.perms=JSON.parse((rp.data&&rp.data.detail)||'{}'); }catch(e){ state.perms={}; } try{ const rg=await sb.from('day_items').select('title,detail').eq('kind','usergrant'); const gm={}; (rg.data||[]).forEach(x=>{ try{ const d=JSON.parse(x.detail||'{}'); if(x.title&&Array.isArray(d.pages)) gm[x.title]=d.pages; }catch(e){} }); state.grants=gm; }catch(e){ state.grants={}; }
   // explicit login-to-roster links (title = profile id, detail = roster name), for names we can't resolve on our own
-  try{ const rl=await sb.from('day_items').select('title,detail').eq('kind','acctlink'); const lm={}; (rl.data||[]).forEach(x=>{ if(x.title&&x.detail) lm[x.title]=x.detail; }); window._acctLink=lm; }catch(e){ window._acctLink={}; } applyBrand(state.settings.brand_color); }
+  try{ const rl=await sb.from('day_items').select('title,detail').eq('kind','acctlink'); const lm={}; (rl.data||[]).forEach(x=>{ if(x.title&&x.detail) lm[x.title]=x.detail; }); window._acctLink=lm; }catch(e){ window._acctLink={}; } applyBrand(state.settings.brand_color); applyAppIdentity(); }
 
 function esc(s){ return (s||"").replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c])); }
 function richBody(html){

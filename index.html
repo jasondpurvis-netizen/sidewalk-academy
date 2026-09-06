@@ -4,6 +4,18 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Academy</title>
+<!-- Added to a phone's home screen, this app had no icon and no name of its own: iOS fell
+     back to a grey screenshot and the page title. These are the hooks; the values are filled
+     in at runtime from the restaurant's own logo and brand colour, so every restaurant's
+     staff get their restaurant on their home screen rather than ours. -->
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" id="mAppTitle" content="Academy" />
+<meta name="theme-color" id="mTheme" content="#4A9CAD" />
+<link rel="apple-touch-icon" id="lAppIcon" href="" />
+<link rel="icon" id="lFavicon" href="" />
+<link rel="manifest" id="lManifest" href="" />
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.7.0/dist/tabler-icons.min.css">
