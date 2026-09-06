@@ -7,7 +7,7 @@
   "background_color": "#FFFFFF",
   "theme_color": "#4A9CAD",
   "icons": [
-    { "src": "/heard-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "/heard-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+    { "src": "/icons/2026-09-06-2/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/2026-09-06-2/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
   ]
 }

@@ -25,3 +25,8 @@ and it cost most of a day. A new query string is a new URL, so a stale copy cann
 for it.
 
 Settings shows the running `BUILD`, so any device can say which version it actually has.
+
+Icons live in `icons/<BUILD>/`. iOS caches a home screen icon by its URL and keeps it
+through deleting the app, restarting the phone and clearing website data — so changing the
+picture at the same path does nothing. A new folder per release is a new URL, and the phone
+has no choice but to fetch it. Move the icons when you bump `BUILD`.
