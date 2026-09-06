@@ -2,7 +2,7 @@
 /* A stamp so any device can say which version it is actually running. Three times now a
    phone and a laptop on the same address have disagreed about what the app looks like,
    and there was no way to tell them apart except by describing the screen. */
-const BUILD = '2026-09-06-3';
+const BUILD = '2026-09-06-4';
 window.BUILD = BUILD;
 const SUPABASE_URL = "https://wjqcnxnwjqmuzrandgea.supabase.co";
 const SUPABASE_KEY = "sb_publishable_DQZclfAnv_MYQJLGcOdzdw_g4vMCiSC";
@@ -754,8 +754,9 @@ window.showWhyMoment=function(mtext,vtext,force){
   // the hero's tile SVG is sized for a short banner; on a full screen it would stretch huge, so scale the viewBox to keep the same tile density
   var _sc=2.1, _vw=Math.max(160,Math.round((window.innerWidth||900)/_sc)), _vh=Math.max(160,Math.round((window.innerHeight||700)/_sc));
   var _tile='<svg class="phero-svg" width="100%" height="100%" viewBox="0 0 '+_vw+' '+_vh+'" preserveAspectRatio="none"><defs><pattern id="swtilewhy" width="40" height="40" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path d="M20 0 L40 20 L20 40 L0 20 Z" fill="none" stroke="#EAF7FA" stroke-width="1.1"/><circle cx="20" cy="20" r="2.2" fill="#EAF7FA"/><path d="M20 6 L20 34 M6 20 L34 20" stroke="#EAF7FA" stroke-width=".7"/></pattern></defs><rect width="'+_vw+'" height="'+_vh+'" fill="url(#swtilewhy)" opacity=".13"/></svg>'
-    +'<svg class="phero-heart" viewBox="0 0 24 24" width="300" height="300"><path d="M12 21s-7-4.5-9.5-8.5C.7 9.6 2 6 5.2 6c2 0 3.2 1.2 3.9 2.2C9.6 7.2 10.8 6 12.8 6 16 6 17.3 9.6 15.5 12.5 13 16.5 12 21 12 21z"/></svg>';
-  m.innerHTML=_tile
+    /* The heart outline behind the hero went the same way as the sparkles: one more mark
+       competing with the greeting in front of it, and doing no work. */
+      m.innerHTML=_tile
     +'<div style="position:relative;z-index:2;min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 28px;overflow:auto;box-sizing:border-box">'
     +'<div style="width:100%;max-width:600px">'
     +'<div style="font-size:12.5px;font-weight:640;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);margin-bottom:7px">Every shift</div><div style="color:#DCEEF1;font-size:14px;margin-bottom:40px">'+esc(dstr)+'</div>'
@@ -1213,7 +1214,7 @@ window.csDay=async function(dw){ const y=window.scrollY||document.documentElemen
 window.csToggleHelp=function(){ const b=document.getElementById('csHelpBody'); if(!b)return; const hide=b.style.display!=='none'; b.style.display=hide?'none':'block'; try{localStorage.setItem('cs_help_hidden',hide?'1':'0');}catch(e){} const c=document.getElementById('csHelpChev'); if(c)c.className='ti ti-chevron-'+(hide?'down':'up'); };
 window.csToggleDetail=function(){ const b=document.getElementById('csDetail'); if(!b)return; const open=b.style.display==='none'; b.style.display=open?'block':'none'; try{localStorage.setItem('cs_detail_open',open?'1':'0');}catch(e){} const c=document.getElementById('csDetChev'); if(c)c.className='ti ti-chevron-'+(open?'up':'down'); };
 window.csSaveTarget=async function(mode){ const g=id=>{const e=document.getElementById(id);return e?+e.value:null;}; const splhTarget=Math.max(1,g('csTarget')||40); const pctTarget=Math.min(60,Math.max(1,g('csPct')||25)); const tplhTarget=Math.max(1,g('csTplh')||6); const minCov=Math.max(1,g('csMin')||2); const minClose=Math.max(1,g('csMinClose')||3); const avgWage=Math.max(1,g('csWage')||15); const m=['pct','splh','tplh'].includes(mode)?mode:'splh'; const _rk=await window._replaceKind('csconfig',{kind:'csconfig',title:'csconfig',detail:JSON.stringify({splhTarget,pctTarget,tplhTarget,minCov,minClose,avgWage,mode:m}),created_by:state.user.id}); if(!_rk.ok){ alert(window._replaceMsg(_rk)); return; } vCostSmart(document.getElementById('view')); };
-function heroTile(){ return `<svg class="phero-svg" width="100%" height="100%" viewBox="0 0 400 200" preserveAspectRatio="none"><defs><pattern id="swtile" width="40" height="40" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path d="M20 0 L40 20 L20 40 L0 20 Z" fill="none" stroke="#EAF7FA" stroke-width="1.1"/><circle cx="20" cy="20" r="2.2" fill="#EAF7FA"/><path d="M20 6 L20 34 M6 20 L34 20" stroke="#EAF7FA" stroke-width=".7"/></pattern></defs><rect width="400" height="200" fill="url(#swtile)" opacity=".13"/></svg><svg class="phero-heart" viewBox="0 0 24 24" width="230" height="230"><path d="M12 21s-7-4.5-9.5-8.5C.7 9.6 2 6 5.2 6c2 0 3.2 1.2 3.9 2.2C9.6 7.2 10.8 6 12.8 6 16 6 17.3 9.6 15.5 12.5 13 16.5 12 21 12 21z"/></svg>`; }
+function heroTile(){ return `<svg class="phero-svg" width="100%" height="100%" viewBox="0 0 400 200" preserveAspectRatio="none"><defs><pattern id="swtile" width="40" height="40" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path d="M20 0 L40 20 L20 40 L0 20 Z" fill="none" stroke="#EAF7FA" stroke-width="1.1"/><circle cx="20" cy="20" r="2.2" fill="#EAF7FA"/><path d="M20 6 L20 34 M6 20 L34 20" stroke="#EAF7FA" stroke-width=".7"/></pattern></defs><rect width="400" height="200" fill="url(#swtile)" opacity=".13"/></svg>`; }
 function heroBanner(eyebrow,titleHTML,sub,ctaHTML){ return `<div class="phero">${heroTile()}<div class="phero-in"><div class="phero-eyebrow">${eyebrow}</div><div class="phero-title">${titleHTML}</div>${sub?`<div class="phero-sub">${sub}</div>`:''}${ctaHTML||''}</div></div>`; }
 function smartResume(){
   const vt=visibleTracks();
