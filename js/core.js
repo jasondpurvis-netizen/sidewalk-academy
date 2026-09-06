@@ -4,6 +4,49 @@ const SUPABASE_KEY = "sb_publishable_DQZclfAnv_MYQJLGcOdzdw_g4vMCiSC";
 const __RECOVERY_HASH = (typeof location!=='undefined' && location.hash) ? location.hash : '';
 const __RECOVERY_SEARCH = (typeof location!=='undefined' && location.search) ? location.search : '';
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { detectSessionInUrl: false, flowType: 'implicit', persistSession: true, autoRefreshToken: true } });
+
+/* ---------- When a read fails, say so instead of showing an empty list ----------
+   A signed-out or expired session makes every read come back "permission denied", and
+   because each screen renders whatever it got, that arrives as a page saying "Nothing on
+   the list". Which is indistinguishable from your data being deleted, and is exactly how
+   somebody concludes the app lost their work. Writes have been intercepted for a while;
+   reads never were.
+
+   One hook on fetch covers every read in the app rather than a hundred call sites. Only
+   the data endpoints count -- a failed sign-in is a 400 on the auth endpoint and is
+   somebody's password, not a lost session. */
+(function(){
+  const _f = window.fetch;
+  let shown = false;
+  window._readFailBanner = function(kind){
+    if(shown) return; shown = true;
+    let el = document.getElementById('readFailBar');
+    if(!el){ el = document.createElement('div'); el.id = 'readFailBar'; document.body.appendChild(el); }
+    el.style.cssText = 'position:fixed;left:0;right:0;top:0;z-index:10080;display:flex;align-items:center;'
+      + 'justify-content:center;gap:12px;flex-wrap:wrap;padding:12px 16px;font-size:14px;font-weight:560;'
+      + 'background:#FBECEA;color:#8A2C1A;border-bottom:1px solid #E6BFB6;'
+      + 'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif';
+    el.innerHTML = '<span>' + (kind === 'auth'
+        ? 'You have been signed out, so nothing can load. <b>Your data is safe.</b>'
+        : 'Something did not load. What you can see may be incomplete.')
+      + '</span><button style="border:1px solid #C98C7C;background:#fff;color:#8A2C1A;border-radius:8px;'
+      + 'padding:7px 15px;font-size:13.5px;font-weight:620;cursor:pointer;font-family:inherit" '
+      + 'onclick="location.reload()">' + (kind === 'auth' ? 'Sign in again' : 'Reload') + '</button>';
+  };
+  window.fetch = function(){
+    const args = arguments;
+    const url = (typeof args[0] === 'string') ? args[0] : ((args[0] && args[0].url) || '');
+    return _f.apply(this, args).then(function(res){
+      try{
+        if(url.indexOf(SUPABASE_URL + '/rest/') === 0 || url.indexOf(SUPABASE_URL + '/storage/') === 0){
+          if(res.status === 401 || res.status === 403) window._readFailBanner('auth');
+          else if(res.status >= 500) window._readFailBanner('server');
+        }
+      }catch(e){}
+      return res;
+    });
+  };
+})();
 /* ---------- Never let a save fail in silence ----------
    Most write calls in this app don't check .error, so a failed save used to vanish with no sign
    (that's how a permissions change could look saved and not be). This wraps every insert/update/
