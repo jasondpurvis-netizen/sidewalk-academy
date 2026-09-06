@@ -276,12 +276,17 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script></script>
-<script src="js/core.js"></script>
-<script src="js/academy.js"></script>
-<script src="js/community.js"></script>
-<script src="js/lists.js"></script>
-<script src="js/today.js"></script>
-<script src="js/schedule.js"></script>
-<script src="js/team.js"></script>
+<!-- The version on each of these is not decoration. A phone was running the current
+     index.html with month-old JavaScript underneath it: the page said one thing, the code
+     did another, and the two devices disagreed with no way to tell why. A new query string
+     is a new URL, so a stale copy cannot answer for it. Bump it with BUILD on every
+     release. -->
+<script src="js/core.js?v=2026-09-06-1"></script>
+<script src="js/academy.js?v=2026-09-06-1"></script>
+<script src="js/community.js?v=2026-09-06-1"></script>
+<script src="js/lists.js?v=2026-09-06-1"></script>
+<script src="js/today.js?v=2026-09-06-1"></script>
+<script src="js/schedule.js?v=2026-09-06-1"></script>
+<script src="js/team.js?v=2026-09-06-1"></script>
 </body>
 </html>
