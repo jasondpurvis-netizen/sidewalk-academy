@@ -420,7 +420,11 @@ function renderAuth(){
   const logo = s.logo_url?`<img src="${s.logo_url}" style="max-width:230px;max-height:76px;width:auto;height:auto;object-fit:contain;margin:0 auto 16px;display:block"/>`:`<div class="logo">${esc((s.academy_name||'A').charAt(0).toUpperCase())}</div>`;
   const head = m==="in"?"Welcome back":(m==="reset"?"Reset your password":"Create your account");
   const sub = m==="in"?esc(s.academy_name||'Academy'):(m==="reset"?"Enter your email and we'll send you a link to set a new password.":"First set up your login — you'll pick your restaurant next.");
+  /* On the sign-in screen too, not just in Settings. Checking which version a phone is
+     running should not require signing in first -- that was the one thing we could not do
+     while the phone was stuck. */
   root.innerHTML = `<div class="auth"><div class="box">
+    <div style="position:absolute;top:10px;right:14px;font-size:11.5px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--faint)">${esc(window.BUILD||'?')}</div>
     ${logo}
     <h1>${head}</h1>
     <p class="sub">${sub}</p>
