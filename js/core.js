@@ -475,12 +475,12 @@ function renderApp(){
   ({whiteboard:vToday, home:vHome, acat:vAcat, track:vTrack, lesson:vLesson, summary:vSummary, team:vTeam, ownership:vOwnership, journal:vJournal, community:vCommunity, feedback:vFeedback, downloads:vDownloads, settings:vSettings, brain:vBrain, resources:vResources, ask:vAsk, build:vBuild, today:vToday, logbook:schLogbook, rm:vRM, lists:vLists, recovery:vRecovery, schedule:vSchedule, onboarding:vOnboarding, calendar:vCalendar, sales:vSales, checklists:vChecklists, setup:vSetup, pay:vPay, clock:vClock, saleshist:vSalesHist, costsmart:vCostSmart}[state.page]||vHome)(v);
 }
 const PAGE_HERO={
-  acat:'&#10022; The Academy',
-  schedule:'&#10022; Plan the week', today:'&#10022; Every shift', whiteboard:'&#10022; Every shift', rm:'&#10022; Keep it running', team:'&#10022; Your people', ownership:'&#10022; Who owns what', onboarding:'&#10022; New hires',
-  community:'&#10022; The team', resources:'&#10022; On hand', downloads:'&#10022; Take it with you', checklists:'&#10022; Open &amp; close', onboarding:'&#10022; New team members',
-  sales:'&#10022; The numbers', saleshist:'&#10022; The numbers', costsmart:'&#10022; Right-size the labor', setup:'&#10022; Get set up', ask:'&#10022; Ask me anything',
-  journal:'&#10022; Your notes', build:'&#10022; Course builder', calendar:'&#10022; The month', settings:'&#10022; Settings', logbook:'&#10022; Close the day',
-  pay:'&#10022; Private', clock:'&#10022; Time clock', summary:'&#10022; Your progress', feedback:'&#10022; Feedback'
+  acat:'The Academy',
+  schedule:'Plan the week', today:'Every shift', whiteboard:'Every shift', rm:'Keep it running', team:'Your people', ownership:'Who owns what', onboarding:'New hires',
+  community:'The team', resources:'On hand', downloads:'Take it with you', checklists:'Open &amp; close', onboarding:'New team members',
+  sales:'The numbers', saleshist:'The numbers', costsmart:'Right-size the labor', setup:'Get set up', ask:'Ask me anything',
+  journal:'Your notes', build:'Course builder', calendar:'The month', settings:'Settings', logbook:'Close the day',
+  pay:'Private', clock:'Time clock', summary:'Your progress', feedback:'Feedback'
 };
 const HEROICON={home:'ti-school',acat:'ti-school',whiteboard:'ti-layout-dashboard',track:'ti-book-2',lesson:'ti-book-2'};
 function setTitle(t,s){
@@ -601,7 +601,7 @@ window.showWhyMoment=function(mtext,vtext,force){
   m.innerHTML=_tile
     +'<div style="position:relative;z-index:2;min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 28px;overflow:auto;box-sizing:border-box">'
     +'<div style="width:100%;max-width:600px">'
-    +'<div style="font-size:12.5px;font-weight:640;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);margin-bottom:7px">&#10022; Every shift</div><div style="color:#DCEEF1;font-size:14px;margin-bottom:40px">'+esc(dstr)+'</div>'
+    +'<div style="font-size:12.5px;font-weight:640;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);margin-bottom:7px">Every shift</div><div style="color:#DCEEF1;font-size:14px;margin-bottom:40px">'+esc(dstr)+'</div>'
     +(mtext?'<div style="'+lab+'">Mission</div><div style="'+stmt+'">'+esc(mtext)+'</div>':'')
     +((mtext&&vtext)?'<div style="height:1px;background:rgba(255,255,255,.3);margin:30px 0"></div>':'')
     +(vtext?'<div style="'+lab+'">Vision</div><div style="'+stmt+'">'+esc(vtext)+'</div>':'')
@@ -865,7 +865,7 @@ window.csRenderPreview=function(){
   const M$=n=>'$'+Math.round(n||0).toLocaleString();
   const saveCost=(p.cur.cost||0)-(p.prop.cost||0); const savePts=(p.cur.pct!=null&&p.prop.pct!=null)?(p.cur.pct-p.prop.pct):null;
   const clk=t=>{ if(!t)return''; let hh=+String(t).slice(0,2); const mm=String(t).slice(3,5); const ap=hh<12?'a':'p'; let h12=hh%12; if(h12===0)h12=12; return h12+(mm==='00'?'':':'+mm)+ap; };
-  let h=`<div style="background:linear-gradient(135deg,var(--tealmid),var(--tealdark));color:#fff;border-radius:12px;padding:18px 20px;margin-bottom:16px"><div style="font-size:12.5px;font-weight:640;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);margin-bottom:6px">&#10022; Cost-Smart proposal</div><div style="font-size:26px;font-weight:800">Week of ${wkLab}</div><div style="font-size:14px;opacity:.9;margin-top:4px">Nothing has changed yet. Look it over, then apply it or throw it away.</div></div>`;
+  let h=`<div style="background:linear-gradient(135deg,var(--tealmid),var(--tealdark));color:#fff;border-radius:12px;padding:18px 20px;margin-bottom:16px"><div style="font-size:12.5px;font-weight:640;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);margin-bottom:6px">Cost-Smart proposal</div><div style="font-size:26px;font-weight:800">Week of ${wkLab}</div><div style="font-size:14px;opacity:.9;margin-top:4px">Nothing has changed yet. Look it over, then apply it or throw it away.</div></div>`;
   const fb=window._csFcBasis; if(fb){ const yoyPct=Math.round((fb.yoy-1)*100); const ndgPct=Math.round((fb.nudge-1)*100); const parts=[fb.haveLY?"last year's shape for this week":'your recent same-day history']; if(fb.haveLY) parts.push('scaled to this year ('+(yoyPct>=0?'+':'')+yoyPct+'% vs last year)'); parts.push(Math.abs(ndgPct)<1?'last week held steady':('nudged '+(ndgPct>0?'up':'down')+' '+Math.abs(ndgPct)+'% for last week')); h+='<div class="card" style="padding:12px 15px;margin-bottom:14px;border-left:4px solid var(--tealmid)"><div style="font-size:15.5px;font-weight:600;letter-spacing:-.012em;text-transform:none;color:var(--ink);margin-bottom:5px">Built to your forecast</div><div style="font-size:14px;color:var(--ink);line-height:1.55">'+parts.join(' &middot; ')+'.</div></div>'; }
   const col=(lbl,o,accent)=>`<div style="flex:1;padding:14px 16px${accent?';background:var(--brand-soft)':''}"><div style="font-size:15.5px;text-transform:none;letter-spacing:-.012em;font-weight:600;color:${accent?'var(--brand)':'var(--faint)'};margin-bottom:8px">${lbl}</div><div style="font-size:26px;font-weight:800;color:var(--ink)">${o.hrs?o.hrs.toFixed(1):'0'}h</div><div style="font-size:14px;color:var(--muted);margin-top:2px">${o.cost?M$(o.cost):'&mdash;'}${o.pct!=null?' &middot; '+o.pct.toFixed(1)+'% of sales':''}</div></div>`;
   h+=`<div class="card" style="padding:0;overflow:hidden;margin-bottom:14px"><div class="row" style="align-items:stretch;gap:0">${col('Your schedule now',p.cur,false)}<div style="width:1px;background:var(--line)"></div>${col('Cost-Smart proposal',p.prop,true)}</div></div>`;
@@ -1077,7 +1077,7 @@ function vHome(v){
   const _first=((name||'').split(/\s+/)[0]||name); setTitle(`Welcome back, ${_first.charAt(0).toUpperCase()+_first.slice(1)}`, "Your training");
   const rz=smartResume();
   const cta = rz ? `<button class="phero-cta" onclick="go('lesson',{tid:'${rz.t.id}',lid:'${rz.l.id}'})"><span class="pd">&#9654;</span> ${rz.verb} — ${esc(rz.l.title)}</button>` : '';
-  let h = heroBanner('&#10022; The Academy', 'Learn it.<br>Lead it. <span class="hl">Own it.</span>', 'Everything your team needs to grow — from leading people to running every station — in one place, at their own pace.', cta);
+  let h = heroBanner('The Academy', 'Learn it.<br>Lead it. <span class="hl">Own it.</span>', 'Everything your team needs to grow — from leading people to running every station — in one place, at their own pace.', cta);
   const _vt=visibleTracks();
   const _dev=_vt.filter(t=>(t.category||'development')!=='operations');
   const _ops=_vt.filter(t=>t.category==='operations');
