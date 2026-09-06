@@ -345,14 +345,122 @@ async function vRM(v){
   h+=`<button class="btn pri" style="width:auto;padding:10px 20px" onclick="rmAdd()"><i class="ti ti-plus"></i> Add to the list</button></div>`;
   h+=`<div class="sec">Needs fixing${open.length?' · '+open.length:''}</div>`;
   if(!open.length){ h+=`<div class="card" style="padding:20px;text-align:center"><div class="faint">Nothing on the list. When something breaks, add it here so it doesn&rsquo;t get forgotten.</div></div>`; }
-  else { h+=`<div class="card">`+open.map(i=>{ const d=i.d; const asg=(d.assignees||[]); const who=d.anyone?'<b style="color:var(--brand)">Anyone can grab it</b>':(asg.length?'<b style="color:var(--ink)">'+esc(asg.map(n=>dispName(n)).join(', '))+'</b>':'<span style="color:#B45309">unassigned</span>'); const thumb=d.media_url?(d.media_type==='video'?`<video src="${d.media_url}" playsinline muted style="width:46px;height:46px;object-fit:cover;border-radius:8px;background:#000;flex-shrink:0"></video>`:`<img src="${d.media_url}" onclick="window.open('${d.media_url}','_blank')" style="width:46px;height:46px;object-fit:cover;border-radius:8px;cursor:pointer;flex-shrink:0"/>`):''; return `<div class="lesson-row"><div style="font-size:18px">${d.safety?'🚩':'🔧'}</div><div style="flex:1;min-width:0"><div style="font-weight:600">${esc(d.what||'')}${d.safety?' <span style="color:#fff;background:#DC2626;font-size:11.5px;font-weight:800;padding:1px 6px;border-radius:5px;vertical-align:middle">SAFETY</span>':''}</div><div class="faint" style="font-size:12.5px;margin-top:2px">${d.where?esc(d.where)+' · ':''}${who}${d.created?' · added '+new Date(d.created).toLocaleDateString():''}</div></div>${thumb}<button class="btn" style="width:auto;margin-left:8px" onclick="rmDone('${i.id}')">Fixed</button><span onclick="rmDel('${i.id}')" style="cursor:pointer;color:var(--muted);font-size:15.5px;margin-left:8px" title="Remove"><i class="ti ti-trash"></i></span></div>`; }).join('')+`</div>`; }
-  if(fixed.length){ h+=`<div class="sec" style="margin-top:18px">Recently fixed</div><div class="card">`+fixed.slice(0,8).map(i=>`<div class="lesson-row" style="opacity:.6"><div style="font-size:15.5px;color:var(--green)">✓</div><div style="flex:1;min-width:0"><div style="font-weight:500;text-decoration:line-through">${esc(i.d.what||'')}</div></div><span onclick="rmDel('${i.id}')" style="cursor:pointer;color:var(--muted);font-size:15.5px" title="Remove"><i class="ti ti-trash"></i></span></div>`).join('')+`</div>`; }
+  else { h+=`<div class="card">`+open.map(i=>{ const d=i.d; const asg=(d.assignees||[]); const who=d.anyone?'<b style="color:var(--brand)">Anyone can grab it</b>':(asg.length?'<b style="color:var(--ink)">'+esc(asg.map(n=>dispName(n)).join(', '))+'</b>':'<span style="color:#B45309">unassigned</span>'); const thumb=d.media_url?(d.media_type==='video'?`<video src="${d.media_url}" playsinline muted style="width:46px;height:46px;object-fit:cover;border-radius:8px;background:#000;flex-shrink:0"></video>`:`<img src="${d.media_url}" onclick="window.open('${d.media_url}','_blank')" style="width:46px;height:46px;object-fit:cover;border-radius:8px;cursor:pointer;flex-shrink:0"/>`):''; return `<div class="lesson-row"><div style="font-size:18px">${d.safety?'🚩':'🔧'}</div><div style="flex:1;min-width:0"><div style="font-weight:600">${esc(d.what||'')}${d.safety?' <span style="color:#fff;background:#DC2626;font-size:11.5px;font-weight:800;padding:1px 6px;border-radius:5px;vertical-align:middle">SAFETY</span>':''}</div><div class="faint" style="font-size:12.5px;margin-top:2px">${d.where?esc(d.where)+' · ':''}${who}${d.created?' · added '+new Date(d.created).toLocaleDateString():''}</div></div>${thumb}<button class="btn" style="width:auto;margin-left:8px" onclick="rmDone('${i.id}')">Fixed</button><span onclick="rmEdit('${i.id}')" style="cursor:pointer;color:var(--muted);font-size:15.5px;margin-left:8px" title="Edit"><i class="ti ti-pencil"></i></span><span onclick="rmDel('${i.id}')" style="cursor:pointer;color:var(--muted);font-size:15.5px;margin-left:8px" title="Remove"><i class="ti ti-trash"></i></span></div>`; }).join('')+`</div>`; }
+  if(fixed.length){ h+=`<div class="sec" style="margin-top:18px">Recently fixed</div><div class="card">`+fixed.slice(0,8).map(i=>`<div class="lesson-row" style="opacity:.62"><div style="font-size:15.5px;color:var(--green)">✓</div><div style="flex:1;min-width:0"><div style="font-weight:500;text-decoration:line-through">${esc(i.d.what||'')}</div></div><span onclick="rmReopen('${i.id}')" style="cursor:pointer;color:var(--muted);font-size:15.5px;margin-left:8px" title="Not fixed after all — put it back on the list"><i class="ti ti-arrow-back-up"></i></span><span onclick="rmDel('${i.id}')" style="cursor:pointer;color:var(--muted);font-size:15.5px;margin-left:8px" title="Remove"><i class="ti ti-trash"></i></span></div>`).join('')+`</div>`; }
   v.innerHTML=h;
 }
 window.rmAdd=async function(){ const wEl=document.getElementById('rmWhat'); const what=(wEl&&wEl.value||'').trim(); if(!what){ alert('What needs fixing? Add that first.'); return; } const where=((document.getElementById('rmWhere')||{}).value||'').trim(); const safety=!!((document.getElementById('rmSafety')||{}).checked); const anyone=!!((document.getElementById('rmAnyone')||{}).checked); const assignees=anyone?[]:[...document.querySelectorAll('.rmAsg:checked')].map(c=>c.value); let media_url=null,media_type=null; const fEl=document.getElementById('rmFile'); const btn=document.querySelector('[onclick="rmAdd()"]'); if(fEl&&fEl.files&&fEl.files[0]){ if(btn){btn.innerHTML='<i class="ti ti-loader"></i> Uploading…';btn.style.pointerEvents='none';} const f=fEl.files[0]; media_type=(f.type||'').indexOf('video')===0?'video':'image'; media_url=await uploadMedia(f); } await sb.from('day_items').insert({kind:'fixit',on_date:null,title:what.slice(0,80),done:false,detail:JSON.stringify({what,where,safety,anyone,assignees,media_url,media_type,created:new Date().toISOString()}),created_by:state.user.id}); vRM(document.getElementById('view')); };
 window.rmFilePick=function(el){ const n=document.getElementById('rmFileName'); if(n&&el&&el.files&&el.files[0]) n.textContent='📎 '+el.files[0].name; };
 window.rmAsgFilter=function(q){ q=(q||'').toLowerCase().trim(); document.querySelectorAll('#rmAsgWrap [data-name]').forEach(el=>{ const inp=el.querySelector('input'); const checked=inp&&inp.checked; el.style.display=(!q||el.getAttribute('data-name').indexOf(q)>=0||checked)?'':'none'; }); };
 window.rmDone=async function(id){ await sb.from('day_items').update({done:true}).eq('id',id); if(state.page==='rm') vRM(document.getElementById('view')); else if(typeof refreshView==='function') refreshView(); else render(); };
+/* ---------- Changing a fix-it after you have added it ----------
+   The list could add, tick off and delete, and nothing else. A typo in the description, a
+   photo taken before you found the real problem, or the wrong person put on it meant
+   deleting the item and typing it again -- which loses the photo, the date it was raised,
+   and any sense of how long it had been outstanding. The same fields, opened on an item
+   that already exists, and the photo is kept unless you replace it. */
+window.rmEdit=async function(id){
+  const r=await sb.from('day_items').select('*').eq('id',id).maybeSingle();
+  if(r.error||!r.data){ alert('Could not open that item.'); return; }
+  let d={}; try{ d=JSON.parse(r.data.detail||'{}')||{}; }catch(e){ d={}; }
+  window._rmEditing={id:id, d:d};
+  try{ await loadPositions(); await loadArchived(); }catch(e){}
+  const team=Object.keys(window._posMap||{}).filter(n=>n&&!isArchived(n)).sort((a,b)=>a.localeCompare(b));
+  const asg=Array.isArray(d.assignees)?d.assignees:[];
+  const inp='padding:9px 11px;border:1px solid var(--line2);border-radius:8px;font-family:inherit;font-size:14px;background:var(--card);color:var(--ink);width:100%';
+  let m=document.getElementById('rmEditM'); if(m) m.remove();
+  m=document.createElement('div'); m.id='rmEditM';
+  m.style.cssText='position:fixed;inset:0;z-index:10060;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:16px';
+  m.innerHTML='<div style="background:var(--card);color:var(--ink);border-radius:12px;max-width:520px;width:100%;max-height:90vh;overflow:auto;padding:22px 24px;box-shadow:0 20px 60px rgba(0,0,0,.3)">'
+    +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:16px">'
+      +'<div style="font-weight:700;font-size:18px;letter-spacing:-.018em">Edit this fix-it</div>'
+      +'<button onclick="var x=document.getElementById(\'rmEditM\');if(x)x.remove()" style="border:none;background:transparent;font-size:26px;cursor:pointer;line-height:1;color:inherit">&times;</button></div>'
+    +'<input id="rmEWhat" value="'+esc(d.what||'')+'" placeholder="What needs fixing?" style="'+inp+';margin-bottom:10px"/>'
+    +'<input id="rmEWhere" value="'+esc(d.where||'')+'" placeholder="Where is it? (optional)" style="'+inp+';margin-bottom:12px"/>'
+    + (d.media_url
+        ? '<div style="display:flex;align-items:center;gap:11px;margin-bottom:12px">'
+          + (d.media_type==='video'
+              ? '<video src="'+esc(d.media_url)+'" playsinline muted style="width:52px;height:52px;object-fit:cover;border-radius:8px;background:#000"></video>'
+              : '<img src="'+esc(d.media_url)+'" style="width:52px;height:52px;object-fit:cover;border-radius:8px"/>')
+          + '<span class="faint" style="font-size:13px;flex:1">Photo kept unless you pick a new one.</span>'
+          + '<button onclick="_rmDropMedia(this)" style="border:1px solid var(--line2);background:transparent;color:inherit;border-radius:8px;padding:6px 11px;font-size:12.5px;cursor:pointer">Remove photo</button></div>'
+        : '')
+    +'<label style="display:inline-flex;align-items:center;gap:8px;font-size:14px;color:var(--brand);font-weight:600;cursor:pointer;margin-bottom:12px"><i class="ti ti-camera" style="font-size:18px"></i> '+(d.media_url?'Replace the photo or video':'Add a photo or video')+'<input type="file" id="rmEFile" accept="image/*,video/*" style="display:none" onchange="_rmEName(this)"/></label><span id="rmEFileName" style="font-size:12.5px;color:var(--muted);margin-left:8px"></span>'
+    +'<label style="display:flex;align-items:center;gap:8px;font-size:14px;margin:0 0 12px;cursor:pointer"><input type="checkbox" id="rmESafety" '+(d.safety?'checked':'')+' style="width:16px;height:16px"/><span>Safety issue &mdash; bump it to the top</span></label>'
+    +'<label style="display:flex;align-items:center;gap:8px;font-size:14px;margin:0 0 12px;cursor:pointer"><input type="checkbox" id="rmEAnyone" '+(d.anyone?'checked':'')+' style="width:16px;height:16px"/><span>Anyone can do this</span></label>'
+    +'<div style="font-size:12.5px;font-weight:700;color:var(--muted);margin-bottom:6px">&hellip;or put specific people on it</div>'
+    +'<div class="row" style="gap:6px;flex-wrap:wrap;margin-bottom:16px">'
+      + (team.length? team.map(function(n){
+          return '<label style="display:inline-flex;align-items:center;gap:5px;padding:6px 10px;border:1px solid var(--line2);border-radius:8px;font-size:14px;cursor:pointer"><input type="checkbox" class="rmEAsg" value="'+esc(n)+'" '+(asg.indexOf(n)>=0?'checked':'')+' style="width:15px;height:15px"/>'+esc(dispName(n))+'</label>';
+        }).join('') : '<span class="faint" style="font-size:14px">No team members yet.</span>')
+    +'</div>'
+    +'<div style="display:flex;gap:9px;align-items:center;flex-wrap:wrap">'
+      +'<button class="btn pri" style="width:auto" id="rmESave" onclick="rmEditSave()">Save changes</button>'
+      +'<button class="btn" style="width:auto" onclick="var x=document.getElementById(\'rmEditM\');if(x)x.remove()">Cancel</button>'
+      +'<span id="rmEMsg" class="faint" style="font-size:12.5px"></span></div>'
+    +'</div>';
+  document.body.appendChild(m);
+};
+window._rmEName=function(el){ const n=document.getElementById('rmEFileName'); if(n&&el&&el.files&&el.files[0]) n.textContent='\ud83d\udcce '+el.files[0].name; };
+window._rmDropMedia=function(btn){
+  const e=window._rmEditing; if(!e) return;
+  e.dropMedia=true;
+  const wrap=btn.parentNode; if(wrap) wrap.innerHTML='<span class="faint" style="font-size:13px">Photo will be removed when you save.</span>';
+};
+window.rmEditSave=async function(){
+  const e=window._rmEditing; if(!e) return;
+  const go=document.getElementById('rmESave'), msg=document.getElementById('rmEMsg');
+  const what=((document.getElementById('rmEWhat')||{}).value||'').trim();
+  if(!what){ if(msg){ msg.style.color='#B32D2D'; msg.textContent='It still needs a description.'; } return; }
+  if(go){ go.disabled=true; go.textContent='Saving\u2026'; }
+  const anyone=!!((document.getElementById('rmEAnyone')||{}).checked);
+  const next=Object.assign({}, e.d, {
+    what: what,
+    where: ((document.getElementById('rmEWhere')||{}).value||'').trim(),
+    safety: !!((document.getElementById('rmESafety')||{}).checked),
+    anyone: anyone,
+    assignees: anyone? [] : [].slice.call(document.querySelectorAll('.rmEAsg:checked')).map(function(c){return c.value;}),
+    edited: new Date().toISOString()
+  });
+  if(e.dropMedia){ next.media_url=null; next.media_type=null; }
+  /* A new file replaces the old one; no file at all leaves whatever was there. Same
+     uploader the Add form uses, so a photo added here behaves identically to one added
+     when the item was raised. */
+  try{
+    const fEl=document.getElementById('rmEFile');
+    if(fEl && fEl.files && fEl.files[0]){
+      if(go) go.textContent='Uploading\u2026';
+      const f=fEl.files[0];
+      const url=await uploadMedia(f);
+      if(url){ next.media_url=url; next.media_type=(f.type||'').indexOf('video')===0?'video':'image'; }
+    }
+  }catch(err){
+    if(msg){ msg.style.color='#B32D2D'; msg.textContent='The photo did not upload. Nothing was saved.'; }
+    if(go){ go.disabled=false; go.textContent='Try again'; }
+    return;
+  }
+  /* The row's own title column is what the rest of the app reads for a short label, so it
+     has to move with the description or the two drift apart. */
+  const u=await sb.from('day_items').update({title:what.slice(0,80), detail:JSON.stringify(next)}).eq('id', e.id);
+  if(u.error){
+    if(msg){ msg.style.color='#B32D2D'; msg.textContent='Not saved: '+u.error.message; }
+    if(go){ go.disabled=false; go.textContent='Try again'; }
+    return;
+  }
+  const x=document.getElementById('rmEditM'); if(x) x.remove();
+  window._rmEditing=null;
+  if(state.page==='rm') vRM(document.getElementById('view')); else render();
+};
+/* Ticking something off was a one-way door: a mistap sent it to Recently fixed, and the
+   only way out was deleting it and typing it in again. Things also come back -- the screw
+   works loose, the same tap drips again -- and the item that was already written is the
+   right one to put back. */
+window.rmReopen=async function(id){
+  const u=await sb.from('day_items').update({done:false}).eq('id',id);
+  if(u.error){ alert('Could not put that back on the list: '+u.error.message); return; }
+  if(state.page==='rm') vRM(document.getElementById('view'));
+  else if(typeof refreshView==='function') refreshView(); else render();
+};
 window.rmDel=async function(id){ if(!confirm('Remove this item?'))return; await sb.from('day_items').delete().eq('id',id); if(state.page==='rm') vRM(document.getElementById('view')); else if(typeof refreshView==='function') refreshView(); else render(); };
 
 /* ---------- Lists: owner-made running lists (supply run, Amazon, recovery, anything) ---------- */
