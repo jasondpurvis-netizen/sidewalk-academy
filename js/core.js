@@ -240,6 +240,12 @@ async function applyAppIdentity(){
     const st=state.settings||{};
     const name=st.academy_name||DEFAULT_NAME;
     const brand=st.brand_color||DEFAULT_BRAND;
+    /* A restaurant that has not changed anything keeps the crisp file shipped with the app.
+       Redrawing the default logo onto a canvas only makes it slightly worse, and the file
+       is the one Safari can actually see when somebody adds the app. */
+    const _stock = (brand===DEFAULT_BRAND) && (name===DEFAULT_NAME) &&
+                   (!st.logo_url || st.logo_url===DEFAULT_LOGO);
+    if(_stock){ const t=document.getElementById('mAppTitle'); if(t) t.setAttribute('content',name); document.title=name; return; }
     const icon=(await _iconFromLogo(st.logo_url, brand)) || _iconLetter(name, brand);
     window._appIconUrl=icon;
     /* Created rather than filled in: a <link> that exists with no destination is a

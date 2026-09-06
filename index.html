@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Academy</title>
+<title>Sidewalk Academy</title>
 <!-- Added to a phone's home screen, this app had no icon and no name of its own: iOS fell
      back to a grey screenshot and the page title. These are the hooks; the values are filled
      in at runtime from the restaurant's own logo and brand colour, so every restaurant's
@@ -13,10 +13,16 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" id="mAppTitle" content="Sidewalk" />
 <meta name="theme-color" id="mTheme" content="#4A9CAD" />
-<!-- The icon and manifest links are created in JS once there is something real to point
-     at. They used to sit here with href="" -- which resolves to the page itself, so iOS
-     asked for an image and was handed HTML, and drew a black square. An empty href is
-     worse than no link at all. -->
+<!-- Real files, named in the raw HTML. Twice I generated the icon in JavaScript and
+     twice iOS ignored it: Safari reads the icon out of the page source when somebody taps
+     Add to Home Screen, and a link that only exists after a script has run is not in the
+     source. The PNGs are flat and fully opaque, because iOS composites any transparency
+     onto black -- which is the other half of how a teal icon arrived looking black.
+     A restaurant with its own logo still gets it: the script below replaces these once
+     the page knows whose restaurant it is. -->
+<link rel="apple-touch-icon" id="lAppIcon" sizes="180x180" href="/apple-touch-icon.png" />
+<link rel="icon" id="lFavicon" type="image/png" sizes="192x192" href="/icon-192.png" />
+<link rel="manifest" id="lManifest" href="/manifest.webmanifest" />
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.7.0/dist/tabler-icons.min.css">
