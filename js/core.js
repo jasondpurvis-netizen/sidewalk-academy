@@ -200,9 +200,17 @@ async function applyAppIdentity(){
     const brand=st.brand_color||DEFAULT_BRAND;
     const icon=(await _iconFromLogo(st.logo_url, brand)) || _iconLetter(name, brand);
     window._appIconUrl=icon;
+    /* Created rather than filled in: a <link> that exists with no destination is a
+       request the phone still makes, and it gets the page back instead of a picture. */
+    const link=(id,rel,href,type)=>{
+      let el=document.getElementById(id);
+      if(!el){ el=document.createElement('link'); el.id=id; el.rel=rel; document.head.appendChild(el); }
+      if(type) el.type=type;
+      el.href=href;
+    };
+    link('lAppIcon','apple-touch-icon',icon);
+    link('lFavicon','icon',icon,'image/png');
     const set=(id,attr,val)=>{ const el=document.getElementById(id); if(el) el.setAttribute(attr,val); };
-    set('lAppIcon','href',icon);
-    set('lFavicon','href',icon);
     set('mAppTitle','content',name);
     set('mTheme','content',brand);
     document.title=name;
@@ -215,10 +223,13 @@ async function applyAppIdentity(){
     const blob=new Blob([JSON.stringify(man)],{type:'application/manifest+json'});
     if(window._manUrl){ try{ URL.revokeObjectURL(window._manUrl); }catch(e){} }
     window._manUrl=URL.createObjectURL(blob);
-    set('lManifest','href',window._manUrl);
+    link('lManifest','manifest',window._manUrl);
   }catch(e){}
 }
 window.applyAppIdentity=applyAppIdentity;
+/* Deferred a tick on purpose: DEFAULT_NAME and DEFAULT_BRAND are declared further down
+   this file, and calling straight away would reach them before they exist. */
+setTimeout(function(){ try{ applyAppIdentity(); }catch(e){} }, 0);
 function applyBrand(color){ if(!color) return; const {r,g,b}=hexRgb(color); const s=document.documentElement.style; s.setProperty('--brand',color); s.setProperty('--brand-soft',`rgba(${r},${g},${b},0.10)`); s.setProperty('--brand-line',`rgba(${r},${g},${b},0.30)`); const dk=c=>Math.round(c*0.62), lt=c=>Math.round(c+(255-c)*0.42); s.setProperty('--tealmid',color); s.setProperty('--tealdark',`rgb(${dk(r)},${dk(g)},${dk(b)})`); s.setProperty('--teallite',`rgb(${lt(r)},${lt(g)},${lt(b)})`); }
 const STALL_DAYS=5;
 const DEFAULT_BRAND='#4A9CAD';
