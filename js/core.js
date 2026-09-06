@@ -155,11 +155,12 @@ function hexRgb(h){ h=(h||'').replace('#',''); if(h.length===3)h=h.split('').map
 function _iconLetter(name, brand){
   const c=document.createElement('canvas'); c.width=c.height=180;
   const x=c.getContext('2d');
-  const r=40;                                   // iOS masks its own corners; this keeps the fill honest on Android
+  /* Edge to edge, square. Rounding the corners here left them transparent, and iOS
+     composites transparency onto black before applying its own rounded mask -- which is
+     how a teal icon arrives on a phone looking like a black one. The phone does the
+     rounding; the icon just has to fill the square. */
   x.fillStyle=brand||'#4A9CAD';
-  x.beginPath();
-  if(x.roundRect) x.roundRect(0,0,180,180,r); else x.rect(0,0,180,180);
-  x.fill();
+  x.fillRect(0,0,180,180);
   x.fillStyle='#fff';
   x.font='700 96px -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif';
   x.textAlign='center'; x.textBaseline='middle';
@@ -178,9 +179,7 @@ function _iconFromLogo(url, brand){
         const c=document.createElement('canvas'); c.width=c.height=180;
         const x=c.getContext('2d');
         x.fillStyle=brand||'#4A9CAD';
-        x.beginPath();
-        if(x.roundRect) x.roundRect(0,0,180,180,40); else x.rect(0,0,180,180);
-        x.fill();
+        x.fillRect(0,0,180,180);
         const pad=26, box=180-pad*2;
         const sc=Math.min(box/img.width, box/img.height);
         const w=img.width*sc, h=img.height*sc;
