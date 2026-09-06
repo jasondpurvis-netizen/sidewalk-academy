@@ -2,7 +2,7 @@
 /* A stamp so any device can say which version it is actually running. Three times now a
    phone and a laptop on the same address have disagreed about what the app looks like,
    and there was no way to tell them apart except by describing the screen. */
-const BUILD = '2026-09-06-2';
+const BUILD = '2026-09-06-3';
 window.BUILD = BUILD;
 const SUPABASE_URL = "https://wjqcnxnwjqmuzrandgea.supabase.co";
 const SUPABASE_KEY = "sb_publishable_DQZclfAnv_MYQJLGcOdzdw_g4vMCiSC";
@@ -250,8 +250,18 @@ async function applyAppIdentity(){
        is the one Safari can actually see when somebody adds the app. */
     /* A restaurant that has uploaded its own logo gets its own icon. One that has not keeps
        the product's mark -- this is Heard, not one restaurant's app, and the default should
-       say so. */
-    const _stock = (!st.logo_url || st.logo_url===DEFAULT_LOGO);
+       say so.
+
+       This deliberately keeps the product mark even for a restaurant that has uploaded a
+       logo. A logo drawn for a sign or a cup does not survive being shrunk to the size of
+       a fingernail, and the home screen is the one place the product needs a name. When
+       somebody actually wants their own mark there, that should be a choice they make in
+       Settings, not something inferred from whether they happened to upload a picture.
+
+       The previous test compared the stored logo against the default constant and looked
+       equivalent. It was not: the stored copy is 10,366 characters where the constant is
+       281. So every restaurant counted as customised, and the mark was quietly replaced. */
+    const _stock = true;
     if(_stock){ const t=document.getElementById('mAppTitle'); if(t) t.setAttribute('content',name); document.title=name; return; }
     const icon=(await _iconFromLogo(st.logo_url, brand)) || _iconLetter(name, brand);
     window._appIconUrl=icon;
