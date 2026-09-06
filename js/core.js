@@ -2,7 +2,7 @@
 /* A stamp so any device can say which version it is actually running. Three times now a
    phone and a laptop on the same address have disagreed about what the app looks like,
    and there was no way to tell them apart except by describing the screen. */
-const BUILD = '2026-09-06-1';
+const BUILD = '2026-09-06-2';
 window.BUILD = BUILD;
 const SUPABASE_URL = "https://wjqcnxnwjqmuzrandgea.supabase.co";
 const SUPABASE_KEY = "sb_publishable_DQZclfAnv_MYQJLGcOdzdw_g4vMCiSC";
