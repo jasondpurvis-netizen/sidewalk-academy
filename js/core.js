@@ -2,7 +2,7 @@
 /* A stamp so any device can say which version it is actually running. Three times now a
    phone and a laptop on the same address have disagreed about what the app looks like,
    and there was no way to tell them apart except by describing the screen. */
-const BUILD = '2026-09-17-1';
+const BUILD = '2026-09-17-2';
 window.BUILD = BUILD;
 const SUPABASE_URL = "https://wjqcnxnwjqmuzrandgea.supabase.co";
 const SUPABASE_KEY = "sb_publishable_DQZclfAnv_MYQJLGcOdzdw_g4vMCiSC";
@@ -607,7 +607,24 @@ function renderApp(){
    creates training, Ask searches your own training, Recovery is for guests who had a bad
    visit. And a group called Lists containing an item called Lists helps nobody.
    Group labels now say when you would use the thing, not what kind of thing it is. */
-  const NAV_ALL=[["",[["today","Today","ti-sun"],["logbook","Log","ti-clipboard-check"]]],["Training",[["home","Academy","ti-school"],["build","Create training","ti-tools"],["ask","Find an answer","ti-bulb"],["journal","Journal","ti-notebook"]]],["Running the restaurant",[["schedule","Schedule","ti-calendar-week"],["team","Team","ti-users"],["ownership","Who owns what","ti-sitemap"],["onboarding","New Hires","ti-user-plus"],["calendar","Calendar","ti-calendar-month"]]],["Day to day",[["rm","Fix-it list","ti-tool"],["recovery","Guest recovery","ti-heart-handshake"],["lists","Checklists","ti-list-details"],["sales","Sales","ti-chart-line"]]],["Shared with the team",[["community","Community","ti-messages"],["resources","Resources","ti-files"],["downloads","Downloads","ti-download"]]],["Set up",[["brain","The Brain","ti-bulb"],["setup","Getting started","ti-list-check"],["settings","Settings","ti-settings"]]]];
+  /* Six doors, not twenty-one.
+
+   The old nav was six groups over twenty-one destinations, which is a menu a busy GM
+   bounces off rather than reads. Nothing is deleted -- everything still exists and still
+   works -- but the sidebar now shows only the loop the product is actually about:
+   you schedule somebody onto a station, they get told, and they learn to run it.
+
+   The rest moves inside the screen it belongs to, or behind More. Fix-its, checklists,
+   guest recovery and the daily log are all things that happen during a shift, so they
+   live on Today. Who owns what and New Hires are people, so they live on Team. Creating
+   a lesson and searching your own training are both Training. The Brain, Getting started
+   and Settings are all setup.
+
+   Anything added back should have to earn a door, rather than get one by existing. */
+const NAV_MAIN=[["today","Today","ti-sun"],["schedule","Schedule","ti-calendar-week"],["team","Team","ti-users"],["home","Training","ti-school"],["community","Messages","ti-messages"],["brain","Set up","ti-adjustments"]];
+/* Reachable, not advertised. Opens from More at the foot of the sidebar. */
+const NAV_MORE=[["logbook","Shift log","ti-clipboard-check"],["rm","Fix-it list","ti-tool"],["lists","Checklists","ti-list-details"],["recovery","Guest recovery","ti-heart-handshake"],["ownership","Who owns what","ti-sitemap"],["onboarding","New hires","ti-user-plus"],["calendar","Calendar","ti-calendar-month"],["build","Create training","ti-tools"],["ask","Find an answer","ti-bulb"],["journal","Journal","ti-notebook"],["resources","Resources","ti-files"],["downloads","Downloads","ti-download"],["sales","Sales","ti-chart-line"],["setup","Getting started","ti-list-check"],["settings","Settings","ti-settings"]];
+const NAV_ALL=[["",NAV_MAIN],["More",NAV_MORE]];
   window.toggleNavGroup=function(g){
     let shut={}; try{ shut=JSON.parse(localStorage.getItem('sw_navshut')||'null')||{}; }catch(e){}
     shut[g]=shut[g]?0:1;
@@ -637,7 +654,11 @@ function renderApp(){
      always-on items stay open, and the rest fold to a single heading you can click. A
      manager who lives in Today and Schedule sees six or seven lines instead of twenty-one,
      and nothing is hidden -- one click brings any group back. Choices are remembered. */
-  let _navShut={}; try{ _navShut=JSON.parse(localStorage.getItem('sw_navshut')||'null')||{'Training':1,'Shared with the team':1,'Set up':1}; }catch(e){ _navShut={'Training':1,'Shared with the team':1,'Set up':1}; }
+  /* More starts closed, and stays closed for people whose browser still remembers the old
+     six groups -- their saved choices have no opinion about a group that did not exist,
+     and defaulting an unknown group to open would put all fifteen back on screen. */
+  let _navShut={}; try{ _navShut=JSON.parse(localStorage.getItem('sw_navshut')||'null')||{}; }catch(e){ _navShut={}; }
+  if(!('More' in _navShut)) _navShut['More']=1;
   const _curGroup=(nav.find(([g,items])=>items.some(([p])=>p===state.page))||[])[0];
   document.getElementById("nav").innerHTML = nav.map(([g,items])=>{
     const _shut = g && g!=='Favorites' && _navShut[g] && g!==_curGroup;
