@@ -2,7 +2,7 @@
 /* A stamp so any device can say which version it is actually running. Three times now a
    phone and a laptop on the same address have disagreed about what the app looks like,
    and there was no way to tell them apart except by describing the screen. */
-const BUILD = '2026-09-06-4';
+const BUILD = '2026-09-17-1';
 window.BUILD = BUILD;
 const SUPABASE_URL = "https://wjqcnxnwjqmuzrandgea.supabase.co";
 const SUPABASE_KEY = "sb_publishable_DQZclfAnv_MYQJLGcOdzdw_g4vMCiSC";
@@ -297,10 +297,31 @@ window.applyAppIdentity=applyAppIdentity;
 setTimeout(function(){ try{ applyAppIdentity(); }catch(e){} }, 0);
 function applyBrand(color){ if(!color) return; const {r,g,b}=hexRgb(color); const s=document.documentElement.style; s.setProperty('--brand',color); s.setProperty('--brand-soft',`rgba(${r},${g},${b},0.10)`); s.setProperty('--brand-line',`rgba(${r},${g},${b},0.30)`); const dk=c=>Math.round(c*0.62), lt=c=>Math.round(c+(255-c)*0.42); s.setProperty('--tealmid',color); s.setProperty('--tealdark',`rgb(${dk(r)},${dk(g)},${dk(b)})`); s.setProperty('--teallite',`rgb(${lt(r)},${lt(g)},${lt(b)})`); }
 const STALL_DAYS=5;
+/* The tenant that existed before tenants did. Referenced in exactly one place -- the
+   legacy branding fallback in loadSettings -- so it is a named constant rather than a
+   magic string buried in a condition. */
+const LEGACY_TENANT='11111111-1111-1111-1111-111111111111';
 const DEFAULT_BRAND='#4A9CAD';
 const DEFAULT_NAME='Sidewalk Academy';
 const DEFAULT_LOGO="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%234A9CAD'/%3E%3Ctext x='50' y='71' font-family='Georgia,serif' font-style='italic' font-size='60' fill='white' text-anchor='middle'%3ES%3C/text%3E%3C/svg%3E";
-async function loadSettings(){ const { data } = await sb.from('settings').select('*').eq('id',1).maybeSingle(); const s=data||{}; let _tn=null,_tjc=null,_tan=null,_tbc=null,_tlg=null,_tlj=null,_tof=null; const _isSW=!!(state.profile && state.profile.tenant_id==='11111111-1111-1111-1111-111111111111'); if(state.profile && state.profile.tenant_id){ try{ const _tr=await sb.from('tenants').select('*').maybeSingle(); if(_tr.data){ state.tenant=_tr.data; _tn=_tr.data.name; _tjc=_tr.data.join_code; _tan=_tr.data.academy_name; _tbc=_tr.data.brand_color; _tlg=_tr.data.logo_url; _tlj=_tr.data.law_jurisdiction; _tof=_tr.data.open_floor; } }catch(e){} try{ const _su=await sb.from('subscriptions').select('*').maybeSingle(); if(_su.data) state.sub=_su.data; }catch(e){} } state.settings = Object.assign({}, s, { academy_name: _tan||_tn||(_isSW?s.academy_name:null)||DEFAULT_NAME, brand_color: _tbc||(_isSW?s.brand_color:null)||DEFAULT_BRAND, logo_url: (_tlg!=null&&_tlg!=='')?_tlg:(_isSW?(s.logo_url||(data?DEFAULT_LOGO:'')):''), join_code: _tjc||s.join_code||'', law_jurisdiction: _tlj||s.law_jurisdiction||'AZ', open_floor: _tof||s.open_floor||'05:30' }); try{ const rs=await sb.from('day_items').select('detail').eq('kind','stations').maybeSingle(); const arr=JSON.parse((rs.data&&rs.data.detail)||'[]'); if(Array.isArray(arr)) state.settings.stations=arr; }catch(e){} try{ const rp=await sb.from('day_items').select('detail').eq('kind','perms').maybeSingle(); state.perms=JSON.parse((rp.data&&rp.data.detail)||'{}'); }catch(e){ state.perms={}; } try{ const rg=await sb.from('day_items').select('title,detail').eq('kind','usergrant'); const gm={}; (rg.data||[]).forEach(x=>{ try{ const d=JSON.parse(x.detail||'{}'); if(x.title&&Array.isArray(d.pages)) gm[x.title]=d.pages; }catch(e){} }); state.grants=gm; }catch(e){ state.grants={}; }
+/* `settings` is a single global row, id=1, from before this was a multi-tenant product.
+   Every tenant was reading it and then having a few fields overridden, so any column not
+   explicitly overridden bled across restaurants -- including `join_code`, which is the only
+   gate on staff signup. A second restaurant would have inherited Sidewalk's code and been
+   able to add themselves to Sidewalk's team.
+
+   Per-restaurant values live in `tenants`, which is RLS-scoped and already written
+   correctly. So: a tenant reads its own row and nothing else. The global row is read only
+   for Sidewalk, whose branding predates the tenants table and still lives there. That is
+   the last thing the hardcoded id does, and it can go once Sidewalk's tenant row is
+   filled in. */
+async function loadSettings(){
+  const _isSW=!!(state.profile && state.profile.tenant_id===LEGACY_TENANT);
+  const _hasTenant=!!(state.profile && state.profile.tenant_id);
+  let s={};
+  if(_isSW || !_hasTenant){ const { data } = await sb.from('settings').select('*').eq('id',1).maybeSingle(); s=data||{}; }
+  const data=_isSW? s : null;
+  let _tn=null,_tjc=null,_tan=null,_tbc=null,_tlg=null,_tlj=null,_tof=null; if(state.profile && state.profile.tenant_id){ try{ const _tr=await sb.from('tenants').select('*').maybeSingle(); if(_tr.data){ state.tenant=_tr.data; _tn=_tr.data.name; _tjc=_tr.data.join_code; _tan=_tr.data.academy_name; _tbc=_tr.data.brand_color; _tlg=_tr.data.logo_url; _tlj=_tr.data.law_jurisdiction; _tof=_tr.data.open_floor; } }catch(e){} try{ const _su=await sb.from('subscriptions').select('*').maybeSingle(); if(_su.data) state.sub=_su.data; }catch(e){} } state.settings = Object.assign({}, s, { academy_name: _tan||_tn||(_isSW?s.academy_name:null)||DEFAULT_NAME, brand_color: _tbc||(_isSW?s.brand_color:null)||DEFAULT_BRAND, logo_url: (_tlg!=null&&_tlg!=='')?_tlg:(_isSW?(s.logo_url||(data?DEFAULT_LOGO:'')):''), join_code: _tjc||s.join_code||'', law_jurisdiction: _tlj||s.law_jurisdiction||'AZ', open_floor: _tof||s.open_floor||'05:30' }); try{ const rs=await sb.from('day_items').select('detail').eq('kind','stations').maybeSingle(); const arr=JSON.parse((rs.data&&rs.data.detail)||'[]'); if(Array.isArray(arr)) state.settings.stations=arr; }catch(e){} try{ const rp=await sb.from('day_items').select('detail').eq('kind','perms').maybeSingle(); state.perms=JSON.parse((rp.data&&rp.data.detail)||'{}'); }catch(e){ state.perms={}; } try{ const rg=await sb.from('day_items').select('title,detail').eq('kind','usergrant'); const gm={}; (rg.data||[]).forEach(x=>{ try{ const d=JSON.parse(x.detail||'{}'); if(x.title&&Array.isArray(d.pages)) gm[x.title]=d.pages; }catch(e){} }); state.grants=gm; }catch(e){ state.grants={}; }
   // explicit login-to-roster links (title = profile id, detail = roster name), for names we can't resolve on our own
   try{ const rl=await sb.from('day_items').select('title,detail').eq('kind','acctlink'); const lm={}; (rl.data||[]).forEach(x=>{ if(x.title&&x.detail) lm[x.title]=x.detail; }); window._acctLink=lm; }catch(e){ window._acctLink={}; } applyBrand(state.settings.brand_color); applyAppIdentity(); }
 

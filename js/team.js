@@ -1481,7 +1481,14 @@ window.go=window.go||function(){};
 /* ---------- Billing / subscription gating (dormant until BILLING_LIVE) ---------- */
 const BILLING_LIVE=true; // Stripe keys + edge functions live (test mode) 2026-07-08
 const SB_URL='https://wjqcnxnwjqmuzrandgea.supabase.co';
-function billingState(){ const t=state.sub||{}; const st=(t.status||'active');
+function billingState(){ const t=state.sub||{};
+  /* This used to default to 'active', so a tenant with no subscription row at all read as
+     a paying customer and got everything free. Three of six existing tenants had no row.
+     An unknown billing state has to be locked, or the gate is decoration.
+
+     Sidewalk itself is comped rather than locked: it predates billing and its owner is not
+     a customer. That is a deliberate exception for one id, not a hole. */
+  const st = t.status || ((state.profile && state.profile.tenant_id===LEGACY_TENANT) ? 'comp' : 'none');
   if(st==='comp'||st==='active') return {ok:true,status:st};
   if(st==='past_due') return {ok:true,status:'past_due'}; // keep access during Stripe dunning
   if(st==='trialing'){ if(!t.stripe_subscription_id) return {ok:false,status:'needs_checkout'}; const end=t.trial_ends_at?new Date(t.trial_ends_at).getTime():0; const days=end?Math.ceil((end-Date.now())/864e5):null; if(!end||days>=0) return {ok:true,status:'trialing',daysLeft:days}; return {ok:false,status:'trial_expired'}; }
