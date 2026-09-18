@@ -55,11 +55,59 @@ window.fuzzyHas=function(txt,term){
 window.acatFilter=function(){ const el=document.getElementById('acatSearch'); const main=document.getElementById('acatMain'); const res=document.getElementById('acatResults'); if(!el||!res)return; const q=(el.value||'').trim().toLowerCase(); if(!q){ res.innerHTML=''; if(main)main.style.display=''; return; } if(main)main.style.display='none'; const idx=window._acatIdx||[]; const terms=q.split(/\s+/).filter(Boolean); const hits=idx.filter(function(r){ return terms.every(function(tm){ return window.fuzzyHas(r.txt,tm); }); }).slice(0,40);
   if(!hits.length){ res.innerHTML='<div class="card" style="padding:22px 18px;text-align:center"><div class="muted" style="font-size:14px">No modules match &ldquo;'+esc(q)+'&rdquo;. Try a station name or a single word.</div></div>'; return; }
   res.innerHTML='<div class="faint" style="font-size:12.5px;margin:0 0 8px">'+hits.length+' match'+(hits.length===1?'':'es')+'</div><div class="card" style="padding:4px 0">'+hits.map(function(r){ const done=isDone(r.lid); return '<div class="lesson-row" onclick="go(\'lesson\',{tid:\''+r.tid+'\',lid:\''+r.lid+'\'})"><div class="dot '+(done?'done':'')+'">'+(done?'✓':'')+'</div><div style="flex:1"><div style="font-weight:500">'+esc(r.title)+'</div><div class="faint" style="font-size:12.5px">'+esc(r.track)+' &middot; Module '+r.n+'</div></div><span class="faint">&rsaquo;</span></div>'; }).join('')+'</div>'; };
+/* ---------- Which station does this training teach? ----------
+   Training and the schedule have never known about each other. The Brain knows who can run
+   Bar, the Academy knows how to teach Bar, and nothing joins the two -- so a manager who
+   finds out only two people can close has to go and work out for themselves what to do
+   about it.
+
+   One field closes that. Say a track teaches a station, and the team screen can stop
+   reporting a problem and start offering the fix. Stored as a day_item rather than a
+   column on `tracks` so it needs no migration and no downtime. */
+window._trackStation={};
+async function loadTrackStations(){
+  try{ const r=await sb.from('day_items').select('title,detail').eq('kind','trackstation');
+    const m={}; (r.data||[]).forEach(x=>{ try{ const d=JSON.parse(x.detail||'{}'); if(x.title&&d.station) m[x.title]=d.station; }catch(e){} });
+    window._trackStation=m; }catch(e){ window._trackStation={}; }
+  return window._trackStation;
+}
+window.setTrackStation=async function(tid,station){
+  const prev=window._trackStation[tid];
+  if(station) window._trackStation[tid]=station; else delete window._trackStation[tid];
+  const msg=document.getElementById('tsMsg'); if(msg){ msg.style.color='var(--muted)'; msg.textContent='Saving…'; }
+  try{
+    const d=await sb.from('day_items').delete().eq('kind','trackstation').eq('title',tid);
+    if(d.error) throw d.error;
+    if(station){ const i=await sb.from('day_items').insert({kind:'trackstation',title:tid,on_date:null,detail:JSON.stringify({station}),created_by:state.user.id}); if(i.error) throw i.error; }
+    if(msg){ msg.style.color='var(--green)'; msg.textContent='Saved'; setTimeout(function(){ if(msg) msg.textContent=''; },2200); }
+  }catch(e){
+    if(prev) window._trackStation[tid]=prev; else delete window._trackStation[tid];
+    if(msg){ msg.style.color='#B32D2D'; msg.textContent='Not saved: '+(e.message||e); }
+  }
+};
 function vTrack(v){
   const t=state.tracks.find(x=>x.id===state.ctx.tid); if(!t){ go("home"); return; }
   setTitle(t.name, `${trackLessons(t.id).length} modules · earns ${t.cert}`);
   const _bk=t.category==='operations'?'operations':'development'; const _bl=_bk==='operations'?'Operations & How-To':'Leadership & Development';
-  let h=`<div class="crumb" onclick="go('acat',{cat:'${_bk}'})">← ${_bl}</div><div class="card">`;
+  let h=`<div class="crumb" onclick="go('acat',{cat:'${_bk}'})">← ${_bl}</div>`;
+  if(myRank()>=3){
+    const _st=(state.settings&&Array.isArray(state.settings.stations))?state.settings.stations:[];
+    const _cur=(window._trackStation||{})[t.id]||'';
+    h+=`<div class="card" style="padding:15px 17px;margin-bottom:14px">
+      <div style="font-size:15.5px;font-weight:600;letter-spacing:-.012em;margin-bottom:3px">What does this teach?</div>
+      <div class="faint" style="font-size:13.5px;margin-bottom:11px;line-height:1.5">Tie it to a station and the team screen can offer this training to whoever is short on it, instead of just telling you there is a gap.</div>
+      <div class="row" style="gap:10px;flex-wrap:wrap">
+        <select onchange="setTrackStation('${t.id}',this.value)" style="padding:9px 11px;border:1px solid var(--line2);border-radius:8px;font-family:inherit;font-size:15.5px;background:var(--card);color:var(--ink);min-width:200px">
+          <option value="">Not tied to a station</option>
+          ${_st.map(x=>`<option value="${esc(x)}"${x===_cur?' selected':''}>${esc(x)}</option>`).join('')}
+          <option value="__open"${_cur==='__open'?' selected':''}>Opening the store</option>
+          <option value="__close"${_cur==='__close'?' selected':''}>Closing the store</option>
+        </select>
+        <span id="tsMsg" class="faint" style="font-size:13px"></span>
+      </div>
+    </div>`;
+  }
+  h+=`<div class="card">`;
   h+=trackLessons(t.id).map(l=>{ const d=isDone(l.id);
     return `<div class="lesson-row" onclick="go('lesson',{tid:'${t.id}',lid:'${l.id}'})"><div class="dot ${d?'done':''}">${d?'✓':''}</div><div style="flex:1"><div style="font-weight:500">${esc(l.title)}</div><div class="faint" style="font-size:12.5px">Module ${l.n}</div></div><span class="faint">›</span></div>`;
   }).join("")+`</div>`;

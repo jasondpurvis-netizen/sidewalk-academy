@@ -1,4 +1,42 @@
 
+/* Assigning the training, from the screen where you noticed the gap. Reuses the existing
+   track assignment -- the same thing the Academy already does -- so a person picked here
+   sees it in exactly the place they would have anyway. */
+window.offerTraining=async function(tid, label){
+  const tr=(state.tracks||[]).find(t=>t.id===tid); if(!tr) return;
+  await loadProfiles(); await loadPositions(); await loadArchived();
+  const people=Object.keys(window._posMap||{}).filter(n=>posOf(n)!=='Owner'&&!isArchived(n)).sort();
+  let m=document.getElementById('otM'); if(m) m.remove();
+  m=document.createElement('div'); m.id='otM';
+  m.style.cssText='position:fixed;inset:0;z-index:10060;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:16px';
+  m.innerHTML='<div style="background:var(--card);color:var(--ink);border-radius:12px;max-width:470px;width:100%;max-height:88vh;overflow:auto;padding:22px 24px;box-shadow:0 20px 60px rgba(0,0,0,.3)">'
+    +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:6px">'
+      +'<div style="font-weight:700;font-size:18px;letter-spacing:-.018em">Who should learn '+esc(label)+'?</div>'
+      +'<button onclick="var x=document.getElementById(\'otM\');if(x)x.remove()" style="border:none;background:transparent;font-size:26px;cursor:pointer;line-height:1;color:inherit">&times;</button></div>'
+    +'<div class="faint" style="font-size:14px;margin-bottom:15px;line-height:1.5">They get <b>'+esc(tr.name)+'</b> on their training list. Tick anyone.</div>'
+    +'<div style="display:flex;flex-direction:column;gap:2px;margin-bottom:17px">'
+      + people.map(function(n){
+          return '<label style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;font-size:15.5px;cursor:pointer"><input type="checkbox" class="otWho" value="'+esc(n)+'" style="width:17px;height:17px"/>'+esc(dispName(n))+'</label>';
+        }).join('')
+    +'</div>'
+    +'<div style="display:flex;gap:9px;align-items:center;flex-wrap:wrap">'
+      +'<button class="btn pri" style="width:auto" id="otGo" onclick="offerTrainingSave(\''+tid+'\')">Assign it</button>'
+      +'<button class="btn" style="width:auto" onclick="var x=document.getElementById(\'otM\');if(x)x.remove()">Cancel</button>'
+      +'<span id="otMsg" class="faint" style="font-size:13px"></span></div>'
+    +'</div>';
+  document.body.appendChild(m);
+};
+window.offerTrainingSave=async function(tid){
+  const go=document.getElementById('otGo'), msg=document.getElementById('otMsg');
+  const names=[].slice.call(document.querySelectorAll('.otWho:checked')).map(function(c){return c.value;});
+  if(!names.length){ if(msg){ msg.style.color='#B32D2D'; msg.textContent='Tick at least one person.'; } return; }
+  if(go){ go.disabled=true; go.textContent='Assigning…'; }
+  const r=await sb.from('day_items').insert({kind:'trackassign',title:tid,on_date:null,detail:JSON.stringify({track_id:tid,names}),created_by:state.user.id});
+  if(r.error){ if(msg){ msg.style.color='#B32D2D'; msg.textContent='Not assigned: '+r.error.message; } if(go){ go.disabled=false; go.textContent='Try again'; } return; }
+  try{ await notify({title:'New training for you', body:'You have been added to a training track.', act:"go('home')"}); }catch(e){}
+  const x=document.getElementById('otM'); if(x) x.remove();
+  vTeamSkills(document.getElementById('view'));
+};
 async function vTeamSkills(v){
   v.innerHTML='<div class="muted">Loading…</div>';
   await loadProfiles(); await loadPositions(); await loadArchived();
@@ -30,6 +68,17 @@ async function vTeamSkills(v){
   _risk.push({label:'Close the store', who:people.filter(canC), crit:true});
   cols.forEach(function(c){ _risk.push({label:c, who:people.filter(n=>_lvl(n,c)>=2), learning:people.filter(n=>_lvl(n,c)===1)}); });
   const _thin=_risk.filter(r=>r.who.length<=2).sort((a,b)=>a.who.length-b.who.length || (b.crit?1:0)-(a.crit?1:0));
+  /* The fix, not just the problem. A track that has said which station it teaches can be
+     offered right here, to the people who cannot do it yet -- which is the whole reason
+     training and scheduling belong in one product. Silent when nothing is tied to a
+     station: an empty gesture is worse than none. */
+  try{ await loadTrackStations(); }catch(e){}
+  const _trackFor=function(label){
+    const key = label==='Open the store' ? '__open' : (label==='Close the store' ? '__close' : label);
+    const m=window._trackStation||{};
+    const tid=Object.keys(m).find(k=>m[k]===key);
+    return tid ? (state.tracks||[]).find(t=>t.id===tid) : null;
+  };
   let h='';
   if(people.length && _thin.length){
     const _worst=_thin[0].who.length;
@@ -40,10 +89,14 @@ async function vTeamSkills(v){
       + _thin.map(function(r){
           const names=r.who.map(n=>dispName(n)).join(', ');
           const lrn=(r.learning||[]).length;
-          return `<div style="display:flex;gap:12px;align-items:baseline;flex-wrap:wrap">
+          const tr=_trackFor(r.label);
+          const able=new Set(r.who);
+          const next=people.filter(n=>!able.has(n)).slice(0,3);
+          return `<div style="display:flex;gap:12px;align-items:baseline;flex-wrap:wrap;padding:2px 0">
             <span style="font-size:15.5px;font-weight:560;letter-spacing:-.012em;min-width:150px">${esc(r.label)}</span>
-            <span style="font-size:15px;font-weight:600;color:${r.who.length===0?'#B4341C':(r.who.length===1?'#B4341C':'#8F6412')}">${r.who.length===0?'nobody':(r.who.length===1?'only '+esc(names):esc(names))}</span>
+            <span style="font-size:15px;font-weight:600;color:${r.who.length<=1?'#B4341C':'#8F6412'}">${r.who.length===0?'nobody':(r.who.length===1?'only '+esc(names):esc(names))}</span>
             ${lrn?`<span style="font-size:14px;color:var(--muted)">· ${lrn} learning</span>`:''}
+            ${(tr&&next.length)?`<button onclick="offerTraining('${tr.id}',${JSON.stringify(r.label).replace(/"/g,'&quot;')})" style="border:1px solid rgba(0,0,0,.18);background:rgba(255,255,255,.7);color:inherit;border-radius:7px;padding:5px 12px;font-size:13.5px;font-weight:560;cursor:pointer;font-family:inherit">Train someone</button>`:''}
           </div>`;
         }).join('')
       + `</div></div>`;
