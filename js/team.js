@@ -16,7 +16,39 @@ async function vTeamSkills(v){
   const _LV=[['—','var(--muted)','var(--card)'],['L','#fff','#B7791F'],['S','#fff','var(--brand)'],['E','#fff','#1B7B3F']];
   const pill=(lvl,h)=>`<button onclick="${h}" title="Click to change: not trained → Learning → Solid → Expert" style="width:27px;height:24px;border-radius:8px;border:1px solid var(--line2);cursor:pointer;font-size:12.5px;font-weight:800;color:${_LV[lvl][1]};background:${_LV[lvl][2]}">${_LV[lvl][0]}</button>`;
   const vth=(t,col)=>`<th style="padding:6px 7px;font-size:12.5px;font-weight:700;color:${col||'var(--muted)'};white-space:nowrap;writing-mode:vertical-rl;transform:rotate(180deg);height:78px;vertical-align:bottom">${esc(t)}</th>`;
-  let h=`<div class="faint" style="font-size:12.5px;margin-bottom:8px">Who can work what, and how well. Open &amp; close are built‑in yes/no; each station cycles when you tap it — it saves as you go. The number under each column is how many people can work it — a <span style="color:var(--amber)">low count</span> is a cross‑training gap.</div><div style="display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;margin-bottom:12px">${[['—','var(--muted)','var(--card)','not trained'],['L','#fff','#B7791F','Learning'],['S','#fff','var(--brand)','Solid — runs it alone'],['E','#fff','#1B7B3F','Expert — your go‑to']].map(x=>`<span style="display:inline-flex;align-items:center;gap:5px"><span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:18px;border-radius:5px;border:1px solid var(--line2);font-size:11.5px;font-weight:800;color:${x[1]};background:${x[2]}">${x[0]}</span> ${x[3]}</span>`).join('')}</div><div style="overflow-x:auto;border:1px solid var(--line);border-radius:12px"><table style="border-collapse:collapse;font-size:12.5px;width:100%"><thead><tr><th style="padding:6px 10px;text-align:left;position:sticky;left:0;background:var(--card);z-index:2"></th>${vth('Open','var(--brand)')}${vth('Close','var(--brand)')}${cols.map(c=>vth(c)).join('')}</tr></thead><tbody>`;
+  /* ---------- What the grid is actually telling you ----------
+     The grid has always had the answer in it -- a column with two ticks in it is a station
+     that stops if two people call out -- but you had to read fifteen rows and count. That
+     is work the software can do. Counting is what computers are for; a manager's job is
+     deciding what to do about it.
+
+     Nothing new is stored. Open and close are the ones that hurt most, because a station
+     nobody can open does not mean a slow morning, it means a locked door. */
+  const _lvl=(n,st)=>{ const sl=(window._profiles[n]||{}).skillLevels; if(sl&&typeof sl==='object'&&(st in sl)) return +sl[st]||0; return hasRole(n,st)?2:0; };
+  const _risk=[];
+  _risk.push({label:'Open the store', who:people.filter(canO), crit:true});
+  _risk.push({label:'Close the store', who:people.filter(canC), crit:true});
+  cols.forEach(function(c){ _risk.push({label:c, who:people.filter(n=>_lvl(n,c)>=2), learning:people.filter(n=>_lvl(n,c)===1)}); });
+  const _thin=_risk.filter(r=>r.who.length<=2).sort((a,b)=>a.who.length-b.who.length || (b.crit?1:0)-(a.crit?1:0));
+  let h='';
+  if(people.length && _thin.length){
+    const _worst=_thin[0].who.length;
+    h+=`<div class="card" style="padding:17px 19px;margin-bottom:16px;border-color:${_worst===0?'#E4B8A8':'#E4CFA3'};background:${_worst===0?'#FBF1EE':'#FCF7EC'}">
+      <div style="font-size:18px;font-weight:600;letter-spacing:-.02em;margin-bottom:3px;color:${_worst===0?'#8A2C1A':'#7A5B1E'}">If one person calls out</div>
+      <div style="font-size:14px;color:${_worst===0?'#8A2C1A':'#7A5B1E'};opacity:.85;margin-bottom:12px;line-height:1.5">${_thin.length} thing${_thin.length>1?'s':''} here ${_thin.length>1?'rest':'rests'} on two people or fewer.</div>
+      <div style="display:flex;flex-direction:column;gap:9px">`
+      + _thin.map(function(r){
+          const names=r.who.map(n=>dispName(n)).join(', ');
+          const lrn=(r.learning||[]).length;
+          return `<div style="display:flex;gap:12px;align-items:baseline;flex-wrap:wrap">
+            <span style="font-size:15.5px;font-weight:560;letter-spacing:-.012em;min-width:150px">${esc(r.label)}</span>
+            <span style="font-size:15px;font-weight:600;color:${r.who.length===0?'#B4341C':(r.who.length===1?'#B4341C':'#8F6412')}">${r.who.length===0?'nobody':(r.who.length===1?'only '+esc(names):esc(names))}</span>
+            ${lrn?`<span style="font-size:14px;color:var(--muted)">· ${lrn} learning</span>`:''}
+          </div>`;
+        }).join('')
+      + `</div></div>`;
+  }
+  h+=`<div class="faint" style="font-size:12.5px;margin-bottom:8px">Who can work what, and how well. Open &amp; close are built‑in yes/no; each station cycles when you tap it — it saves as you go. The number under each column is how many people can work it — a <span style="color:var(--amber)">low count</span> is a cross‑training gap.</div><div style="display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;margin-bottom:12px">${[['—','var(--muted)','var(--card)','not trained'],['L','#fff','#B7791F','Learning'],['S','#fff','var(--brand)','Solid — runs it alone'],['E','#fff','#1B7B3F','Expert — your go‑to']].map(x=>`<span style="display:inline-flex;align-items:center;gap:5px"><span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:18px;border-radius:5px;border:1px solid var(--line2);font-size:11.5px;font-weight:800;color:${x[1]};background:${x[2]}">${x[0]}</span> ${x[3]}</span>`).join('')}</div><div style="overflow-x:auto;border:1px solid var(--line);border-radius:12px"><table style="border-collapse:collapse;font-size:12.5px;width:100%"><thead><tr><th style="padding:6px 10px;text-align:left;position:sticky;left:0;background:var(--card);z-index:2"></th>${vth('Open','var(--brand)')}${vth('Close','var(--brand)')}${cols.map(c=>vth(c)).join('')}</tr></thead><tbody>`;
   people.forEach(n=>{ h+=`<tr style="border-top:1px solid var(--line)"><td style="padding:7px 10px;position:sticky;left:0;background:var(--card);white-space:nowrap;z-index:1"><span style="font-weight:600">${esc(n.split(' ')[0])}</span> <span class="faint" style="font-size:12.5px">${esc(posOf(n))}</span></td><td style="text-align:center;padding:5px">${box(canO(n),`toggleCap('${jn(n)}','open',this.checked)`)}</td><td style="text-align:center;padding:5px">${box(canC(n),`toggleCap('${jn(n)}','close',this.checked)`)}</td>${cols.map(st=>`<td style="text-align:center;padding:4px">${pill(lvlOf(n,st),`cycleLevel('${jn(n)}','${jn(st)}',this)`)}</td>`).join('')}</tr>`; });
   const cnt=c=>`<td style="text-align:center;font-size:12.5px;font-weight:800;color:${c<=1?'var(--amber)':'var(--muted)'}">${c}</td>`;
   h+=`<tr style="border-top:2px solid var(--line2);background:var(--bg)"><td style="padding:7px 10px;position:sticky;left:0;background:var(--bg);font-size:12.5px;color:var(--muted);font-weight:700">Trained</td>${cnt(people.filter(canO).length)}${cnt(people.filter(canC).length)}${cols.map(st=>cnt(people.filter(n=>lvlOf(n,st)>=1).length)).join('')}</tr></tbody></table></div>`;
