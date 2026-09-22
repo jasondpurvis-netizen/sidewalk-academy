@@ -2,7 +2,7 @@
 /* A stamp so any device can say which version it is actually running. Three times now a
    phone and a laptop on the same address have disagreed about what the app looks like,
    and there was no way to tell them apart except by describing the screen. */
-const BUILD = '2026-09-22-2';
+const BUILD = '2026-09-22-3';
 window.BUILD = BUILD;
 const SUPABASE_URL = "https://wjqcnxnwjqmuzrandgea.supabase.co";
 const SUPABASE_KEY = "sb_publishable_DQZclfAnv_MYQJLGcOdzdw_g4vMCiSC";
@@ -711,7 +711,31 @@ const NAV_ALL=[["",NAV_MAIN],["More",NAV_MORE]];
   const PI={whiteboard:'ti-layout-dashboard',home:'ti-school',summary:'ti-chart-bar',team:'ti-users',onboarding:'ti-user-plus',ask:'ti-bulb',build:'ti-tools',today:'ti-clipboard-list',schedule:'ti-calendar-week',calendar:'ti-calendar-month',community:'ti-messages',resources:'ti-files',downloads:'ti-download',settings:'ti-settings',journal:'ti-notebook',track:'ti-book-2',lesson:'ti-book-2',feedback:'ti-message-2',ownership:'ti-sitemap'};
   const _ti=document.getElementById('topicon'); if(_ti)_ti.innerHTML='<i class="ti '+(PI[state.page]||'ti-point')+'"></i>';
   const v=document.getElementById("view");
-  ({whiteboard:vToday, home:vHome, acat:vAcat, track:vTrack, lesson:vLesson, summary:vSummary, team:vTeam, ownership:vOwnership, journal:vJournal, community:vCommunity, feedback:vFeedback, downloads:vDownloads, settings:vSettings, brain:vBrain, resources:vResources, ask:vAsk, build:vBuild, today:vToday, logbook:schLogbook, rm:vRM, lists:vLists, recovery:vRecovery, schedule:vSchedule, onboarding:vOnboarding, calendar:vCalendar, sales:vSales, checklists:vChecklists, setup:vSetup, pay:vPay, clock:vClock, saleshist:vSalesHist, costsmart:vCostSmart}[state.page]||vHome)(v);
+  /* ---------- A screen that fails should say so ----------
+   Eighteen views printed "Loading…" and then ran database queries with no error handling.
+   One failed query -- an expired session, a dropped connection, a slow night -- and the
+   screen sat on "Loading…" for ever. No message, no retry, nothing to do but reload and
+   hope. That is most of what "it hangs" means in practice, and it was never one screen's
+   bug: it was the shape of every screen.
+
+   Rather than eighteen try/catch blocks that the nineteenth screen would forget, the router
+   catches it once, here, for anything that throws or rejects. */
+  const _view = ({whiteboard:vToday, home:vHome, acat:vAcat, track:vTrack, lesson:vLesson, summary:vSummary, team:vTeam, ownership:vOwnership, journal:vJournal, community:vCommunity, feedback:vFeedback, downloads:vDownloads, settings:vSettings, brain:vBrain, resources:vResources, ask:vAsk, build:vBuild, today:vToday, logbook:schLogbook, rm:vRM, lists:vLists, recovery:vRecovery, schedule:vSchedule, onboarding:vOnboarding, calendar:vCalendar, sales:vSales, checklists:vChecklists, setup:vSetup, pay:vPay, clock:vClock, saleshist:vSalesHist, costsmart:vCostSmart}[state.page]||vHome);
+  const _failed = function(err){
+    const v2=document.getElementById('view'); if(!v2) return;
+    const why=(err&&(err.message||err.error_description))||'';
+    v2.innerHTML='<div class="card" style="padding:26px 24px;max-width:520px">'
+      +'<div style="font-size:18px;font-weight:600;letter-spacing:-.02em;margin-bottom:6px">This didn\u2019t load</div>'
+      +'<div class="faint" style="font-size:15px;line-height:1.55;margin-bottom:16px">'
+      +'Nothing has been lost \u2014 the page could not fetch its data.'
+      +(why?' <span style="opacity:.8">('+esc(why)+')</span>':'')+'</div>'
+      +'<button class="btn pri" style="width:auto" onclick="render()">Try again</button></div>';
+    try{ console.error('view failed:', state.page, err); }catch(e){}
+  };
+  try{
+    const _r = _view(v);
+    if(_r && typeof _r.then==='function') _r.catch(_failed);
+  }catch(err){ _failed(err); }
 }
 const PAGE_HERO={
   acat:'The Academy',
