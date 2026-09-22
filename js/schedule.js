@@ -358,6 +358,32 @@ h+=`<div class="board"><div class="board-grid"><div class="bh bh-team">Team</div
       h+=`<div class="pcell"><span class="av"><i class="ti ti-calendar-event"></i></span><span style="min-width:0"><span class="nm">Meetings</span><span class="mt">${(_evList||[]).length} this week</span></span></div>`+_ec;
     }
   }
+  /* ---------- What's on, above the people who have to cover it ----------
+     A 200-cover catering on Saturday changes how many people Saturday needs. It lived only
+     on the Calendar page, which meant the person building the schedule had to remember to
+     go and look -- and the whole reason the order gets missed is that nobody remembers to
+     go and look. It sits on the grid now, over the day it lands on, so you cannot staff
+     Saturday without seeing it.
+
+     Separate from the Meetings row above because that reads the `events` table, while
+     catering, deliveries and holidays are calendar day_items. Two sources, one place. */
+  try{
+    const _CK={catering:{l:'Catering',c:'#A8551F'},delivery:{l:'Delivery',c:'#2563EB'},holiday:{l:'Holiday',c:'#7C3AED'},event:{l:'Event',c:'#0D9488'},order:{l:'Order',c:'#64748B'},clean:{l:'Deep clean',c:'#0891B2'}};
+    const _cr=await sb.from('day_items').select('id,kind,title,detail,on_date')
+      .in('kind',Object.keys(_CK)).gte('on_date',isoDays[0]).lte('on_date',isoDays[6]);
+    const _cBy={}; (_cr.data||[]).forEach(function(x){ (_cBy[x.on_date]=_cBy[x.on_date]||[]).push(x); });
+    if((_cr.data||[]).length){
+      h+=`<div class="band">What's on</div>`;
+      const _cc=isoDays.map(function(iso){
+        const inner=(_cBy[iso]||[]).map(function(x){
+          const k=_CK[x.kind]||_CK.event;
+          return `<div class="scard" title="${esc(x.detail||'')}" style="background:${k.c}14;color:${k.c};border:1px solid ${k.c}33;white-space:normal;line-height:1.2">${esc(x.title)}</div>`;
+        }).join('');
+        return `<div class="daycell${iso===todayIso?' today':''}">${inner}</div>`;
+      }).join('');
+      h+=`<div class="pcell"><span class="av"><i class="ti ti-tools-kitchen-2"></i></span><span style="min-width:0"><span class="nm">What's on</span><span class="mt">${(_cr.data||[]).length} this week</span></span></div>`+_cc;
+    }
+  }catch(e){}
   const dayHrs=isoDays.map(()=>0), dayCost=isoDays.map(()=>0);
   const POS_ORDER=['OJR','Owner','GM','Manager','Supervisor','Trainer','Trainee','Team Member','Unassigned']; const POS_COL={OJR:'#DC2626',Owner:'#7C3AED',Manager:'#2563EB',Supervisor:'#0D9488',Trainer:'#0891B2',Trainee:'#D97706','Team Member':'#64748B',Unassigned:'#94A3B8'};
   Object.keys(roles).sort((a,b)=>{const ia=POS_ORDER.indexOf(a),ib=POS_ORDER.indexOf(b);return (ia<0?99:ia)-(ib<0?99:ib)||a.localeCompare(b);}).forEach(role=>{
