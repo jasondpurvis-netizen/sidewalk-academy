@@ -23,9 +23,9 @@
      onto black -- which is the other half of how a teal icon arrived looking black.
      A restaurant with its own logo still gets it: the script below replaces these once
      the page knows whose restaurant it is. -->
-<link rel="apple-touch-icon" id="lAppIcon" sizes="180x180" href="/icons/2026-09-17-4/touch-180.png" />
-<link rel="icon" id="lFavicon" type="image/png" sizes="32x32" href="/icons/2026-09-17-4/icon-32.png" />
-<link rel="icon" type="image/png" sizes="192x192" href="/icons/2026-09-17-4/icon-192.png" />
+<link rel="apple-touch-icon" id="lAppIcon" sizes="180x180" href="/icons/2026-09-22-1/touch-180.png" />
+<link rel="icon" id="lFavicon" type="image/png" sizes="32x32" href="/icons/2026-09-22-1/icon-32.png" />
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/2026-09-22-1/icon-192.png" />
 <link rel="manifest" id="lManifest" href="/manifest.webmanifest" />
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
@@ -241,12 +241,6 @@
   .sop-callout{background:var(--brand-soft);border-left:3px solid var(--brand);padding:11px 14px;margin:14px 0;font-weight:600;font-size:14px;line-height:1.45;border-radius:0 8px 8px 0}
   .sop-signoff{font-size:14px;color:var(--ink);margin:16px 0 4px;border-top:1px solid var(--line);padding-top:12px}
   .nav a{transition:background .13s ease,color .13s ease}
-  /* A star beside every row is a mark competing with the word it labels, and there were
-     twenty-one of them. Kept, but only painted when you reach for the row -- opacity, not
-     display, so nothing moves under the cursor. Pinned ones stay lit: those mean something. */
-  .nav a .favpin,.nav a .favgrip{opacity:0;transition:opacity .12s ease}
-  .nav a:hover .favpin,.nav a:hover .favgrip,.nav a:focus-within .favpin,.nav a .favpin.on{opacity:1}
-  @media(hover:none){ .nav a .favpin,.nav a .favgrip{opacity:.45} .nav a .favpin.on{opacity:1} }
   .nav a i{font-size:18px;width:22px;text-align:center;flex-shrink:0}
   .navgroup{font-size:12.5px;font-weight:640;letter-spacing:.02em;text-transform:none;color:var(--faint);padding:17px 12px 6px}
   .navgroup:first-child{padding-top:4px}
@@ -281,12 +275,12 @@
      did another, and the two devices disagreed with no way to tell why. A new query string
      is a new URL, so a stale copy cannot answer for it. Bump it with BUILD on every
      release. -->
-<script src="js/core.js?v=2026-09-17-4"></script>
-<script src="js/academy.js?v=2026-09-17-4"></script>
-<script src="js/community.js?v=2026-09-17-4"></script>
-<script src="js/lists.js?v=2026-09-17-4"></script>
-<script src="js/today.js?v=2026-09-17-4"></script>
-<script src="js/schedule.js?v=2026-09-17-4"></script>
-<script src="js/team.js?v=2026-09-17-4"></script>
+<script src="js/core.js?v=2026-09-22-1"></script>
+<script src="js/academy.js?v=2026-09-22-1"></script>
+<script src="js/community.js?v=2026-09-22-1"></script>
+<script src="js/lists.js?v=2026-09-22-1"></script>
+<script src="js/today.js?v=2026-09-22-1"></script>
+<script src="js/schedule.js?v=2026-09-22-1"></script>
+<script src="js/team.js?v=2026-09-22-1"></script>
 </body>
 </html>

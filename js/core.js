@@ -2,7 +2,7 @@
 /* A stamp so any device can say which version it is actually running. Three times now a
    phone and a laptop on the same address have disagreed about what the app looks like,
    and there was no way to tell them apart except by describing the screen. */
-const BUILD = '2026-09-17-4';
+const BUILD = '2026-09-22-1';
 window.BUILD = BUILD;
 const SUPABASE_URL = "https://wjqcnxnwjqmuzrandgea.supabase.co";
 const SUPABASE_KEY = "sb_publishable_DQZclfAnv_MYQJLGcOdzdw_g4vMCiSC";
@@ -437,9 +437,9 @@ async function undo(lid){ state.progress.delete(lid); await sb.from("progress").
 
 /* ---------- nav ---------- */
 function go(page,ctx){ if(window._dirty){ if(!confirm('You have unsaved changes'+(window._dirty.label?' in '+window._dirty.label:'')+'.\n\nLeave without saving?')) return; window.clearDirty(); } try{const _n=document.querySelector('.side .nav'),_s=document.querySelector('.side'); window._navScroll=(_n&&_n.scrollTop)||0; window._sideScroll=(_s&&_s.scrollTop)||0;}catch(e){} state.page=page; state.ctx=ctx||{}; try{ history.pushState({p:page,c:state.ctx},''); localStorage.setItem('sw_nav',JSON.stringify({p:page,c:state.ctx})); }catch(e){} scrollTo(0,0); render(); }
-window.toggleFavPin=function(p){ try{ let pins=JSON.parse(localStorage.getItem('sw_favpin')||'[]'); const i=pins.indexOf(p); if(i>=0) pins.splice(i,1); else pins.push(p); localStorage.setItem('sw_favpin',JSON.stringify(pins)); }catch(e){} renderApp(); };
-window.favDragStart=function(p,e){ window._favDrag=p; try{ if(e&&e.dataTransfer){ e.dataTransfer.effectAllowed='move'; e.dataTransfer.setData('text/plain',p); } }catch(_){} };
-window.favDrop=function(targetP){ const p=window._favDrag; window._favDrag=null; if(!p||p===targetP)return; try{ let pins=JSON.parse(localStorage.getItem('sw_favpin')||'[]'); const from=pins.indexOf(p); if(from<0)return; pins.splice(from,1); let ti=pins.indexOf(targetP); if(ti<0)ti=pins.length; pins.splice(ti,0,p); localStorage.setItem('sw_favpin',JSON.stringify(pins)); }catch(e){} renderApp(); };
+
+
+
 window.addEventListener('popstate',function(e){ if(!state.user) return; if(e.state&&e.state.p){ state.page=e.state.p; state.ctx=e.state.c||{}; } else { state.page='home'; state.ctx={}; } scrollTo(0,0); render(); });
 async function signOut(){ await sb.auth.signOut(); state.user=null; state.profile=null; render(); }
 
@@ -638,8 +638,12 @@ const NAV_ALL=[["",NAV_MAIN],["More",NAV_MORE]];
     const cnt=document.getElementById(id+'-n'); if(cnt) cnt.style.display=shutNow?'':'none';
   };
   let nav = NAV_ALL.map(([g,items])=>[g, items.filter(([p])=>canSee(p))]).filter(([g,items])=>items.length);
-  let _pins=[]; try{ _pins=JSON.parse(localStorage.getItem('sw_favpin')||'[]'); }catch(e){}
-  try{ const meta={}; NAV_ALL.forEach(([g,items])=>items.forEach(it=>meta[it[0]]=it)); const pinnedFavs=_pins.filter(p=>meta[p]&&canSee(p)); if(pinnedFavs.length){ nav = nav.map(([g,items])=>[g, items.filter(([p])=>_pins.indexOf(p)<0)]).filter(([g,items])=>items.length); nav.unshift(['Favorites', pinnedFavs.map(p=>meta[p])]); } }catch(e){}
+  /* Favourites are gone. They existed to make twenty-one destinations survivable: pin the
+     four you use and scroll past the rest. With six destinations the trade is all cost --
+     pinning lifted four items out of the main list into a collapsed group, so the sidebar
+     showed two things and looked broken. Anything saved from before is ignored rather than
+     migrated; six items do not need shortcuts to six items. */
+  const _pins=[];
   root.innerHTML = `<div class="app">
     <aside class="side">
       <div class="brand" onclick="go('whiteboard')" style="cursor:pointer${state.settings&&state.settings.logo_url?';flex-direction:column;align-items:flex-start;gap:9px;padding:20px 18px':''}">${state.settings&&state.settings.logo_url?`<img src="${state.settings.logo_url}" style="max-width:190px;max-height:64px;width:auto;height:auto;object-fit:contain;display:block" alt="logo"/><div><b>${esc((state.settings&&state.settings.academy_name)||'Academy')}</b><span>Training</span></div>`:`<div class="lg">${esc(((state.settings&&state.settings.academy_name)||'A').charAt(0).toUpperCase())}</div><div><b>${esc((state.settings&&state.settings.academy_name)||'Academy')}</b><span>Training</span></div>`}</div>
@@ -661,11 +665,13 @@ const NAV_ALL=[["",NAV_MAIN],["More",NAV_MORE]];
   if(!('More' in _navShut)) _navShut['More']=1;
   const _curGroup=(nav.find(([g,items])=>items.some(([p])=>p===state.page))||[])[0];
   document.getElementById("nav").innerHTML = nav.map(([g,items])=>{
-    const _shut = g && g!=='Favorites' && _navShut[g] && g!==_curGroup;
+    const _shut = g && _navShut[g] && g!==_curGroup;
     const _gid0 = g? 'navg-'+g.replace(/[^a-z0-9]/gi,'') : '';
     const gl=g?`<div class="navgroup" onclick="toggleNavGroup('${esc(g)}')" style="cursor:pointer;display:flex;align-items:center;gap:6px;user-select:none">${esc(g)}<i class="ti ti-chevron-${_shut?'right':'down'}" id="${_gid0}-chev" style="font-size:14px;opacity:.55"></i><span id="${_gid0}-n" style="opacity:.5;font-weight:500;${_shut?'':'display:none'}">${items.length}</span></div>`:'';
     const _gid = g? 'navg-'+g.replace(/[^a-z0-9]/gi,'') : '';
-    const _fav=g==='Favorites'; return gl+items.map(([p,l,i])=>{ const _pn=_pins.indexOf(p)>=0; const _drag=_fav?` draggable="true" ondragstart="favDragStart('${p}',event)" ondragover="event.preventDefault()" ondrop="event.preventDefault();favDrop('${p}')"`:''; const _grip=_fav?`<span class="favgrip" title="Drag to reorder" style="cursor:grab;color:var(--line2);font-size:14px;flex-shrink:0;padding:0 1px">⠿</span>`:''; return `<a${_drag} data-navgrp="${_gid}" style="display:${_shut?'none':'flex'};align-items:center;gap:3px;${p==='setup'?'margin-top:auto':''}" class="${state.page===p||(state.page==='lesson'||state.page==='track'||state.page==='acat')&&p==='home'?'active':''}" onclick="go('${p}');toggleNav(false)">${_grip}<i class="ti ${i}" aria-hidden="true"></i><span style="flex:1;min-width:0">${l}</span>${(p==='community'&&window._communityUnread>0)?`<span class="commbadge" style="background:#DC2626;color:#fff;font-size:11.5px;font-weight:800;min-width:18px;height:18px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;padding:0 5px;flex-shrink:0">${window._communityUnread>99?'99+':window._communityUnread}</span>`:''}<span class="favpin${_pn?' on':''}" onclick="event.stopPropagation();toggleFavPin('${p}')" title="${_pn?'Unpin from Favorites':'Pin to Favorites'}" style="cursor:pointer;font-size:14px;line-height:1;color:${_pn?'#E5A800':'var(--line2)'};padding:0 2px;flex-shrink:0">${_pn?'★':'☆'}</span></a>`; }).join(''); }).join("");
+    return gl+items.map(([p,l,i])=>{ const _drag='';
+    const _grip='';
+    return `<a${_drag} data-navgrp="${_gid}" style="display:${_shut?'none':'flex'};align-items:center;gap:3px;${p==='setup'?'margin-top:auto':''}" class="${state.page===p||(state.page==='lesson'||state.page==='track'||state.page==='acat')&&p==='home'?'active':''}" onclick="go('${p}');toggleNav(false)">${_grip}<i class="ti ${i}" aria-hidden="true"></i><span style="flex:1;min-width:0">${l}</span>${(p==='community'&&window._communityUnread>0)?`<span class="commbadge" style="background:#DC2626;color:#fff;font-size:11.5px;font-weight:800;min-width:18px;height:18px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;padding:0 5px;flex-shrink:0">${window._communityUnread>99?'99+':window._communityUnread}</span>`:''}</a>`; }).join(''); }).join("");
   try{ const _n=document.querySelector('.side .nav'); if(_n&&window._navScroll)_n.scrollTop=window._navScroll; const _s=document.querySelector('.side'); if(_s&&window._sideScroll)_s.scrollTop=window._sideScroll; }catch(e){}
   document.getElementById("out").onclick=signOut;
   const PI={whiteboard:'ti-layout-dashboard',home:'ti-school',summary:'ti-chart-bar',team:'ti-users',onboarding:'ti-user-plus',ask:'ti-bulb',build:'ti-tools',today:'ti-clipboard-list',schedule:'ti-calendar-week',calendar:'ti-calendar-month',community:'ti-messages',resources:'ti-files',downloads:'ti-download',settings:'ti-settings',journal:'ti-notebook',track:'ti-book-2',lesson:'ti-book-2',feedback:'ti-message-2',ownership:'ti-sitemap'};
