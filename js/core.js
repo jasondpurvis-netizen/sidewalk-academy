@@ -2,7 +2,7 @@
 /* A stamp so any device can say which version it is actually running. Three times now a
    phone and a laptop on the same address have disagreed about what the app looks like,
    and there was no way to tell them apart except by describing the screen. */
-const BUILD = '2026-09-22-5';
+const BUILD = '2026-09-22-6';
 window.BUILD = BUILD;
 const SUPABASE_URL = "https://wjqcnxnwjqmuzrandgea.supabase.co";
 const SUPABASE_KEY = "sb_publishable_DQZclfAnv_MYQJLGcOdzdw_g4vMCiSC";
@@ -657,7 +657,7 @@ function renderApp(){
    Anything added back should have to earn a door, rather than get one by existing. */
 const NAV_MAIN=[["today","Today","ti-sun"],["schedule","Schedule","ti-calendar-week"],["team","Team","ti-users"],["home","Training","ti-school"],["community","Messages","ti-messages"],["brain","Set up","ti-adjustments"]];
 /* Reachable, not advertised. Opens from More at the foot of the sidebar. */
-const NAV_MORE=[["logbook","Shift log","ti-clipboard-check"],["rm","Fix-it list","ti-tool"],["lists","Checklists","ti-list-details"],["recovery","Guest recovery","ti-heart-handshake"],["ownership","Who owns what","ti-sitemap"],["onboarding","New hires","ti-user-plus"],["calendar","Calendar","ti-calendar-month"],["build","Create training","ti-tools"],["ask","Find an answer","ti-bulb"],["journal","Journal","ti-notebook"],["resources","Resources","ti-files"],["downloads","Downloads","ti-download"],["sales","Sales","ti-chart-line"],["setup","Getting started","ti-list-check"],["settings","Settings","ti-settings"]];
+const NAV_MORE=[["logbook","Shift log","ti-clipboard-check"],["rm","Fix-it list","ti-tool"],["lists","Checklists","ti-list-details"],["recovery","Guest recovery","ti-heart-handshake"],["ownership","Who owns what","ti-sitemap"],["onboarding","New hires","ti-user-plus"],["calendar","Calendar","ti-calendar-month"],["build","Create training","ti-tools"],["ask","Find an answer","ti-bulb"],["resources","Resources","ti-files"],["downloads","Downloads","ti-download"],["sales","Sales","ti-chart-line"],["setup","Getting started","ti-list-check"],["settings","Settings","ti-settings"]];
 const NAV_ALL=[["",NAV_MAIN],["More",NAV_MORE]];
   window.toggleNavGroup=function(g){
     let shut={}; try{ shut=JSON.parse(localStorage.getItem('sw_navshut')||'null')||{}; }catch(e){}
