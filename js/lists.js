@@ -36,7 +36,9 @@ async function vRecovery(v){
   const open=items.filter(i=>!i.done); const done=items.filter(i=>i.done);
   const inp='padding:9px 11px;border:1px solid var(--line2);border-radius:9px;font-family:inherit;font-size:14px;background:var(--card);color:var(--ink);width:100%';
   const _fd=s=>{ if(!s)return''; const d=new Date(s+'T00:00'); return isNaN(d)?esc(s):d.toLocaleDateString(undefined,{month:'short',day:'numeric'}); };
-  let h=`<div class="card" style="padding:16px 18px;margin-bottom:16px"><div class="sec" style="margin-bottom:4px">Log a recovery</div><div class="faint" style="font-size:12.5px;margin-bottom:12px">A guest had something go wrong and we're making it right. Write it down so it actually happens and nothing slips through.</div>`;
+  /* Same rule as every other screen: what is outstanding first, the form behind a button. */
+  let h=addBar('recAddCard','Log a recovery', (typeof open!=='undefined'&&open&&open.length)?`${open.length} open`:'', 'recGuest')
+    + `<div id="recAddCard" class="card" style="padding:16px 18px;margin-bottom:16px;display:none"><div class="row" style="justify-content:space-between;align-items:flex-start"><div class="sec" style="margin:0 0 4px">Log a recovery</div><button onclick="toggleAdd('recAddCard',false)" style="border:none;background:transparent;font-size:26px;line-height:1;cursor:pointer;color:var(--muted)">&times;</button></div><div class="faint" style="font-size:12.5px;margin-bottom:12px">A guest had something go wrong and we're making it right. Write it down so it actually happens and nothing slips through.</div>`;
   h+=`<input id="recGuest" placeholder="Guest name" style="${inp};margin-bottom:10px"/>`;
   h+=`<div class="faint" style="font-size:12.5px;font-weight:700;margin-bottom:3px">Date of the incident</div><input id="recDate" type="date" value="${isoDate(new Date())}" style="${inp};margin-bottom:10px;max-width:200px"/>`;
   h+=`<textarea id="recWhat" placeholder="What happened?" style="${inp};min-height:70px;margin-bottom:10px;line-height:1.5"></textarea>`;

@@ -2,7 +2,7 @@
 /* A stamp so any device can say which version it is actually running. Three times now a
    phone and a laptop on the same address have disagreed about what the app looks like,
    and there was no way to tell them apart except by describing the screen. */
-const BUILD = '2026-09-22-1';
+const BUILD = '2026-09-22-2';
 window.BUILD = BUILD;
 const SUPABASE_URL = "https://wjqcnxnwjqmuzrandgea.supabase.co";
 const SUPABASE_KEY = "sb_publishable_DQZclfAnv_MYQJLGcOdzdw_g4vMCiSC";
@@ -325,6 +325,40 @@ async function loadSettings(){
   // explicit login-to-roster links (title = profile id, detail = roster name), for names we can't resolve on our own
   try{ const rl=await sb.from('day_items').select('title,detail').eq('kind','acctlink'); const lm={}; (rl.data||[]).forEach(x=>{ if(x.title&&x.detail) lm[x.title]=x.detail; }); window._acctLink=lm; }catch(e){ window._acctLink={}; } applyBrand(state.settings.brand_color); applyAppIdentity(); }
 
+/* ---------- One rule, every screen: your work first, the form behind a button ----------
+   Nearly every page in this app opened with an empty form -- text boxes, pickers, a row of
+   name chips -- and put the thing you came to see underneath it. You visit these screens
+   far more often to look at what is there than to add to it, and a page that leads with an
+   empty form reads as unfinished however well the form is built. It is also the single
+   most common reason software feels "busy": the first screenful is all chrome.
+
+   This is the shared toggle so every screen does it the same way, rather than each one
+   inventing its own. Consistency is most of what "finished" means. */
+window.toggleAdd=function(id,on,focusId){
+  const c=document.getElementById(id); if(!c) return;
+  c.style.display = on ? 'block' : 'none';
+  if(on){
+    const f=focusId && document.getElementById(focusId);
+    if(f) f.focus();
+    c.scrollIntoView({behavior:'smooth',block:'nearest'});
+  }
+};
+/* The button that opens it. Same shape everywhere: one primary action, a quiet count
+   beside it so the page says what is waiting before you have read anything. */
+window.addBar=function(id,label,countText,focusId){
+  return `<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px">`
+    + `<button class="btn pri" style="width:auto" onclick="toggleAdd('${id}',true${focusId?`,'${focusId}'`:''})"><i class="ti ti-plus"></i> ${label}</button>`
+    + (countText?`<span class="faint" style="font-size:14.5px">${countText}</span>`:'')
+    + `</div>`;
+};
+/* The card the form sits in, closed until asked for. */
+window.addCard=function(id,title,inner){
+  return `<div id="${id}" class="card" style="padding:16px 18px;margin-bottom:16px;display:none">`
+    + `<div class="row" style="justify-content:space-between;align-items:flex-start;margin-bottom:10px">`
+    + `<div class="sec" style="margin:0">${title}</div>`
+    + `<button onclick="toggleAdd('${id}',false)" style="border:none;background:transparent;font-size:26px;line-height:1;cursor:pointer;color:var(--muted)">&times;</button></div>`
+    + inner + `</div>`;
+};
 function esc(s){ return (s||"").replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c])); }
 function richBody(html){
   try{
