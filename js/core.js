@@ -2,7 +2,7 @@
 /* A stamp so any device can say which version it is actually running. Three times now a
    phone and a laptop on the same address have disagreed about what the app looks like,
    and there was no way to tell them apart except by describing the screen. */
-const BUILD = '2026-09-24-2';
+const BUILD = '2026-09-24-3';
 window.BUILD = BUILD;
 const SUPABASE_URL = "https://wjqcnxnwjqmuzrandgea.supabase.co";
 const SUPABASE_KEY = "sb_publishable_DQZclfAnv_MYQJLGcOdzdw_g4vMCiSC";
@@ -1351,11 +1351,19 @@ function vHome(v){
     return `<div class="entrycard" style="position:relative;overflow:hidden;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:22px;box-shadow:0 10px 26px rgba(23,37,42,.09);cursor:pointer" onclick="go('acat',{cat:'${cat}'})"><div style="position:absolute;top:0;left:0;right:0;height:5px;background:${tone.bar}"></div><div class="emedallion" style="background:${tone.med};box-shadow:0 8px 18px ${tone.sh}">${tone.icon}</div><div style="font-weight:800;font-size:18px;letter-spacing:-.01em">${label}</div><div class="muted" style="font-size:14px;margin-top:5px;line-height:1.5">${desc}</div><div style="font-weight:600;font-size:15.5px;letter-spacing:-.012em;text-transform:none;margin-top:14px;color:${tone.ink}">${list.length} ${list.length===1?'track':'tracks'}${dc?` &middot; ${dc} certified`:''} &middot; Open &rarr;</div></div>`; };
   const dev=_entry('development','Leadership &amp; Development','Grow into and beyond your role.',_dev,{bar:'linear-gradient(90deg,var(--tealmid),var(--teallite))',med:'linear-gradient(135deg,var(--tealmid),var(--tealdark))',sh:'rgba(46,125,138,.36)',icon:ICON_SCHOOL,ink:'var(--brand)'});
   const ops=_entry('operations','Operations &amp; How-To','The daily craft, station by station.',_ops,{bar:'linear-gradient(90deg,var(--accent-2),var(--accent))',med:'linear-gradient(135deg,var(--accent),var(--accent-2))',sh:'rgba(229,168,0,.4)',icon:ICON_TOOLS,ink:'var(--accent-ink)'});
-  if(_vt.length) h+=`<div class="entrygrid">${dev}${ops}</div>`;
-  else h+=`<div class="muted" style="padding:8px 2px">No tracks yet.</div>`;
-  /* Recipes are training material, not a track -- nobody certifies on a cream cheese.
-     It gets its own door here rather than being buried as a lesson. */
-  h+=`<div class="sec" style="margin-top:18px">Reference</div>`;
-  h+=`<div class="card"><div class="lesson-row" style="cursor:pointer" onclick="go('recipes')"><div style="flex:1;min-width:0"><div style="font-weight:500">Recipes</div><div class="faint" style="font-size:12.5px">Every recipe and what goes in it, straight from MarginEdge</div></div><i class="ti ti-chevron-right" style="opacity:.5"></i></div></div>`;
+  /* Recipes are training material, not a track -- nobody certifies on a cream cheese --
+     but it sat under the two entry cards as a plain row and read like an afterthought.
+     Same card, same weight, third tone. */
+  const ICON_BOOK='<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#fff" stroke-width="1.8"><path d="M4 5.5A2.5 2.5 0 016.5 3H19v15H6.5A2.5 2.5 0 004 20.5z"/><path d="M8 7.5h7M8 11h7"/></svg>';
+  const _nrec=(state._recipeCount!=null)?state._recipeCount:null;
+  const rec=`<div class="entrycard" style="position:relative;overflow:hidden;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:22px;box-shadow:0 10px 26px rgba(23,37,42,.09);cursor:pointer" onclick="go('recipes')"><div style="position:absolute;top:0;left:0;right:0;height:5px;background:linear-gradient(90deg,#7E5A43,#B3866A)"></div><div class="emedallion" style="background:linear-gradient(135deg,#8A6349,#5F4331);box-shadow:0 8px 18px rgba(138,99,73,.36)">${ICON_BOOK}</div><div style="font-weight:800;font-size:18px;letter-spacing:-.01em">Recipes</div><div class="muted" style="font-size:14px;margin-top:5px;line-height:1.5">Every recipe and exactly what goes in it.</div><div style="font-weight:600;font-size:15.5px;letter-spacing:-.012em;margin-top:14px;color:#7E5A43">${_nrec!=null?_nrec+' recipe'+(_nrec===1?'':'s'):'Reference'} &middot; Open &rarr;</div></div>`;
+  if(_vt.length) h+=`<div class="entrygrid">${dev}${ops}${rec}</div>`;
+  else h+=`<div class="entrygrid">${rec}</div>`;
   v.innerHTML=h;
+  /* Fill in the count once, quietly, so the card is not lying on a cold load. */
+  if(state._recipeCount==null){
+    sb.from('day_items').select('id',{count:'exact',head:true}).eq('kind','recipe')
+      .then(r=>{ state._recipeCount=(r&&r.count)||0; if(state.page==='home') vHome(document.getElementById('view')); })
+      .catch(()=>{ state._recipeCount=0; });
+  }
 }

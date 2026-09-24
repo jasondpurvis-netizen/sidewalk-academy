@@ -306,9 +306,9 @@ function _renderRecipes(v){
       <div class="row" style="gap:10px;align-items:center;flex-wrap:wrap">
         <div style="flex:1;min-width:190px">
           <div style="font-weight:600;font-size:14px">Recipes come from MarginEdge</div>
-          <div class="faint" style="font-size:12.5px;margin-top:2px">Run the pull script, then load the two files here. Re-loading updates what changed — it never makes duplicates.</div>
+          <div class="faint" style="font-size:12.5px;margin-top:3px;line-height:1.5">Choose <b>both</b> files, then Load. They are in your Claude project folder under <b>recipes-export</b>:<br><code style="font-size:11.5px">recipes.json</code> and <code style="font-size:11.5px">recipeIngredients.json</code>. Hold &#8984; to pick both. Re-loading updates what changed &mdash; it never makes duplicates.</div>
         </div>
-        <input type="file" id="recFiles" accept=".json" multiple style="font-size:13px;max-width:250px"/>
+        <input type="file" id="recFiles" accept=".json,application/json" multiple onchange="recFilesPicked()" style="font-size:13px;max-width:250px"/>
         <button class="btn" style="width:auto" onclick="recipesImport()">Load</button>
       </div>
       <div id="recImportMsg"></div>
@@ -389,6 +389,18 @@ function _renderRecipes(v){
   if(si && state.ctx.q){ si.focus(); si.setSelectionRange(si.value.length,si.value.length); }
 }
 
+window.recFilesPicked=function(){
+  const f=document.getElementById('recFiles'), m=document.getElementById('recImportMsg');
+  if(!f||!m) return;
+  const names=Array.from(f.files||[]).map(x=>x.name);
+  if(!names.length){ m.innerHTML=''; return; }
+  const hasR=names.some(n=>/recipes\.json$/i.test(n));
+  const hasI=names.some(n=>/ingredients\.json$/i.test(n));
+  const missing=[]; if(!hasR) missing.push('recipes.json'); if(!hasI) missing.push('recipeIngredients.json');
+  m.innerHTML = missing.length
+    ? `<div class="msg err" style="margin-top:9px">Picked ${esc(names.join(', '))} &mdash; still need ${esc(missing.join(' and '))}.</div>`
+    : `<div class="msg ok" style="margin-top:9px">Both files ready. Press Load.</div>`;
+};
 window.recipeSearch=function(t){ state.ctx.q=t; state.ctx.open=null; _renderRecipes(document.getElementById('view')); };
 window.recipeOpen=function(id){ state.ctx.open = (state.ctx.open==id) ? null : id; _renderRecipes(document.getElementById('view')); };
 
