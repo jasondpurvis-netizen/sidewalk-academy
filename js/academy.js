@@ -273,34 +273,68 @@ window.manageChannels=function(){ const all=effectiveChannels(); window._chanEdi
    costs for owners, hidden for staff -- still puts food cost on a screen a barista is
    standing next to. Cost lives in MarginEdge, which is where it is maintained anyway. */
 
-const RECIPE_TONES=[
-  {g:'linear-gradient(135deg,#8A5CF6,#5A2FC2)', ic:'ti-cup'},
-  {g:'linear-gradient(135deg,#4A9CAD,#2A6E7A)', ic:'ti-bowl'},
-  {g:'linear-gradient(135deg,#F2820A,#BF5E00)', ic:'ti-bread'},
-  {g:'linear-gradient(135deg,#3FA06B,#227048)', ic:'ti-salad'},
-  {g:'linear-gradient(135deg,#E0567F,#A82552)', ic:'ti-cheese'},
-  {g:'linear-gradient(135deg,#5C7CE0,#2F4BA8)', ic:'ti-flask'},
-  {g:'linear-gradient(135deg,#C9962E,#8E6510)', ic:'ti-egg'},
-  {g:'linear-gradient(135deg,#6E7B8A,#41505E)', ic:'ti-tools-kitchen-2'},
-  {g:'linear-gradient(135deg,#B0539B,#78256A)', ic:'ti-chef-hat'}
+/* Twelve distinct hues, and every category is guaranteed one of its own.
+   Keyword rules alone were not enough -- 'Breakfast Bagels' contains 'bagel',
+   so three categories came out as the same orange loaf. A category now states
+   a preference, and if that colour is already taken it gets the next free one,
+   so no two can ever match however the categories are named. */
+const RECIPE_PALETTE=[
+  'linear-gradient(135deg,#8A5CF6,#5A2FC2)',  /* violet  */
+  'linear-gradient(135deg,#4A9CAD,#2A6E7A)',  /* teal    */
+  'linear-gradient(135deg,#F2820A,#BF5E00)',  /* orange  */
+  'linear-gradient(135deg,#3FA06B,#227048)',  /* green   */
+  'linear-gradient(135deg,#E0567F,#A82552)',  /* rose    */
+  'linear-gradient(135deg,#5C7CE0,#2F4BA8)',  /* indigo  */
+  'linear-gradient(135deg,#C9962E,#8E6510)',  /* gold    */
+  'linear-gradient(135deg,#6E7B8A,#41505E)',  /* slate   */
+  'linear-gradient(135deg,#B0539B,#78256A)',  /* magenta */
+  'linear-gradient(135deg,#D4573D,#9E2F1A)',  /* clay    */
+  'linear-gradient(135deg,#7FA82E,#4E7010)',  /* lime    */
+  'linear-gradient(135deg,#38A0D8,#1B6795)'   /* sky     */
 ];
-function _recTone(name,i){
+/* Most specific name first, or 'Breakfast Bagels' matches the bagel rule. */
+const RECIPE_RULES=[
+  [/breakfast|egg/,            6, 'ti-egg'],
+  [/lunch|sandwich/,           7, 'ti-tools-kitchen-2'],
+  [/drink.*prep|prep.*drink/,  5, 'ti-flask'],
+  [/drink|coffee|espresso|tea/,0, 'ti-cup'],
+  [/cream cheese|cheese/,      4, 'ti-cheese'],
+  [/toast|avocado|salad/,      3, 'ti-salad'],
+  [/dough/,                    9, 'ti-chef-hat'],
+  [/bagel|bread/,              2, 'ti-bread'],
+  [/base/,                     1, 'ti-bowl'],
+  [/pastry|danish|muffin|cake/,8,'ti-cookie'],
+  [/sauce|syrup|spread/,      10, 'ti-droplet'],
+  [/retail|merch/,            11, 'ti-shopping-bag']
+];
+function _recRule(name){
   const n=(name||'').toLowerCase();
-  const pick=k=>RECIPE_TONES[k];
-  /* order matters: 'Breakfast Bagels' contains 'bagel', so the more specific
-     name has to be tested first or three categories share one loaf icon. */
-  if(n.includes('breakfast')||n.includes('egg')) return pick(6);
-  if(n.includes('lunch')||n.includes('sandwich')) return pick(7);
-  if(n.includes('drink')&&n.includes('prep')) return pick(5);
-  if(n.includes('drink')||n.includes('coffee')||n.includes('espresso')) return pick(0);
-  if(n.includes('cream cheese')||n.includes('cheese')) return pick(4);
-  if(n.includes('toast')||n.includes('avocado')||n.includes('salad')) return pick(3);
-  if(n.includes('dough')) return pick(8);
-  if(n.includes('bagel')) return pick(2);
-  if(n.includes('base')) return pick(1);
-  /* Anything unrecognised gets the neutral slate, not whatever tone the loop
-     happened to land on -- 'Other' was arriving dressed as a coffee cup. */
-  return {g:'linear-gradient(135deg,#8C96A3,#5A6675)', ic:'ti-bowl'};
+  for(const r of RECIPE_RULES){ if(r[0].test(n)) return r; }
+  return null;
+}
+/* Built once from every category present, so a colour is the same on the grid,
+   inside the category and at the top of a recipe. */
+function _recToneMap(){
+  if(state._recToneMap) return state._recToneMap;
+  const names=[...new Set((state._recipes||[]).map(o=>o.d.type||'Other'))]
+              .sort((a,b)=>a.localeCompare(b));
+  const used=new Set(), map={};
+  names.forEach(n=>{ const r=_recRule(n);
+    if(r && !used.has(r[1])){ used.add(r[1]); map[n]={c:r[1],ic:r[2]}; } });
+  let next=0;
+  names.forEach(n=>{ if(map[n]) return;
+    while(used.has(next)) next++;
+    used.add(next);
+    const r=_recRule(n);
+    map[n]={c:next, ic:(r&&r[2])||'ti-bowl'};
+  });
+  state._recToneMap=map;
+  return map;
+}
+function _recTone(name){
+  const m=_recToneMap()[name||'Other'];
+  return m ? {g:RECIPE_PALETTE[m.c%RECIPE_PALETTE.length], ic:m.ic}
+           : {g:RECIPE_PALETTE[7], ic:'ti-bowl'};
 }
 function _qty(n){
   if(n==null||isNaN(n)) return '';
@@ -325,6 +359,7 @@ async function vRecipes(v){
     state._recipes=(r.data||[]).map(x=>{ let d={}; try{ d=JSON.parse(x.detail||'{}'); }catch(e){} return {id:x.id,name:x.title,d}; })
                                 .filter(o=>!o.d.inactive);
     state._recipeCount=state._recipes.length;
+    state._recToneMap=null;
   }
   _renderRecipes(v);
 }
@@ -358,7 +393,7 @@ function _renderRecipes(v){
   /* inside one category */
   if(cat){
     const list=all.filter(o=>(o.d.type||'Other')===cat);
-    const t=_recTone(cat,0);
+    const t=_recTone(cat);
     h+=`<div class="crumb" onclick="recipeCat(null)">← Recipes</div>`;
     h+=`<div style="display:flex;align-items:center;gap:14px;margin:0 0 15px">
           <div style="width:52px;height:52px;border-radius:12px;background:${t.g};display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 8px 18px rgba(23,37,42,.2)"><i class="ti ${t.ic}" style="font-size:26px;color:#fff"></i></div>
@@ -381,7 +416,7 @@ function _renderRecipes(v){
   all.forEach(o=>{ const g=o.d.type||'Other'; (groups[g]=groups[g]||[]).push(o); });
   const names=Object.keys(groups).sort((a,b)=>groups[b].length-groups[a].length);
   h+=`<div class="grid">`+names.map((n,i)=>{
-    const t=_recTone(n,i), c=groups[n].length;
+    const t=_recTone(n), c=groups[n].length;
     return `<div class="card" style="padding:0;overflow:hidden;cursor:pointer" onclick="recipeCat('${esc(n).replace(/'/g,"\\'")}')">
       <div style="height:96px;background:${t.g};position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden">
         <i class="ti ${t.ic}" style="font-size:40px;color:#fff;opacity:.97"></i>
@@ -407,7 +442,7 @@ function _recRow(o,showCat){
 }
 
 function _renderOneRecipe(v,o){
-  const d=o.d, t=_recTone(d.type||'',0);
+  const d=o.d, t=_recTone(d.type||'');
   const ing=(d.ing||[]).slice().sort((a,b)=>(a.p||0)-(b.p||0));
   let h=`<div class="crumb" onclick="recipeCat('${esc(d.type||'').replace(/'/g,"\\'")}')">← ${esc(d.type||'Recipes')}</div>`;
   h+=`<div class="card" style="padding:0;overflow:hidden">
@@ -524,6 +559,6 @@ window.recipesImport=async function(){
   }catch(e){ say('Stopped: '+e.message,true); return; }
 
   say(`Done — ${toAdd.length} new, ${toUpd.length} updated.`);
-  state._recipes=null; state._recipeCount=null;
+  state._recipes=null; state._recipeCount=null; state._recToneMap=null;
   await vRecipes(document.getElementById('view'));
 };
