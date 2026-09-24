@@ -294,17 +294,20 @@ const RECIPE_PALETTE=[
 ];
 /* Most specific name first, or 'Breakfast Bagels' matches the bagel rule. */
 const RECIPE_RULES=[
-  [/breakfast|egg/,            6, 'ti-egg'],
-  [/lunch|sandwich/,           7, 'ti-tools-kitchen-2'],
+  [/breakfast/,                6, 'bagel-egg'],
+  [/lunch|sandwich|burger/,    7, 'ti-burger'],
   [/drink.*prep|prep.*drink/,  5, 'ti-flask'],
   [/drink|coffee|espresso|tea/,0, 'ti-cup'],
   [/cream cheese|cheese/,      4, 'ti-cheese'],
-  [/toast|avocado|salad/,      3, 'ti-salad'],
+  [/avocado/,                  3, 'ti-avocado'],
+  [/toast|salad/,              3, 'ti-salad'],
   [/dough/,                    9, 'ti-chef-hat'],
-  [/bagel|bread/,              2, 'ti-bread'],
-  [/base/,                     1, 'ti-bowl'],
+  [/bagel/,                    2, 'bagel'],
+  [/bread|toast/,              2, 'ti-bread'],
+  [/base/,                     1, 'ti-bowl-spoon'],
   [/pastry|danish|muffin|cake/,8,'ti-cookie'],
-  [/sauce|syrup|spread/,      10, 'ti-droplet'],
+  [/sauce|syrup|spread|milk/, 10, 'ti-milk'],
+  [/egg/,                      6, 'ti-egg-fried'],
   [/retail|merch/,            11, 'ti-shopping-bag']
 ];
 function _recRule(name){
@@ -326,10 +329,22 @@ function _recToneMap(){
     while(used.has(next)) next++;
     used.add(next);
     const r=_recRule(n);
-    map[n]={c:next, ic:(r&&r[2])||'ti-bowl'};
+    map[n]={c:next, ic:(r&&r[2])||'ti-tools-kitchen-2'};
   });
   state._recToneMap=map;
   return map;
+}
+
+/* Tabler has no bagel, and substituting a loaf for one is how "Bagels" ended up
+   looking like toast while "Avocado Toast" was a salad bowl. Two are drawn here;
+   everything else uses a Tabler glyph that actually depicts the thing. */
+const RECIPE_DRAWN={
+  'bagel':(sz,col,op)=>`<svg viewBox="0 0 24 24" width="${sz}" height="${sz}" fill="none" stroke="${col}" stroke-width="1.7" stroke-linecap="round" style="opacity:${op}"><circle cx="12" cy="12" r="8.6"/><circle cx="12" cy="12" r="3.3"/><path d="M8.6 6.1l.6 1.1M15.4 6.1l-.6 1.1M6.1 15.4l1.1-.6M17.9 15.4l-1.1-.6M12 3.4v1.2"/></svg>`,
+  'bagel-egg':(sz,col,op)=>`<svg viewBox="0 0 24 24" width="${sz}" height="${sz}" fill="none" stroke="${col}" stroke-width="1.7" stroke-linecap="round" style="opacity:${op}"><circle cx="9.8" cy="14" r="7.4"/><circle cx="9.8" cy="14" r="2.9"/><path d="M14.2 3.3a4.3 4.3 0 013.6 7.2 4.3 4.3 0 01-6.1-6.1 4.3 4.3 0 012.5-1.1z"/><circle cx="15.6" cy="7.1" r="1.5" fill="${col}" stroke="none"/></svg>`
+};
+function _recIcon(ic,sz,col,op){
+  if(RECIPE_DRAWN[ic]) return RECIPE_DRAWN[ic](sz,col,op);
+  return `<i class="ti ${ic}" style="font-size:${sz}px;color:${col};opacity:${op}"></i>`;
 }
 function _recTone(name){
   const m=_recToneMap()[name||'Other'];
@@ -396,7 +411,7 @@ function _renderRecipes(v){
     const t=_recTone(cat);
     h+=`<div class="crumb" onclick="recipeCat(null)">← Recipes</div>`;
     h+=`<div style="display:flex;align-items:center;gap:14px;margin:0 0 15px">
-          <div style="width:52px;height:52px;border-radius:12px;background:${t.g};display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 8px 18px rgba(23,37,42,.2)"><i class="ti ${t.ic}" style="font-size:26px;color:#fff"></i></div>
+          <div style="width:52px;height:52px;border-radius:12px;background:${t.g};display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 8px 18px rgba(23,37,42,.2)">${_recIcon(t.ic,26,'#fff',1)}</div>
           <div><div style="font-weight:800;font-size:20px;letter-spacing:-.02em">${esc(cat)}</div>
           <div class="muted" style="font-size:13.5px">${list.length} recipe${list.length===1?'':'s'}</div></div>
         </div>`;
@@ -419,8 +434,8 @@ function _renderRecipes(v){
     const t=_recTone(n), c=groups[n].length;
     return `<div class="card" style="padding:0;overflow:hidden;cursor:pointer" onclick="recipeCat('${esc(n).replace(/'/g,"\\'")}')">
       <div style="height:96px;background:${t.g};position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden">
-        <i class="ti ${t.ic}" style="font-size:40px;color:#fff;opacity:.97"></i>
-        <i class="ti ${t.ic}" style="position:absolute;right:-14px;bottom:-18px;font-size:96px;color:#fff;opacity:.11"></i>
+        ${_recIcon(t.ic,40,'#fff',.97)}
+        <span style="position:absolute;right:-14px;bottom:-18px;line-height:0">${_recIcon(t.ic,96,'#fff',.11)}</span>
       </div>
       <div style="padding:15px 17px 17px">
         <div style="font-weight:600;font-size:15.5px;margin:0 0 3px">${esc(n)}</div>
