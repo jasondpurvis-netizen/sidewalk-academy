@@ -2,7 +2,7 @@
 /* A stamp so any device can say which version it is actually running. Three times now a
    phone and a laptop on the same address have disagreed about what the app looks like,
    and there was no way to tell them apart except by describing the screen. */
-const BUILD = '2026-09-24-12';
+const BUILD = '2026-09-24-13';
 window.BUILD = BUILD;
 const SUPABASE_URL = "https://wjqcnxnwjqmuzrandgea.supabase.co";
 const SUPABASE_KEY = "sb_publishable_DQZclfAnv_MYQJLGcOdzdw_g4vMCiSC";
@@ -637,10 +637,44 @@ function canSee(page){ return myRank()>=permOf(page)||hasGrant(page); }
    could see them. The page header quietly fell back to a generic dot on every
    screen because its icon lookup ran at load time and found no NAV_ALL. They are
    plain constants with no dependency on renderApp's locals, so they live here. */
-const NAV_MAIN=[["today","Today","ti-sun"],["schedule","Schedule","ti-calendar-week"],["team","Team","ti-users"],["home","Training","ti-school"],["community","Messages","ti-messages"],["brain","Set up","ti-adjustments"]];
-/* Reachable, not advertised. Opens from More at the foot of the sidebar. */
-const NAV_MORE=[["recipes","Recipes","ti-chef-hat"],["catering","Catering","ti-tools-kitchen-2"],["logbook","Shift log","ti-clipboard-check"],["rm","Fix-it list","ti-tool"],["lists","Checklists","ti-list-details"],["recovery","Guest recovery","ti-heart-handshake"],["ownership","Who owns what","ti-sitemap"],["onboarding","New hires","ti-user-plus"],["calendar","Calendar","ti-calendar-month"],["build","Create training","ti-tools"],["ask","Find an answer","ti-bulb"],["resources","Resources","ti-files"],["downloads","Downloads","ti-download"],["sales","Sales","ti-chart-line"],["setup","Getting started","ti-list-check"],["settings","Settings","ti-settings"]];
-const NAV_ALL=[["",NAV_MAIN],["More",NAV_MORE]];
+const NAV_MAIN=[["today","Today","ti-sun"],["schedule","Schedule","ti-calendar-week"],["team","Team","ti-users"]];
+const NAV_ACADEMY=[["home","Training","ti-school"],["recipes","Recipes","ti-chef-hat"],["resources","Resources","ti-files"],["build","Create training","ti-tools"]];
+const NAV_OPS=[["logbook","Shift log","ti-clipboard-check"],["lists","Checklists","ti-list-details"],["rm","Fix-it list","ti-tool"],["recovery","Guest recovery","ti-heart-handshake"],["catering","Catering","ti-tools-kitchen-2"]];
+const NAV_TALK=[["community","Messages","ti-messages"]];
+const NAV_SETUP=[["brain","Your rules","ti-adjustments"],["setup","Getting started","ti-list-check"],["settings","Settings","ti-settings"]];
+const NAV_ALL=[["",NAV_MAIN],["The Academy",NAV_ACADEMY],["Operations",NAV_OPS],["",NAV_TALK],["Set up",NAV_SETUP]];
+
+/* Every page that can be pinned, including the ones with no door of their own.
+   A page with no label here cannot be pinned, which is the intent for the
+   internal ones (lesson, track, acat) that only make sense from somewhere else. */
+const PAGE_LABEL={
+  today:'Today', schedule:'Schedule', team:'Team', home:'Training', recipes:'Recipes',
+  resources:'Resources', build:'Create training', logbook:'Shift log', lists:'Checklists',
+  rm:'Fix-it list', recovery:'Guest recovery', catering:'Catering', community:'Messages',
+  brain:'Your rules', setup:'Getting started', settings:'Settings',
+  /* no door in the sidebar any more -- reachable by pinning, or from the page they belong to */
+  ownership:'Who owns what', onboarding:'New hires', ask:'Find an answer',
+  downloads:'Downloads', sales:'Sales', saleshist:'Sales history',
+  costsmart:'Right-size the labour', calendar:'Calendar', summary:'Your progress'
+};
+
+/* Pins are additive. The old Favourites feature lifted pinned items OUT of the main
+   list into a group of their own, so pinning four of six destinations left a sidebar
+   showing two things and looking broken. A pin now adds a shortcut at the top and
+   changes nothing else. */
+function myPins(){
+  try{ const a=JSON.parse(localStorage.getItem('sw_pins')||'[]');
+       return Array.isArray(a)?a.filter(p=>PAGE_LABEL[p]&&canSee(p)):[]; }catch(e){ return []; }
+}
+function isPinned(p){ return myPins().indexOf(p)>=0; }
+window.togglePin=function(p){
+  if(!PAGE_LABEL[p]) return;
+  let a=[]; try{ a=JSON.parse(localStorage.getItem('sw_pins')||'[]')||[]; }catch(e){}
+  const i=a.indexOf(p);
+  if(i>=0) a.splice(i,1); else a.push(p);
+  try{ localStorage.setItem('sw_pins', JSON.stringify(a)); }catch(e){}
+  renderApp();
+};
 
 function renderApp(){
   const isAdmin = state.profile && state.profile.role==="admin";
@@ -677,6 +711,11 @@ function renderApp(){
     const cnt=document.getElementById(id+'-n'); if(cnt) cnt.style.display=shutNow?'':'none';
   };
   let nav = NAV_ALL.map(([g,items])=>[g, items.filter(([p])=>canSee(p))]).filter(([g,items])=>items.length);
+  const _pinned=myPins();
+  if(_pinned.length){
+    const _icon=p=>{ for(const [,items] of NAV_ALL){ const r=items.find(x=>x[0]===p); if(r) return r[2]; } return HEROICON[p]||'ti-bookmark'; };
+    nav=[['Pinned', _pinned.map(p=>[p, PAGE_LABEL[p], _icon(p)])]].concat(nav);
+  }
   /* Favourites are gone. They existed to make twenty-one destinations survivable: pin the
      four you use and scroll past the rest. With six destinations the trade is all cost --
      pinning lifted four items out of the main list into a collapsed group, so the sidebar
@@ -701,7 +740,8 @@ function renderApp(){
      six groups -- their saved choices have no opinion about a group that did not exist,
      and defaulting an unknown group to open would put all fifteen back on screen. */
   let _navShut={}; try{ _navShut=JSON.parse(localStorage.getItem('sw_navshut')||'null')||{}; }catch(e){ _navShut={}; }
-  if(!('More' in _navShut)) _navShut['More']=1;
+  /* 'More' is gone; the named groups start open, and Pinned always is. */
+  delete _navShut['More']; _navShut['Pinned']=0;
   const _curGroup=(nav.find(([g,items])=>items.some(([p])=>p===state.page))||[])[0];
   document.getElementById("nav").innerHTML = nav.map(([g,items])=>{
     const _shut = g && _navShut[g] && g!==_curGroup;
@@ -764,7 +804,12 @@ const HEROICON=(function(){
 function setTitle(t,s){
   const ph=document.getElementById('pagehero'); if(!ph) return;
   if(PAGE_HERO[state.page]){ ph.innerHTML=heroBanner(PAGE_HERO[state.page], esc(t||''), s?esc(s):'', ''); }
-  else { ph.innerHTML=`<div class="top"><span class="topicon"><i class="ti ${HEROICON[state.page]||'ti-point'}"></i></span><div style="min-width:0"><h1 id="ttl">${esc(t||'')}</h1><div class="sub" id="tsub">${esc(s||'')}</div></div></div>`; }
+  else {
+    const _canPin=!!PAGE_LABEL[state.page];
+    const _on=_canPin&&isPinned(state.page);
+    const _pin=_canPin?`<button class="iconbtn" onclick="togglePin('${state.page}')" title="${_on?'Remove from the sidebar':'Pin to the sidebar'}" aria-label="${_on?'Remove from the sidebar':'Pin to the sidebar'}" style="margin-left:auto;flex:none;color:${_on?'var(--brand)':'var(--muted)'}"><i class="ti ti-${_on?'bookmark-filled':'bookmark'}"></i></button>`:'';
+    ph.innerHTML=`<div class="top" style="display:flex;align-items:center;gap:13px"><span class="topicon"><i class="ti ${HEROICON[state.page]||'ti-point'}"></i></span><div style="min-width:0;flex:1"><h1 id="ttl">${esc(t||'')}</h1><div class="sub" id="tsub">${esc(s||'')}</div></div>${_pin}</div>`;
+  }
 }
 window.toggleNav=function(open){ const s=document.querySelector('.side'); const sc=document.getElementById('scrim'); if(!s)return; s.classList.toggle('open',open); if(sc)sc.classList.toggle('open',open); };
 window.togglePreviewLIT=function(){ if(state.previewLIT){ if(state._realRole!==undefined && state.profile) state.profile.role=state._realRole; state._realRole=undefined; state.previewLIT=false; } else { if(state.profile){ state._realRole=state.profile.role; state.profile.role='team'; } state.previewLIT=true; } state.page='whiteboard'; state.ctx={}; renderApp(); };
