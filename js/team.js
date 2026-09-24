@@ -1754,10 +1754,12 @@ async function boot(){
   }catch(e){}
   await loadAll();
   if(!applyHash()){
-    let np='today',nc={};
-    try{ const n=JSON.parse(localStorage.getItem('sw_nav')||'null'); if(n&&n.p){ np=n.p; nc=n.c||{}; } }catch(e){}
-    if((np==='lesson'||np==='track') && !(nc.tid && state.tracks.find(t=>t.id===nc.tid))){ np='home'; nc={}; }
-    state.page=np; state.ctx=nc;
+    /* Opening the app always lands on Today. It used to reopen wherever you happened to
+       close it, so somebody who last looked at Settings on Tuesday opened the app on
+       Settings on Wednesday morning. Today is the page that knows what changed overnight,
+       and it is the first impression every single day. The saved page is still used for
+       the browser back button and for a reload inside a session. */
+    state.page='today'; state.ctx={};
   }
   render();
   try{ updateBillingBanner(); }catch(e){}

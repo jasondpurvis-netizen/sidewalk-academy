@@ -2,7 +2,7 @@
 /* A stamp so any device can say which version it is actually running. Three times now a
    phone and a laptop on the same address have disagreed about what the app looks like,
    and there was no way to tell them apart except by describing the screen. */
-const BUILD = '2026-09-24-13';
+const BUILD = '2026-09-24-14';
 window.BUILD = BUILD;
 const SUPABASE_URL = "https://wjqcnxnwjqmuzrandgea.supabase.co";
 const SUPABASE_KEY = "sb_publishable_DQZclfAnv_MYQJLGcOdzdw_g4vMCiSC";
@@ -803,6 +803,12 @@ const HEROICON=(function(){
 })();
 function setTitle(t,s){
   const ph=document.getElementById('pagehero'); if(!ph) return;
+  /* The sidebar said Schedule and the page said Operations; Messages opened Community;
+     Shift log opened Log; Getting started opened Setup. Five places where the door and
+     the room had different names, which is how somebody decides an app is untrustworthy.
+     A page with a door owns the door's name -- it cannot set its own any more. Screens
+     with no door (a lesson, a track) still title themselves. */
+  if(PAGE_LABEL[state.page]) t=PAGE_LABEL[state.page];
   if(PAGE_HERO[state.page]){ ph.innerHTML=heroBanner(PAGE_HERO[state.page], esc(t||''), s?esc(s):'', ''); }
   else {
     const _canPin=!!PAGE_LABEL[state.page];
