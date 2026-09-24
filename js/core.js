@@ -2,7 +2,7 @@
 /* A stamp so any device can say which version it is actually running. Three times now a
    phone and a laptop on the same address have disagreed about what the app looks like,
    and there was no way to tell them apart except by describing the screen. */
-const BUILD = '2026-09-24-16';
+const BUILD = '2026-09-24-17';
 window.BUILD = BUILD;
 const SUPABASE_URL = "https://wjqcnxnwjqmuzrandgea.supabase.co";
 const SUPABASE_KEY = "sb_publishable_DQZclfAnv_MYQJLGcOdzdw_g4vMCiSC";
@@ -821,13 +821,24 @@ window.filterRows=function(inputId,targetId){
   const el=document.getElementById(inputId), box=document.getElementById(targetId);
   if(!el||!box) return;
   const q=(el.value||'').trim().toLowerCase();
+  const hit=node=>!q || ((node.textContent||'').toLowerCase().indexOf(q)>=0);
   let shown=0;
-  Array.from(box.children).forEach(function(row){
-    if(row.dataset && row.dataset.nofilter!==undefined) return;
-    const hit = !q || ((row.textContent||'').toLowerCase().indexOf(q)>=0);
-    row.style.display = hit ? '' : 'none';
-    if(hit) shown++;
-  });
+  /* A page that groups its rows -- the roster bands people by position -- must be filtered
+     at the row, not the block. Filtering the blocks matched every Manager for "ryen"
+     because Ryen sits in that block. Rows carry data-srow, their wrapper data-sgroup. */
+  const rows=box.querySelectorAll('[data-srow]');
+  if(rows.length){
+    rows.forEach(function(r){ const ok=hit(r); r.style.display=ok?'':'none'; if(ok) shown++; });
+    box.querySelectorAll('[data-sgroup]').forEach(function(g){
+      const any=Array.prototype.some.call(g.querySelectorAll('[data-srow]'),x=>x.style.display!=='none');
+      g.style.display=any?'':'none';
+    });
+  } else {
+    Array.prototype.forEach.call(box.children,function(row){
+      if(row.dataset && row.dataset.nofilter!==undefined) return;
+      const ok=hit(row); row.style.display=ok?'':'none'; if(ok) shown++;
+    });
+  }
   const none=document.getElementById(targetId+'-none');
   if(none) none.style.display=(q && !shown) ? '' : 'none';
 };
