@@ -340,7 +340,7 @@ function _recToneMap(){
    everything else uses a Tabler glyph that actually depicts the thing. */
 const RECIPE_DRAWN={
   'bagel':(sz,col,op)=>`<svg viewBox="0 0 24 24" width="${sz}" height="${sz}" fill="none" stroke="${col}" stroke-width="1.7" stroke-linecap="round" style="opacity:${op}"><circle cx="12" cy="12" r="8.6"/><circle cx="12" cy="12" r="3.3"/><path d="M8.6 6.1l.6 1.1M15.4 6.1l-.6 1.1M6.1 15.4l1.1-.6M17.9 15.4l-1.1-.6M12 3.4v1.2"/></svg>`,
-  'bagel-egg':(sz,col,op)=>`<svg viewBox="0 0 24 24" width="${sz}" height="${sz}" fill="none" stroke="${col}" stroke-width="1.7" stroke-linecap="round" style="opacity:${op}"><circle cx="9.8" cy="14" r="7.4"/><circle cx="9.8" cy="14" r="2.9"/><path d="M14.2 3.3a4.3 4.3 0 013.6 7.2 4.3 4.3 0 01-6.1-6.1 4.3 4.3 0 012.5-1.1z"/><circle cx="15.6" cy="7.1" r="1.5" fill="${col}" stroke="none"/></svg>`
+  'bagel-egg':(sz,col,op)=>`<svg viewBox="0 0 24 24" width="${sz}" height="${sz}" fill="none" stroke="${col}" stroke-width="1.7" stroke-linecap="round" style="opacity:${op}"><circle cx="8.6" cy="15" r="6.6"/><circle cx="8.6" cy="15" r="2.5"/><circle cx="16.6" cy="7.4" r="4.7"/><circle cx="16.6" cy="7.4" r="1.7" fill="${col}" stroke="none"/></svg>`
 };
 function _recIcon(ic,sz,col,op){
   if(RECIPE_DRAWN[ic]) return RECIPE_DRAWN[ic](sz,col,op);
