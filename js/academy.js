@@ -294,7 +294,7 @@ const RECIPE_PALETTE=[
 ];
 /* Most specific name first, or 'Breakfast Bagels' matches the bagel rule. */
 const RECIPE_RULES=[
-  [/breakfast/,                6, 'bagel-egg'],
+  [/breakfast/,                6, 'ti-egg-fried'],
   [/lunch|sandwich|burger/,    7, 'ti-burger'],
   [/drink.*prep|prep.*drink/,  5, 'ti-flask'],
   [/drink|coffee|espresso|tea/,0, 'ti-cup'],
