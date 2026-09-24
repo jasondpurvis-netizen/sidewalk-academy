@@ -2,7 +2,7 @@
 /* A stamp so any device can say which version it is actually running. Three times now a
    phone and a laptop on the same address have disagreed about what the app looks like,
    and there was no way to tell them apart except by describing the screen. */
-const BUILD = '2026-09-24-15';
+const BUILD = '2026-09-24-16';
 window.BUILD = BUILD;
 const SUPABASE_URL = "https://wjqcnxnwjqmuzrandgea.supabase.co";
 const SUPABASE_KEY = "sb_publishable_DQZclfAnv_MYQJLGcOdzdw_g4vMCiSC";
@@ -605,7 +605,7 @@ const ROLE_LABELS={5:'Owner',4:'GM',3:'Manager',2:'Supervisor',1:'Team member'};
    checklists; only leaders can build or change them. Editing is gated inside each page by rank,
    so opening a page is not the same as being able to change it. */
 const PERM_DEFAULT={catering:3,recipes:1,brain:3,whiteboard:1,home:1,ask:1,journal:1,build:4,setup:4,team:3,ownership:2,onboarding:3,today:1,rm:1,schedule:1,checklists:1,sales:4,saleshist:4,costsmart:4,calendar:3,lists:1,recovery:1,community:1,resources:1,downloads:1,settings:5,pay:5,clock:5};
-const PERM_LABELS={build:'Training & SOP builder',logbook:'Log (shift close-out)',setup:'Setup',team:'Team',ownership:'Who owns what (org chart)',onboarding:'Onboarding',schedule:'Schedule',sales:'Sales',saleshist:'Sales history import',costsmart:'Cost-Smart Schedule',pay:'Pay rates',settings:'Settings',today:'Daily Report',rm:'Fix-it list (R&M)',checklists:'Checklists',calendar:'Calendar',lists:'Lists',recovery:'Recovery',community:'Community',resources:'Resources',downloads:'Downloads'};
+const PERM_LABELS_EXTRA={setup:'Getting started',onboarding:'New hires',ownership:'Who owns what',saleshist:'Sales history import',costsmart:'Right-size the labour',pay:'Pay rates',today:'Today',checklists:'Open & close',lists:'Checklists',recovery:'Guest recovery',build:'Create training',logbook:'Shift log',community:'Messages',rm:'Fix-it list'};
 /* A person exists twice: the login they created (profiles.name, often just a first name) and the roster
    record the owner entered (e.g. "Presley Elizondo"). Matching those by exact string silently demoted
    every leader to rank 1. Resolve the roster name properly: an explicit link wins, then exact, then
@@ -657,6 +657,13 @@ const PAGE_LABEL={
   downloads:'Downloads', sales:'Sales', saleshist:'Sales history',
   costsmart:'Right-size the labour', calendar:'Calendar', summary:'Your progress'
 };
+/* These used to be a second, older set of names: the sidebar said Shift log and this
+   table said 'Log (shift close-out)'; Messages was 'Community'; Fix-it list was
+   'Fix-it list (R&M)'. Somebody setting permissions was reading about areas they
+   could not find. The door's name wins; only pages with no door keep a name here. */
+const PERM_LABELS=(function(){ const m=Object.assign({},PERM_LABELS_EXTRA);
+  try{ Object.keys(PAGE_LABEL).forEach(k=>{ m[k]=PAGE_LABEL[k]; }); }catch(e){}
+  return m; })();
 
 /* Pins are additive. The old Favourites feature lifted pinned items OUT of the main
    list into a group of their own, so pinning four of six destinations left a sidebar
@@ -801,6 +808,32 @@ const HEROICON=(function(){
   try{ NAV_ALL.forEach(g=>g[1].forEach(r=>{ if(!m[r[0]]) m[r[0]]=r[2]; })); }catch(e){}
   return m;
 })();
+/* ---------- One search box, three pages ----------
+   Recipes, Training, Resources and Downloads each had a search. Team, the Fix-it list and
+   Checklists -- the three that actually grow without limit -- had none, so finding a name
+   on a roster of seventeen meant scrolling. Rather than three more bespoke filters, this
+   one hides rows whose text does not match, which needs no re-render and no per-page
+   knowledge of what a row contains. */
+function searchBox(id,placeholder,targetId){
+  return `<div style="position:relative;margin:0 0 13px"><i class="ti ti-search" style="position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:15.5px;pointer-events:none"></i><input id="${id}" type="search" autocomplete="off" oninput="filterRows('${id}','${targetId}')" placeholder="${placeholder}" style="width:100%;padding:11px 14px 11px 38px;border:1px solid var(--line2);border-radius:12px;background:var(--card);color:var(--ink);font-family:inherit;font-size:14px"/></div>`;
+}
+window.filterRows=function(inputId,targetId){
+  const el=document.getElementById(inputId), box=document.getElementById(targetId);
+  if(!el||!box) return;
+  const q=(el.value||'').trim().toLowerCase();
+  let shown=0;
+  Array.from(box.children).forEach(function(row){
+    if(row.dataset && row.dataset.nofilter!==undefined) return;
+    const hit = !q || ((row.textContent||'').toLowerCase().indexOf(q)>=0);
+    row.style.display = hit ? '' : 'none';
+    if(hit) shown++;
+  });
+  const none=document.getElementById(targetId+'-none');
+  if(none) none.style.display=(q && !shown) ? '' : 'none';
+};
+function searchEmpty(targetId){
+  return `<div id="${targetId}-none" style="display:none;padding:22px;text-align:center" class="muted">Nothing matches.</div>`;
+}
 function setTitle(t,s){
   const ph=document.getElementById('pagehero'); if(!ph) return;
   /* The sidebar said Schedule and the page said Operations; Messages opened Community;
