@@ -262,17 +262,42 @@ window.manageChannels=function(){ const all=effectiveChannels(); window._chanEdi
 
 
 /* ---------- Recipes ----------
-   Jason's recipes already exist in MarginEdge, costed, with real quantities. Retyping
-   177 of them into a training page would guarantee two versions that drift apart, so
-   this reads a MarginEdge export instead and keeps recipeId as the identity, which
-   makes a re-import an update rather than a pile of duplicates.
+   Jason's recipes live in MarginEdge, costed, with real quantities. Retyping 177 of them
+   would guarantee two versions that drift apart, so this reads a MarginEdge export and
+   keeps recipeId as the identity -- a re-import updates rather than duplicating.
 
-   Cost is deliberately NOT in the same tier as the method. A barista needs to know it
-   is 20 oz of malt powder; nobody on the floor needs the plate cost. Ingredients and
-   notes are rank 1, money is rank 4 -- the same bar as Sales. */
-const RECIPE_MONEY_RANK = 4;
-function _canSeeRecipeCost(){ return myRank() >= RECIPE_MONEY_RANK; }
-function _money(n){ return (n==null||isNaN(n)) ? '' : '$'+Number(n).toFixed(2); }
+   Three levels, the same shape as Leadership & Operations: categories you click, then
+   the recipes in one, then the recipe. A flat 177-row scroll was the wrong answer.
+
+   No money on this page at all. Jason asked for the costs off, and half a decision --
+   costs for owners, hidden for staff -- still puts food cost on a screen a barista is
+   standing next to. Cost lives in MarginEdge, which is where it is maintained anyway. */
+
+const RECIPE_TONES=[
+  {g:'linear-gradient(135deg,#8A5CF6,#5A2FC2)', ic:'ti-cup'},
+  {g:'linear-gradient(135deg,#4A9CAD,#2A6E7A)', ic:'ti-bowl'},
+  {g:'linear-gradient(135deg,#F2820A,#BF5E00)', ic:'ti-bread'},
+  {g:'linear-gradient(135deg,#3FA06B,#227048)', ic:'ti-salad'},
+  {g:'linear-gradient(135deg,#E0567F,#A82552)', ic:'ti-cheese'},
+  {g:'linear-gradient(135deg,#5C7CE0,#2F4BA8)', ic:'ti-flask'},
+  {g:'linear-gradient(135deg,#C9962E,#8E6510)', ic:'ti-egg'},
+  {g:'linear-gradient(135deg,#6E7B8A,#41505E)', ic:'ti-tools-kitchen-2'},
+  {g:'linear-gradient(135deg,#B0539B,#78256A)', ic:'ti-cookie'}
+];
+function _recTone(name,i){
+  const n=(name||'').toLowerCase();
+  const pick=k=>RECIPE_TONES[k];
+  if(n.includes('drink')&&n.includes('prep')) return pick(5);
+  if(n.includes('drink')||n.includes('coffee')||n.includes('espresso')) return pick(0);
+  if(n.includes('cream cheese')||n.includes('cheese')) return pick(4);
+  if(n.includes('dough')||n.includes('bagel')&&n.includes('prep')) return pick(2);
+  if(n.includes('bagel')) return pick(2);
+  if(n.includes('base')) return pick(1);
+  if(n.includes('breakfast')||n.includes('egg')) return pick(6);
+  if(n.includes('lunch')||n.includes('sandwich')) return pick(7);
+  if(n.includes('toast')||n.includes('avocado')||n.includes('salad')) return pick(3);
+  return RECIPE_TONES[i%RECIPE_TONES.length];
+}
 function _qty(n){
   if(n==null||isNaN(n)) return '';
   const x=Number(n);
@@ -284,135 +309,172 @@ function _unitLbl(u,q){
   const one=Math.abs(Number(q)-1)<0.001;
   return one ? w : (w.endsWith('s')?w:w+'s');
 }
+function _recSearchBox(ph){
+  return `<div style="position:relative;margin:0 0 16px"><i class="ti ti-search" style="position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:15.5px;pointer-events:none"></i><input id="recSearch" type="search" autocomplete="off" value="${esc(state.ctx.q||'')}" oninput="recipeSearch(this.value)" placeholder="${esc(ph)}" style="width:100%;padding:12px 14px 12px 38px;border:1px solid var(--line2);border-radius:12px;background:var(--card);color:var(--ink);font-family:inherit;font-size:14px"/></div>`;
+}
 
 async function vRecipes(v){
   if(!canSee('recipes')){ go('home'); return; }
-  setTitle('Recipes','How everything is made');
-  v.innerHTML='<div class="muted">Loading…</div>';
-  const r=await sb.from('day_items').select('*').eq('kind','recipe').order('title');
-  const rows=(r.data||[]).map(x=>{ let d={}; try{ d=JSON.parse(x.detail||'{}'); }catch(e){} return {row:x,d}; });
-  state._recipes=rows;
+  if(!state._recipes){
+    v.innerHTML='<div class="muted">Loading…</div>';
+    const r=await sb.from('day_items').select('*').eq('kind','recipe').order('title');
+    state._recipes=(r.data||[]).map(x=>{ let d={}; try{ d=JSON.parse(x.detail||'{}'); }catch(e){} return {id:x.id,name:x.title,d}; })
+                                .filter(o=>!o.d.inactive);
+    state._recipeCount=state._recipes.length;
+  }
   _renderRecipes(v);
 }
 
 function _renderRecipes(v){
-  const rows=state._recipes||[];
-  const q=((state.ctx.q||'')+'').toLowerCase();
-  const showMoney=_canSeeRecipeCost();
+  const all=state._recipes||[];
+  const q=((state.ctx.q||'')+'').trim().toLowerCase();
+  const openId=state.ctx.rid, cat=state.ctx.rcat;
+
+  /* one recipe */
+  if(openId){
+    const o=all.find(x=>String(x.id)===String(openId));
+    if(o) return _renderOneRecipe(v,o);
+  }
+
   let h='';
 
-  if(showMoney){
-    h+=`<div class="card" style="padding:13px 15px;margin-bottom:12px">
-      <div class="row" style="gap:10px;align-items:center;flex-wrap:wrap">
-        <div style="flex:1;min-width:190px">
-          <div style="font-weight:600;font-size:14px">Recipes come from MarginEdge</div>
-          <div class="faint" style="font-size:12.5px;margin-top:3px;line-height:1.5">Choose <b>both</b> files, then Load. They are in your Claude project folder under <b>recipes-export</b>:<br><code style="font-size:11.5px">recipes.json</code> and <code style="font-size:11.5px">recipeIngredients.json</code>. Hold &#8984; to pick both. Re-loading updates what changed &mdash; it never makes duplicates.</div>
-        </div>
-        <input type="file" id="recFiles" accept=".json,application/json" multiple onchange="recFilesPicked()" style="font-size:13px;max-width:250px"/>
-        <button class="btn" style="width:auto" onclick="recipesImport()">Load</button>
-      </div>
-      <div id="recImportMsg"></div>
-    </div>`;
+  /* searching cuts across everything, so it never matters which level you were on */
+  if(q){
+    h+=`<div class="crumb" onclick="recipeSearch('')">← All recipes</div>`+_recSearchBox('Search a recipe or an ingredient…');
+    const hits=all.filter(o=>
+      (o.name||'').toLowerCase().includes(q) ||
+      (o.d.type||'').toLowerCase().includes(q) ||
+      (o.d.ing||[]).some(i=>(i.n||'').toLowerCase().includes(q)));
+    h+=`<div class="sec">${hits.length} result${hits.length===1?'':'s'} for “${esc(state.ctx.q)}”</div>`;
+    h+=hits.length?`<div class="card">`+hits.map(o=>_recRow(o,true)).join('')+`</div>`
+                  :`<div class="card" style="padding:26px;text-align:center"><span class="muted">Nothing matches.</span></div>`;
+    v.innerHTML=h; _recFocus(); return;
   }
 
-  if(!rows.length){
-    h+=`<div class="card" style="padding:26px;text-align:center" class="faint">
-      <div class="muted">No recipes loaded yet.</div></div>`;
+  /* inside one category */
+  if(cat){
+    const list=all.filter(o=>(o.d.type||'Other')===cat);
+    const t=_recTone(cat,0);
+    h+=`<div class="crumb" onclick="recipeCat(null)">← Recipes</div>`;
+    h+=`<div style="display:flex;align-items:center;gap:14px;margin:0 0 15px">
+          <div style="width:52px;height:52px;border-radius:12px;background:${t.g};display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 8px 18px rgba(23,37,42,.2)"><i class="ti ${t.ic}" style="font-size:26px;color:#fff"></i></div>
+          <div><div style="font-weight:800;font-size:20px;letter-spacing:-.02em">${esc(cat)}</div>
+          <div class="muted" style="font-size:13.5px">${list.length} recipe${list.length===1?'':'s'}</div></div>
+        </div>`;
+    h+=_recSearchBox('Search a recipe or an ingredient…');
+    h+=`<div class="card">`+list.map(o=>_recRow(o,false)).join('')+`</div>`;
     v.innerHTML=h; return;
   }
 
-  h+=`<div class="card" style="padding:11px 13px;margin-bottom:12px">
-    <input id="recSearch" value="${esc(state.ctx.q||'')}" placeholder="Search recipes or an ingredient…" oninput="recipeSearch(this.value)"
-      style="width:100%;padding:10px 12px;border:1px solid var(--line2);border-radius:8px;background:var(--card);color:var(--ink);font-family:inherit;font-size:15px"/>
-  </div>`;
-
-  const match=o=>{
-    if(!q) return true;
-    if((o.row.title||'').toLowerCase().includes(q)) return true;
-    if((o.d.type||'').toLowerCase().includes(q)) return true;
-    return (o.d.ing||[]).some(i=>(i.n||'').toLowerCase().includes(q));
-  };
-  const shown=rows.filter(match).filter(o=>!o.d.inactive);
-
-  if(!shown.length){
-    h+=`<div class="card" style="padding:24px;text-align:center"><span class="muted">Nothing matches “${esc(state.ctx.q||'')}”.</span></div>`;
-    v.innerHTML=h; return;
+  /* the categories */
+  h+=`<div class="crumb" onclick="go('home')">← Academy</div>`;
+  h+=_recSearchBox('Search a recipe or an ingredient…');
+  if(!all.length){
+    h+=`<div class="card" style="padding:30px;text-align:center"><span class="muted">No recipes loaded yet.</span></div>`;
+    v.innerHTML=h+_recImportBox(); return;
   }
-
   const groups={};
-  shown.forEach(o=>{ const g=o.d.type||'Other'; (groups[g]=groups[g]||[]).push(o); });
-  const names=Object.keys(groups).sort();
+  all.forEach(o=>{ const g=o.d.type||'Other'; (groups[g]=groups[g]||[]).push(o); });
+  const names=Object.keys(groups).sort((a,b)=>groups[b].length-groups[a].length);
+  h+=`<div class="grid">`+names.map((n,i)=>{
+    const t=_recTone(n,i), c=groups[n].length;
+    return `<div class="card" style="padding:0;overflow:hidden;cursor:pointer" onclick="recipeCat('${esc(n).replace(/'/g,"\\'")}')">
+      <div style="height:96px;background:${t.g};position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden">
+        <i class="ti ${t.ic}" style="font-size:40px;color:#fff;opacity:.97"></i>
+        <i class="ti ${t.ic}" style="position:absolute;right:-14px;bottom:-18px;font-size:96px;color:#fff;opacity:.11"></i>
+      </div>
+      <div style="padding:15px 17px 17px">
+        <div style="font-weight:600;font-size:15.5px;margin:0 0 3px">${esc(n)}</div>
+        <div class="muted" style="font-size:12.5px">${c} recipe${c===1?'':'s'}</div>
+      </div></div>`;
+  }).join('')+`</div>`;
+  h+=_recImportBox();
+  v.innerHTML=h;
+}
 
-  names.forEach(g=>{
-    h+=`<div class="sec">${esc(g)} <span class="faint" style="font-weight:400">· ${groups[g].length}</span></div><div class="card">`;
-    groups[g].forEach(o=>{
-      const d=o.d, id=o.row.id;
-      const open=state.ctx.open==id;
-      const y=(d.yield&&d.yield!=1)?` · makes ${_qty(d.yield)} ${_unitLbl(d.unit,d.yield)}`:'';
-      h+=`<div class="lesson-row" style="cursor:pointer;align-items:flex-start" onclick="recipeOpen(${id})">
+function _recRow(o,showCat){
+  const n=(o.d.ing||[]).length;
+  const y=(o.d.yield&&o.d.yield!=1)?` · makes ${_qty(o.d.yield)} ${_unitLbl(o.d.unit,o.d.yield)}`:'';
+  return `<div class="lesson-row" style="cursor:pointer" onclick="recipeShow(${o.id})">
+    <div style="flex:1;min-width:0">
+      <div style="font-weight:500">${esc(o.name)}</div>
+      <div class="faint" style="font-size:12.5px">${showCat?esc(o.d.type||'Other')+' · ':''}${n} ingredient${n===1?'':'s'}${y}</div>
+    </div><i class="ti ti-chevron-right" style="opacity:.45"></i></div>`;
+}
+
+function _renderOneRecipe(v,o){
+  const d=o.d, t=_recTone(d.type||'',0);
+  const ing=(d.ing||[]).slice().sort((a,b)=>(a.p||0)-(b.p||0));
+  let h=`<div class="crumb" onclick="recipeCat('${esc(d.type||'').replace(/'/g,"\\'")}')">← ${esc(d.type||'Recipes')}</div>`;
+  h+=`<div class="card" style="padding:0;overflow:hidden">
+    <div style="height:8px;background:${t.g}"></div>
+    <div style="padding:22px 24px 6px">
+      <div style="font-weight:800;font-size:23px;letter-spacing:-.022em;line-height:1.2">${esc(o.name)}</div>
+      <div class="muted" style="font-size:14px;margin-top:6px">
+        ${d.yield?`Makes ${_qty(d.yield)} ${_unitLbl(d.unit,d.yield)}`:''}${d.yield&&ing.length?' · ':''}${ing.length?ing.length+' ingredient'+(ing.length===1?'':'s'):''}
+      </div>
+    </div>`;
+  if(ing.length){
+    h+=`<div style="padding:16px 24px 24px">
+      <div style="font-family:inherit;font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);font-weight:600;padding-bottom:8px;border-bottom:1px solid var(--line)">What goes in</div>`;
+    ing.forEach((i,k)=>{
+      h+=`<div style="display:flex;gap:16px;align-items:baseline;padding:13px 0;${k<ing.length-1?'border-bottom:1px solid var(--line)':''}">
+        <div style="min-width:112px;text-align:right;font-weight:600;font-size:15px;font-variant-numeric:tabular-nums;letter-spacing:-.01em">${esc(_qty(i.q))} <span style="font-weight:400;color:var(--ink2)">${esc(_unitLbl(i.u,i.q))}</span></div>
         <div style="flex:1;min-width:0">
-          <div style="font-weight:500">${esc(o.row.title)}</div>
-          <div class="faint" style="font-size:12.5px">${(d.ing||[]).length} ingredient${(d.ing||[]).length===1?'':'s'}${y}</div>
-        </div>
-        ${showMoney&&d.cost!=null?`<div style="text-align:right;min-width:74px">
-            <div style="font-size:13.5px;font-weight:600">${_money(d.cost)}</div>
-            ${d.plate!=null?`<div class="faint" style="font-size:11.5px">${Math.round(d.plate*100)}% plate</div>`:''}
-          </div>`:''}
-        <i class="ti ti-chevron-${open?'up':'down'}" style="opacity:.5"></i>
-      </div>`;
-      if(open){
-        const ing=(d.ing||[]).slice().sort((a,b)=>(a.p||0)-(b.p||0));
-        h+=`<div style="padding:4px 14px 16px 14px;border-bottom:1px solid var(--line)">`;
-        if(ing.length){
-          h+=`<table style="width:100%;border-collapse:collapse;font-size:14px">`;
-          ing.forEach(i=>{
-            h+=`<tr>
-              <td style="padding:5px 10px 5px 0;white-space:nowrap;font-variant-numeric:tabular-nums;color:var(--ink2);width:1%">${esc(_qty(i.q))} ${esc(_unitLbl(i.u,i.q))}</td>
-              <td style="padding:5px 0">${esc(i.n||'')}${i.note?`<div class="faint" style="font-size:12.5px">${esc(i.note)}</div>`:''}</td>
-              ${showMoney?`<td style="padding:5px 0;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums" class="faint">${_money(i.c)}</td>`:''}
-            </tr>`;
-          });
-          h+=`</table>`;
-        } else {
-          h+=`<div class="faint" style="font-size:14px">No ingredients listed in MarginEdge for this one.</div>`;
-        }
-        if(showMoney && (d.price!=null || d.cost!=null)){
-          h+=`<div class="faint" style="font-size:12.5px;margin-top:10px">${d.price!=null?'Menu price '+_money(d.price)+' · ':''}${d.cost!=null?'costs '+_money(d.cost):''}${d.updated?' · costed '+esc(String(d.updated).slice(0,10)):''}</div>`;
-        }
-        h+=`</div>`;
-      }
+          <div style="font-size:16px;line-height:1.35">${esc(i.n||'')}</div>
+          ${i.note?`<div class="muted" style="font-size:13px;margin-top:2px">${esc(i.note)}</div>`:''}
+        </div></div>`;
     });
     h+=`</div>`;
-  });
+  } else {
+    h+=`<div style="padding:8px 24px 24px" class="muted">MarginEdge has no ingredients listed for this one.</div>`;
+  }
+  h+=`</div>`;
   v.innerHTML=h;
-  const si=document.getElementById('recSearch');
-  if(si && state.ctx.q){ si.focus(); si.setSelectionRange(si.value.length,si.value.length); }
 }
+
+function _recImportBox(){
+  if(myRank()<4) return '';
+  return `<div class="card" style="padding:13px 15px;margin-top:18px">
+    <div class="row" style="gap:10px;align-items:center;flex-wrap:wrap">
+      <div style="flex:1;min-width:190px">
+        <div style="font-weight:600;font-size:13.5px">Refresh from MarginEdge</div>
+        <div class="faint" style="font-size:12.5px;margin-top:3px;line-height:1.5">Run the pull script, then choose <b>both</b> files from <b>recipes-export</b>. Re-loading updates what changed &mdash; it never makes duplicates.</div>
+      </div>
+      <input type="file" id="recFiles" accept=".json,application/json" multiple onchange="recFilesPicked()" style="font-size:13px;max-width:230px"/>
+      <button class="btn" style="width:auto" onclick="recipesImport()">Load</button>
+    </div>
+    <div id="recImportMsg"></div>
+  </div>`;
+}
+function _recFocus(){ const si=document.getElementById('recSearch'); if(si&&state.ctx.q){ si.focus(); si.setSelectionRange(si.value.length,si.value.length); } }
+
+window.recipeSearch=function(t){ state.ctx.q=t; state.ctx.rid=null; _renderRecipes(document.getElementById('view')); };
+window.recipeCat=function(c){ state.ctx.rcat=c||null; state.ctx.rid=null; state.ctx.q=''; scrollTo(0,0); _renderRecipes(document.getElementById('view')); };
+window.recipeShow=function(id){ state.ctx.rid=id; scrollTo(0,0); _renderRecipes(document.getElementById('view')); };
 
 window.recFilesPicked=function(){
   const f=document.getElementById('recFiles'), m=document.getElementById('recImportMsg');
   if(!f||!m) return;
   const names=Array.from(f.files||[]).map(x=>x.name);
   if(!names.length){ m.innerHTML=''; return; }
-  const hasR=names.some(n=>/recipes\.json$/i.test(n));
-  const hasI=names.some(n=>/ingredients\.json$/i.test(n));
-  const missing=[]; if(!hasR) missing.push('recipes.json'); if(!hasI) missing.push('recipeIngredients.json');
+  const missing=[];
+  if(!names.some(n=>/recipes\.json$/i.test(n))) missing.push('recipes.json');
+  if(!names.some(n=>/ingredients\.json$/i.test(n))) missing.push('recipeIngredients.json');
   m.innerHTML = missing.length
-    ? `<div class="msg err" style="margin-top:9px">Picked ${esc(names.join(', '))} &mdash; still need ${esc(missing.join(' and '))}.</div>`
+    ? `<div class="msg err" style="margin-top:9px">Still need ${esc(missing.join(' and '))}.</div>`
     : `<div class="msg ok" style="margin-top:9px">Both files ready. Press Load.</div>`;
 };
-window.recipeSearch=function(t){ state.ctx.q=t; state.ctx.open=null; _renderRecipes(document.getElementById('view')); };
-window.recipeOpen=function(id){ state.ctx.open = (state.ctx.open==id) ? null : id; _renderRecipes(document.getElementById('view')); };
 
-/* Reads the two files the pull script writes. Identity is MarginEdge's recipeId, kept in
-   detail, so loading the same export twice updates rather than duplicates. Nothing is
-   deleted -- a recipe removed in MarginEdge simply stops being updated here. */
+/* Identity is MarginEdge's recipeId, kept in detail, so loading the same export twice
+   updates rather than duplicates. Nothing is deleted -- a recipe dropped in MarginEdge
+   simply stops being updated here. */
 window.recipesImport=async function(){
   const msg=document.getElementById('recImportMsg');
   const say=(t,bad)=>{ if(msg) msg.innerHTML=`<div class="msg ${bad?'err':'ok'}" style="margin-top:9px">${esc(t)}</div>`; };
   const f=document.getElementById('recFiles');
   const files=(f&&f.files)?Array.from(f.files):[];
-  if(!files.length){ say('Pick recipes.json and recipeIngredients.json first.',true); return; }
+  if(!files.length){ say('Pick both files first.',true); return; }
 
   let recs=null, ings=null;
   for(const file of files){
@@ -426,8 +488,8 @@ window.recipesImport=async function(){
 
   const byRecipe={};
   (ings||[]).forEach(i=>{ (byRecipe[i.recipeId]=byRecipe[i.recipeId]||[]).push({
-    n:i.ingredientName, q:i.quantity, u:i.unit, c:i.ingredientCost,
-    p:i.ingredientPosition, note:(i.notes||'')||undefined, sub:i.subRecipeId||undefined }); });
+    n:i.ingredientName, q:i.quantity, u:i.unit, p:i.ingredientPosition,
+    note:(i.notes||'')||undefined, sub:i.subRecipeId||undefined }); });
 
   const ex=await sb.from('day_items').select('id,detail').eq('kind','recipe');
   const seen={};
@@ -435,9 +497,7 @@ window.recipesImport=async function(){
 
   const pack=r=>JSON.stringify({
     rid:r.recipeId, type:r.recipeTypeName||'Other', cat:r.recipeCategoryType,
-    yield:r.yieldQuantity, unit:r.unit, cost:r.recipeCost, price:r.menuPrice,
-    plate:r.plateCostPercentage, updated:r.lastRecipeCostUpdate,
-    inactive:!!r.isInactive, ing:byRecipe[r.recipeId]||[] });
+    yield:r.yieldQuantity, unit:r.unit, inactive:!!r.isInactive, ing:byRecipe[r.recipeId]||[] });
 
   const toAdd=[], toUpd=[];
   recs.forEach(r=>{
@@ -453,14 +513,13 @@ window.recipesImport=async function(){
       say('Adding… '+Math.min(i+50,toAdd.length)+' of '+toAdd.length);
     }
     for(let i=0;i<toUpd.length;i++){
-      const u=toUpd[i];
-      const e=await sb.from('day_items').update({detail:u.detail}).eq('id',u.id);
+      const e=await sb.from('day_items').update({detail:toUpd[i].detail}).eq('id',toUpd[i].id);
       if(e&&e.error) throw e.error;
       if(i%25===0) say('Updating… '+i+' of '+toUpd.length);
     }
   }catch(e){ say('Stopped: '+e.message,true); return; }
 
   say(`Done — ${toAdd.length} new, ${toUpd.length} updated.`);
+  state._recipes=null; state._recipeCount=null;
   await vRecipes(document.getElementById('view'));
 };
-
