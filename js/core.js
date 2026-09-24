@@ -2,7 +2,7 @@
 /* A stamp so any device can say which version it is actually running. Three times now a
    phone and a laptop on the same address have disagreed about what the app looks like,
    and there was no way to tell them apart except by describing the screen. */
-const BUILD = '2026-09-22-6';
+const BUILD = '2026-09-24-1';
 window.BUILD = BUILD;
 const SUPABASE_URL = "https://wjqcnxnwjqmuzrandgea.supabase.co";
 const SUPABASE_KEY = "sb_publishable_DQZclfAnv_MYQJLGcOdzdw_g4vMCiSC";
@@ -604,7 +604,7 @@ const ROLE_LABELS={5:'Owner',4:'GM',3:'Manager',2:'Supervisor',1:'Team member'};
 /* Defaults follow how workforce apps actually behave: everyone can SEE the schedule and run the
    checklists; only leaders can build or change them. Editing is gated inside each page by rank,
    so opening a page is not the same as being able to change it. */
-const PERM_DEFAULT={brain:3,whiteboard:1,home:1,ask:1,journal:1,build:4,setup:4,team:3,ownership:2,onboarding:3,today:1,rm:1,schedule:1,checklists:1,sales:4,saleshist:4,costsmart:4,calendar:3,lists:1,recovery:1,community:1,resources:1,downloads:1,settings:5,pay:5,clock:5};
+const PERM_DEFAULT={catering:3,brain:3,whiteboard:1,home:1,ask:1,journal:1,build:4,setup:4,team:3,ownership:2,onboarding:3,today:1,rm:1,schedule:1,checklists:1,sales:4,saleshist:4,costsmart:4,calendar:3,lists:1,recovery:1,community:1,resources:1,downloads:1,settings:5,pay:5,clock:5};
 const PERM_LABELS={build:'Training & SOP builder',logbook:'Log (shift close-out)',setup:'Setup',team:'Team',ownership:'Who owns what (org chart)',onboarding:'Onboarding',schedule:'Schedule',sales:'Sales',saleshist:'Sales history import',costsmart:'Cost-Smart Schedule',pay:'Pay rates',settings:'Settings',today:'Daily Report',rm:'Fix-it list (R&M)',checklists:'Checklists',calendar:'Calendar',lists:'Lists',recovery:'Recovery',community:'Community',resources:'Resources',downloads:'Downloads'};
 /* A person exists twice: the login they created (profiles.name, often just a first name) and the roster
    record the owner entered (e.g. "Presley Elizondo"). Matching those by exact string silently demoted
@@ -657,7 +657,7 @@ function renderApp(){
    Anything added back should have to earn a door, rather than get one by existing. */
 const NAV_MAIN=[["today","Today","ti-sun"],["schedule","Schedule","ti-calendar-week"],["team","Team","ti-users"],["home","Training","ti-school"],["community","Messages","ti-messages"],["brain","Set up","ti-adjustments"]];
 /* Reachable, not advertised. Opens from More at the foot of the sidebar. */
-const NAV_MORE=[["logbook","Shift log","ti-clipboard-check"],["rm","Fix-it list","ti-tool"],["lists","Checklists","ti-list-details"],["recovery","Guest recovery","ti-heart-handshake"],["ownership","Who owns what","ti-sitemap"],["onboarding","New hires","ti-user-plus"],["calendar","Calendar","ti-calendar-month"],["build","Create training","ti-tools"],["ask","Find an answer","ti-bulb"],["resources","Resources","ti-files"],["downloads","Downloads","ti-download"],["sales","Sales","ti-chart-line"],["setup","Getting started","ti-list-check"],["settings","Settings","ti-settings"]];
+const NAV_MORE=[["catering","Catering","ti-tools-kitchen-2"],["logbook","Shift log","ti-clipboard-check"],["rm","Fix-it list","ti-tool"],["lists","Checklists","ti-list-details"],["recovery","Guest recovery","ti-heart-handshake"],["ownership","Who owns what","ti-sitemap"],["onboarding","New hires","ti-user-plus"],["calendar","Calendar","ti-calendar-month"],["build","Create training","ti-tools"],["ask","Find an answer","ti-bulb"],["resources","Resources","ti-files"],["downloads","Downloads","ti-download"],["sales","Sales","ti-chart-line"],["setup","Getting started","ti-list-check"],["settings","Settings","ti-settings"]];
 const NAV_ALL=[["",NAV_MAIN],["More",NAV_MORE]];
   window.toggleNavGroup=function(g){
     let shut={}; try{ shut=JSON.parse(localStorage.getItem('sw_navshut')||'null')||{}; }catch(e){}
@@ -720,7 +720,7 @@ const NAV_ALL=[["",NAV_MAIN],["More",NAV_MORE]];
 
    Rather than eighteen try/catch blocks that the nineteenth screen would forget, the router
    catches it once, here, for anything that throws or rejects. */
-  const _view = ({whiteboard:vToday, home:vHome, acat:vAcat, track:vTrack, lesson:vLesson, summary:vSummary, team:vTeam, ownership:vOwnership, journal:vJournal, community:vCommunity, feedback:vFeedback, downloads:vDownloads, settings:vSettings, brain:vBrain, resources:vResources, ask:vAsk, build:vBuild, today:vToday, logbook:schLogbook, rm:vRM, lists:vLists, recovery:vRecovery, schedule:vSchedule, onboarding:vOnboarding, calendar:vCalendar, sales:vSales, checklists:vChecklists, setup:vSetup, pay:vPay, clock:vClock, saleshist:vSalesHist, costsmart:vCostSmart}[state.page]||vHome);
+  const _view = ({whiteboard:vToday, home:vHome, acat:vAcat, track:vTrack, lesson:vLesson, summary:vSummary, team:vTeam, ownership:vOwnership, journal:vJournal, community:vCommunity, feedback:vFeedback, downloads:vDownloads, settings:vSettings, brain:vBrain, resources:vResources, ask:vAsk, build:vBuild, today:vToday, logbook:schLogbook, rm:vRM, lists:vLists, recovery:vRecovery, schedule:vSchedule, onboarding:vOnboarding, calendar:vCalendar, catering:vCatering, sales:vSales, checklists:vChecklists, setup:vSetup, pay:vPay, clock:vClock, saleshist:vSalesHist, costsmart:vCostSmart}[state.page]||vHome);
   const _failed = function(err){
     const v2=document.getElementById('view'); if(!v2) return;
     const why=(err&&(err.message||err.error_description))||'';

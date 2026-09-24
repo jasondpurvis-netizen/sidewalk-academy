@@ -175,8 +175,18 @@ async function vToday(v){
   v.innerHTML=h;
 }
 window.addDayItem=async function(){ const title=val('dititle'); if(!title)return; const kind=document.getElementById('ditype').value; const detail=val('didetail'); const de=document.getElementById('didate'); const on=(de&&de.value)||isoDate(new Date()); await sb.from('day_items').insert({title,kind,detail,on_date:on,created_by:state.user.id}); vToday(document.getElementById('view')); };
-window.toggleDayItem=async function(id,done){ await sb.from('day_items').update({done}).eq('id',id); state.calCache=null; vToday(document.getElementById('view')); };
-window.delDayItem=async function(id){ await sb.from('day_items').delete().eq('id',id); state.calCache=null; vToday(document.getElementById('view')); };
+/* These two are called from Today, the Calendar and Catering. They used to re-render
+   Today no matter where you were, so ticking something off on the Calendar silently
+   swapped the page under you. Refresh whatever page you are actually on. */
+function _dayItemsRefresh(){
+  const v=document.getElementById('view'); if(!v) return;
+  const p=state.page;
+  if(p==='calendar' && typeof vCalendar==='function') return vCalendar(v);
+  if(p==='catering' && typeof vCatering==='function') return vCatering(v);
+  return vToday(v);
+}
+window.toggleDayItem=async function(id,done){ await sb.from('day_items').update({done}).eq('id',id); state.calCache=null; _dayItemsRefresh(); };
+window.delDayItem=async function(id){ await sb.from('day_items').delete().eq('id',id); state.calCache=null; _dayItemsRefresh(); };
 window.addShiftNote=async function(){ const body=val('snbody'); if(!body)return; const _h=new Date().getHours(); const _seg=_h<11?'Opening':_h<16?'Mid':'Closing'; const r=await sb.from('log_entries').insert({author_id:state.user.id,author_name:state.profile.name,body,category:'note',segment:_seg,on_date:isoDate(new Date())}); if(r&&r.error){ alert('Could not post: '+r.error.message); return; } vToday(document.getElementById('view')); };
 window.resolveHandoff=async function(id){ const r=await sb.from('log_entries').update({resolved:true}).eq('id',id); if(r&&r.error){ alert('Could not clear: '+r.error.message); return; } vToday(document.getElementById('view')); };
 window.addRotation=async function(){ const title=val('rotitle'); if(!title)return; const area=val('rotarea'); const cad=parseInt(document.getElementById('rotcad').value)||7; await sb.from('rotations').insert({title,area,cadence_days:cad}); vToday(document.getElementById('view')); };

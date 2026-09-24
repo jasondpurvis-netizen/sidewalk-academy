@@ -1387,6 +1387,7 @@ async function vCalendar(v){
   const hol={}; usHolidays(y).forEach(x=>hol[x.date]=x);
   const todayIso=isoDate(new Date()); const sel=state.ctx.day||(ym===todayIso.slice(0,7)?todayIso:first);
   let h=`<div class="sched-bar"><div class="sched-nav"><button class="iconbtn" aria-label="Previous month" onclick="calMonth(-1)"><i class="ti ti-chevron-left"></i></button><button class="iconbtn" aria-label="Next month" onclick="calMonth(1)"><i class="ti ti-chevron-right"></i></button><button class="btn" style="width:auto" onclick="calMonth(0)">This month</button></div><div style="font-size:18px;font-weight:600">${new Date(y,m-1,1).toLocaleDateString(undefined,{month:'long',year:'numeric'})}</div></div>`;
+  h+=`<div class="faint" style="font-size:13px;margin:-4px 0 10px">Booking catering? <a href="#" onclick="go('catering');return false">Catering has its own page</a> — it asks for the headcount, the pickup time and who it's for.</div>`;
   h+=`<div class="calgrid">`+['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d=>`<div class="calhd">${d}</div>`).join('');
   for(let i=0;i<startDow;i++) h+=`<div class="calcell empty"></div>`;
   for(let d=1;d<=dim;d++){ const iso=y+'-'+pad(m)+'-'+pad(d); const its=byd[iso]||[]; const isT=iso===todayIso; const isS=iso===sel; const hx=hol[iso]; const holChip=hx?`<div class="calchip" style="background:var(--amber-soft);color:var(--amber)">🎉 ${esc(hx.name)}</div>`:'';
@@ -1428,6 +1429,99 @@ window.calAdd=async function(iso){ const kind=document.getElementById('calkind')
       });
     }
   } if(kind==='holiday'){ const d=new Date(iso+'T00:00:00'); const prev=new Date(d); prev.setDate(prev.getDate()-1); await sb.from('day_items').insert([{title:title+' tomorrow — prep extra & pull more product',kind:'note',detail:'Auto-added from calendar. Consider extra staff.',on_date:isoDate(prev),created_by:state.user.id},{title:title+' today — extra product & staffing',kind:'note',detail:'Auto-added from calendar.',on_date:iso,created_by:state.user.id}]); } state.ctx.day=iso; state.calCache=null; vCalendar(document.getElementById('view')); };
+
+
+/* ---------- Catering ----------
+   Catering already worked, but only if you knew to go More -> Calendar -> click the right
+   day -> find it in a dropdown. An order worth a few hundred dollars was four steps behind
+   a menu, and there was nowhere to see all of them at once. Same rows in day_items as
+   before (kind:'catering'), so the calendar keeps showing them -- this is a door, not a
+   second store. */
+const CAT_LEAD_LBL={0:'on the day',1:'1 day before',2:'2 days before',3:'3 days before',7:'a week before'};
+async function vCatering(v){
+  if(!canSee('catering')){ go('home'); return; }
+  setTitle('Catering','Orders, and when prep starts');
+  v.innerHTML='<div class="muted">Loading…</div>';
+  const today=isoDate(new Date());
+  const r=await sb.from('day_items').select('*').eq('kind','catering').order('on_date');
+  const all=r.data||[];
+  const up=all.filter(x=>x.on_date>=today);
+  const past=all.filter(x=>x.on_date<today).reverse();
+
+  const card=(it,dim)=>{
+    const d=new Date(it.on_date+'T00:00:00');
+    const when=d.toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'});
+    const days=Math.round((d-new Date(today+'T00:00:00'))/86400000);
+    const away = days===0?'today':(days===1?'tomorrow':(days>0?'in '+days+' days':''));
+    return `<div class="lesson-row"${dim?' style="opacity:.55"':''}>
+      <div style="min-width:74px">
+        <div style="font-weight:600;font-size:14.5px">${esc(when)}</div>
+        ${away?`<div class="faint" style="font-size:12px">${esc(away)}</div>`:''}
+      </div>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:500;${it.done?'text-decoration:line-through;color:#999':''}">${esc(it.title)}</div>
+        ${it.detail?`<div class="faint" style="font-size:12.5px">${esc(it.detail)}</div>`:''}
+      </div>
+      <button class="btn" style="width:auto" onclick="toggleDayItem(${it.id},${it.done?'false':'true'})">${it.done?'✓ Done':'Mark done'}</button>
+      <button class="btn" style="width:auto;padding:4px 9px" aria-label="Remove" onclick="delDayItem(${it.id})">✕</button>
+    </div>`;
+  };
+
+  let h='';
+  h+=`<div class="card" style="padding:14px;margin-bottom:12px">
+    <div style="font-weight:600;font-size:14px;margin-bottom:9px">New catering order</div>
+    <div class="row" style="gap:8px;flex-wrap:wrap">
+      <input id="catWhat" placeholder="What they ordered — e.g. 60 turkey sandwiches" style="flex:2;min-width:190px;padding:9px 11px;border:1px solid var(--line2);border-radius:8px;background:var(--card);color:var(--ink);font-family:inherit"/>
+      <input id="catWho" placeholder="Who it's for" style="flex:1;min-width:130px;padding:9px 11px;border:1px solid var(--line2);border-radius:8px;background:var(--card);color:var(--ink);font-family:inherit"/>
+    </div>
+    <div class="row" style="gap:8px;margin-top:8px;flex-wrap:wrap">
+      <input id="catDate" type="date" value="${today}" style="padding:9px 11px;border:1px solid var(--line2);border-radius:8px;background:var(--card);color:var(--ink);font-family:inherit"/>
+      <input id="catTime" type="time" style="padding:9px 11px;border:1px solid var(--line2);border-radius:8px;background:var(--card);color:var(--ink);font-family:inherit"/>
+      <input id="catContact" placeholder="Phone or email (optional)" style="flex:1;min-width:150px;padding:9px 11px;border:1px solid var(--line2);border-radius:8px;background:var(--card);color:var(--ink);font-family:inherit"/>
+    </div>
+    <div class="row" style="gap:9px;margin-top:9px;align-items:center;flex-wrap:wrap">
+      <span style="font-size:14px;color:var(--ink2)">Start getting ready</span>
+      <select id="catLead" style="padding:8px 10px;border:1px solid var(--line2);border-radius:8px;background:var(--card);color:var(--ink);font-family:inherit;font-size:14px">
+        <option value="0">on the day</option><option value="1" selected>1 day before</option>
+        <option value="2">2 days before</option><option value="3">3 days before</option><option value="7">a week before</option>
+      </select>
+      <button class="btn pri" style="width:auto;margin-left:auto" onclick="catAdd()">Add the order</button>
+    </div>
+    <div class="faint" style="font-size:12.5px;margin-top:8px">It lands on the calendar on the day, and a heads-up lands on Today the morning prep starts — so a big order stops being a surprise.</div>
+    <div id="catMsg"></div>
+  </div>`;
+
+  h+=`<div class="sec">Coming up</div><div class="card">`+
+     (up.length?up.map(it=>card(it,false)).join('')
+               :`<div style="padding:22px;text-align:center" class="faint">No catering booked. Add the next order above.</div>`)+`</div>`;
+
+  if(past.length){
+    h+=`<div class="sec" style="margin-top:14px">Already done</div><div class="card">`+past.slice(0,12).map(it=>card(it,true)).join('')+`</div>`;
+  }
+  h+=`<div class="faint" style="font-size:12.5px;margin-top:12px;text-align:center">Catering also shows on <a href="#" onclick="go('calendar');return false">the calendar</a> and on Today.</div>`;
+  v.innerHTML=h;
+}
+
+window.catAdd=async function(){
+  const what=val('catWhat'), iso=val('catDate');
+  const msg=document.getElementById('catMsg');
+  if(!what||!iso){ if(msg) msg.innerHTML='<div class="msg err">Needs at least what they ordered and a date.</div>'; return; }
+  const who=val('catWho'), time=val('catTime'), contact=val('catContact');
+  const bits=[]; if(time) bits.push(fmtTime(time)); if(who) bits.push('for '+who); if(contact) bits.push(contact);
+  const detail=bits.join(' · ');
+  const ins=await sb.from('day_items').insert({title:what,kind:'catering',detail,on_date:iso,created_by:state.user.id});
+  if(ins&&ins.error){ if(msg) msg.innerHTML='<div class="msg err">'+esc(ins.error.message)+'</div>'; return; }
+  const lead=+((document.getElementById('catLead')||{}).value||0);
+  if(lead>0){
+    const d=new Date(iso+'T00:00:00'); d.setDate(d.getDate()-lead);
+    const when=new Date(iso+'T00:00:00').toLocaleDateString(undefined,{weekday:'long',month:'short',day:'numeric'});
+    await sb.from('day_items').insert({title:'Get ready: '+what,kind:'task',
+      detail:'Catering on '+when+(detail?' — '+detail:''),on_date:isoDate(d),created_by:state.user.id});
+  }
+  state.calCache=null;
+  vCatering(document.getElementById('view'));
+};
+function fmtTime(t){ const a=(t||'').split(':'); if(a.length<2) return t||''; let h=+a[0]; const m=a[1]; const ap=h<12?'a':'p'; h=h%12; if(h===0)h=12; return h+(m==='00'?'':':'+m)+ap; }
 
 /* ---------- boot ---------- */
 async function vSettings(v){
