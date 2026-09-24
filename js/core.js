@@ -2,7 +2,7 @@
 /* A stamp so any device can say which version it is actually running. Three times now a
    phone and a laptop on the same address have disagreed about what the app looks like,
    and there was no way to tell them apart except by describing the screen. */
-const BUILD = '2026-09-24-9';
+const BUILD = '2026-09-24-10';
 window.BUILD = BUILD;
 const SUPABASE_URL = "https://wjqcnxnwjqmuzrandgea.supabase.co";
 const SUPABASE_KEY = "sb_publishable_DQZclfAnv_MYQJLGcOdzdw_g4vMCiSC";
@@ -737,15 +737,25 @@ const NAV_ALL=[["",NAV_MAIN],["More",NAV_MORE]];
     if(_r && typeof _r.then==='function') _r.catch(_failed);
   }catch(err){ _failed(err); }
 }
-const PAGE_HERO={
-  acat:'The Academy',
-  schedule:'Plan the week', today:'Every shift', whiteboard:'Every shift', rm:'Keep it running', team:'Your people', ownership:'Who owns what', onboarding:'New hires',
-  community:'The team', resources:'On hand', downloads:'Take it with you', checklists:'Open &amp; close', onboarding:'New team members',
-  sales:'The numbers', saleshist:'The numbers', costsmart:'Right-size the labor', setup:'Get set up', ask:'Ask me anything',
-  journal:'Your notes', build:'Course builder', calendar:'The month', settings:'Settings', logbook:'Close the day',
-  pay:'Private', clock:'Time clock', summary:'Your progress', feedback:'Feedback'
-};
-const HEROICON={home:'ti-school',acat:'ti-school',whiteboard:'ti-layout-dashboard',track:'ti-book-2',lesson:'ti-book-2'};
+/* The banner used to run on 26 screens. On every one of them it spent about
+   140px of the top of the page -- the most valuable space there is -- restating
+   the name of the page you had just clicked, plus a slogan. Today opened with
+   "Good afternoon, Jason" above the fold and the thing that actually needed
+   Jason below it.
+
+   The Academy home keeps a banner because it has a real job there: it carries
+   the Resume button. Everywhere else falls back to the compact header, which
+   already existed and was always the better one. */
+const PAGE_HERO={};
+const HEROICON=(function(){
+  const m={home:'ti-school',acat:'ti-school',whiteboard:'ti-sun',track:'ti-book-2',lesson:'ti-book-2',
+           summary:'ti-chart-bar',pay:'ti-lock',clock:'ti-clock',feedback:'ti-message-2',
+           saleshist:'ti-chart-line',costsmart:'ti-scale',checklists:'ti-list-check'};
+  /* the sidebar already chose an icon for every destination; reuse it so the
+     header and the nav entry you clicked are the same picture */
+  try{ NAV_ALL.forEach(g=>g[1].forEach(r=>{ if(!m[r[0]]) m[r[0]]=r[2]; })); }catch(e){}
+  return m;
+})();
 function setTitle(t,s){
   const ph=document.getElementById('pagehero'); if(!ph) return;
   if(PAGE_HERO[state.page]){ ph.innerHTML=heroBanner(PAGE_HERO[state.page], esc(t||''), s?esc(s):'', ''); }
