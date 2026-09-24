@@ -2,7 +2,7 @@
 /* A stamp so any device can say which version it is actually running. Three times now a
    phone and a laptop on the same address have disagreed about what the app looks like,
    and there was no way to tell them apart except by describing the screen. */
-const BUILD = '2026-09-24-3';
+const BUILD = '2026-09-24-4';
 window.BUILD = BUILD;
 const SUPABASE_URL = "https://wjqcnxnwjqmuzrandgea.supabase.co";
 const SUPABASE_KEY = "sb_publishable_DQZclfAnv_MYQJLGcOdzdw_g4vMCiSC";
@@ -1356,7 +1356,7 @@ function vHome(v){
      Same card, same weight, third tone. */
   const ICON_BOOK='<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#fff" stroke-width="1.8"><path d="M4 5.5A2.5 2.5 0 016.5 3H19v15H6.5A2.5 2.5 0 004 20.5z"/><path d="M8 7.5h7M8 11h7"/></svg>';
   const _nrec=(state._recipeCount!=null)?state._recipeCount:null;
-  const rec=`<div class="entrycard" style="position:relative;overflow:hidden;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:22px;box-shadow:0 10px 26px rgba(23,37,42,.09);cursor:pointer" onclick="go('recipes')"><div style="position:absolute;top:0;left:0;right:0;height:5px;background:linear-gradient(90deg,#7E5A43,#B3866A)"></div><div class="emedallion" style="background:linear-gradient(135deg,#8A6349,#5F4331);box-shadow:0 8px 18px rgba(138,99,73,.36)">${ICON_BOOK}</div><div style="font-weight:800;font-size:18px;letter-spacing:-.01em">Recipes</div><div class="muted" style="font-size:14px;margin-top:5px;line-height:1.5">Every recipe and exactly what goes in it.</div><div style="font-weight:600;font-size:15.5px;letter-spacing:-.012em;margin-top:14px;color:#7E5A43">${_nrec!=null?_nrec+' recipe'+(_nrec===1?'':'s'):'Reference'} &middot; Open &rarr;</div></div>`;
+  const rec=`<div class="entrycard" style="position:relative;overflow:hidden;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:22px;box-shadow:0 10px 26px rgba(23,37,42,.09);cursor:pointer" onclick="go('recipes')"><div style="position:absolute;top:0;left:0;right:0;height:5px;background:linear-gradient(90deg,var(--tealdark),var(--tealmid))"></div><div class="emedallion" style="background:linear-gradient(135deg,#1F4E5A,#2E6B7A);box-shadow:0 8px 18px rgba(31,78,90,.34)">${ICON_BOOK}</div><div style="font-weight:800;font-size:18px;letter-spacing:-.01em">Recipes</div><div class="muted" style="font-size:14px;margin-top:5px;line-height:1.5">Every recipe and exactly what goes in it.</div><div style="font-weight:600;font-size:15.5px;letter-spacing:-.012em;margin-top:14px;color:var(--tealdark)">${_nrec!=null?_nrec+' recipe'+(_nrec===1?'':'s'):'Reference'} &middot; Open &rarr;</div></div>`;
   if(_vt.length) h+=`<div class="entrygrid">${dev}${ops}${rec}</div>`;
   else h+=`<div class="entrygrid">${rec}</div>`;
   v.innerHTML=h;
