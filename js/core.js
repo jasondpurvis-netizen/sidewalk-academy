@@ -2,7 +2,7 @@
 /* A stamp so any device can say which version it is actually running. Three times now a
    phone and a laptop on the same address have disagreed about what the app looks like,
    and there was no way to tell them apart except by describing the screen. */
-const BUILD = '2026-09-24-10';
+const BUILD = '2026-09-24-11';
 window.BUILD = BUILD;
 const SUPABASE_URL = "https://wjqcnxnwjqmuzrandgea.supabase.co";
 const SUPABASE_KEY = "sb_publishable_DQZclfAnv_MYQJLGcOdzdw_g4vMCiSC";
@@ -633,6 +633,15 @@ function permOf(page){ const o=state.perms&&state.perms[page]; return (o&&+o)||P
 // Per-person "extra access" — lets a specific person (e.g. a scheduler who's still a team member) into an area beyond their role. Ignored while previewing as a Leader in Training.
 function hasGrant(page){ if(state.previewLIT)return false; const nm=myRosterName(); const g=nm&&state.grants&&state.grants[nm]; return !!(g&&g.indexOf(page)>=0); }
 function canSee(page){ return myRank()>=permOf(page)||hasGrant(page); }
+/* These three were declared inside renderApp(), so nothing outside that function
+   could see them. The page header quietly fell back to a generic dot on every
+   screen because its icon lookup ran at load time and found no NAV_ALL. They are
+   plain constants with no dependency on renderApp's locals, so they live here. */
+const NAV_MAIN=[["today","Today","ti-sun"],["schedule","Schedule","ti-calendar-week"],["team","Team","ti-users"],["home","Training","ti-school"],["community","Messages","ti-messages"],["brain","Set up","ti-adjustments"]];
+/* Reachable, not advertised. Opens from More at the foot of the sidebar. */
+const NAV_MORE=[["recipes","Recipes","ti-chef-hat"],["catering","Catering","ti-tools-kitchen-2"],["logbook","Shift log","ti-clipboard-check"],["rm","Fix-it list","ti-tool"],["lists","Checklists","ti-list-details"],["recovery","Guest recovery","ti-heart-handshake"],["ownership","Who owns what","ti-sitemap"],["onboarding","New hires","ti-user-plus"],["calendar","Calendar","ti-calendar-month"],["build","Create training","ti-tools"],["ask","Find an answer","ti-bulb"],["resources","Resources","ti-files"],["downloads","Downloads","ti-download"],["sales","Sales","ti-chart-line"],["setup","Getting started","ti-list-check"],["settings","Settings","ti-settings"]];
+const NAV_ALL=[["",NAV_MAIN],["More",NAV_MORE]];
+
 function renderApp(){
   const isAdmin = state.profile && state.profile.role==="admin";
   const realAdmin = state.previewLIT ? (state._realRole==='admin') : isAdmin;
@@ -655,10 +664,6 @@ function renderApp(){
    and Settings are all setup.
 
    Anything added back should have to earn a door, rather than get one by existing. */
-const NAV_MAIN=[["today","Today","ti-sun"],["schedule","Schedule","ti-calendar-week"],["team","Team","ti-users"],["home","Training","ti-school"],["community","Messages","ti-messages"],["brain","Set up","ti-adjustments"]];
-/* Reachable, not advertised. Opens from More at the foot of the sidebar. */
-const NAV_MORE=[["recipes","Recipes","ti-chef-hat"],["catering","Catering","ti-tools-kitchen-2"],["logbook","Shift log","ti-clipboard-check"],["rm","Fix-it list","ti-tool"],["lists","Checklists","ti-list-details"],["recovery","Guest recovery","ti-heart-handshake"],["ownership","Who owns what","ti-sitemap"],["onboarding","New hires","ti-user-plus"],["calendar","Calendar","ti-calendar-month"],["build","Create training","ti-tools"],["ask","Find an answer","ti-bulb"],["resources","Resources","ti-files"],["downloads","Downloads","ti-download"],["sales","Sales","ti-chart-line"],["setup","Getting started","ti-list-check"],["settings","Settings","ti-settings"]];
-const NAV_ALL=[["",NAV_MAIN],["More",NAV_MORE]];
   window.toggleNavGroup=function(g){
     let shut={}; try{ shut=JSON.parse(localStorage.getItem('sw_navshut')||'null')||{}; }catch(e){}
     shut[g]=shut[g]?0:1;
