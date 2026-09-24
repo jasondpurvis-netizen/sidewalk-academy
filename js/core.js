@@ -2,7 +2,7 @@
 /* A stamp so any device can say which version it is actually running. Three times now a
    phone and a laptop on the same address have disagreed about what the app looks like,
    and there was no way to tell them apart except by describing the screen. */
-const BUILD = '2026-09-24-14';
+const BUILD = '2026-09-24-15';
 window.BUILD = BUILD;
 const SUPABASE_URL = "https://wjqcnxnwjqmuzrandgea.supabase.co";
 const SUPABASE_KEY = "sb_publishable_DQZclfAnv_MYQJLGcOdzdw_g4vMCiSC";
@@ -641,7 +641,7 @@ const NAV_MAIN=[["today","Today","ti-sun"],["schedule","Schedule","ti-calendar-w
 const NAV_ACADEMY=[["home","Training","ti-school"],["recipes","Recipes","ti-chef-hat"],["resources","Resources","ti-files"],["build","Create training","ti-tools"]];
 const NAV_OPS=[["logbook","Shift log","ti-clipboard-check"],["lists","Checklists","ti-list-details"],["rm","Fix-it list","ti-tool"],["recovery","Guest recovery","ti-heart-handshake"],["catering","Catering","ti-tools-kitchen-2"]];
 const NAV_TALK=[["community","Messages","ti-messages"]];
-const NAV_SETUP=[["brain","Your rules","ti-adjustments"],["setup","Getting started","ti-list-check"],["settings","Settings","ti-settings"]];
+const NAV_SETUP=[["brain","The Brain","ti-brain"],["setup","Getting started","ti-list-check"],["settings","Settings","ti-settings"]];
 const NAV_ALL=[["",NAV_MAIN],["The Academy",NAV_ACADEMY],["Operations",NAV_OPS],["",NAV_TALK],["Set up",NAV_SETUP]];
 
 /* Every page that can be pinned, including the ones with no door of their own.
@@ -651,7 +651,7 @@ const PAGE_LABEL={
   today:'Today', schedule:'Schedule', team:'Team', home:'Training', recipes:'Recipes',
   resources:'Resources', build:'Create training', logbook:'Shift log', lists:'Checklists',
   rm:'Fix-it list', recovery:'Guest recovery', catering:'Catering', community:'Messages',
-  brain:'Your rules', setup:'Getting started', settings:'Settings',
+  brain:'The Brain', setup:'Getting started', settings:'Settings',
   /* no door in the sidebar any more -- reachable by pinning, or from the page they belong to */
   ownership:'Who owns what', onboarding:'New hires', ask:'Find an answer',
   downloads:'Downloads', sales:'Sales', saleshist:'Sales history',
