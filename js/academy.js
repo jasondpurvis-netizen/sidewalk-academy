@@ -259,3 +259,196 @@ async function vCommunity(v){
 window.toggleChannelMode=async function(ch,tw){ await sb.from('channel_modes').upsert({channel:ch, two_way:tw, updated_at:new Date().toISOString()}); state.community=null; go('community',{ch}); };
 // ── Owner channel manager: add / rename / reorder / hide / who-sees / who-posts. Persists to day_items kind 'chandef'. Hiding never deletes posts.
 window.manageChannels=function(){ const all=effectiveChannels(); window._chanEdit=all.map(c=>({id:c.id,label:c.label,announceOnly:!!c.announceOnly,memberVisible:!!c.memberVisible,icon:c.icon||'ti-hash',hidden:!!c.hidden,builtin:!!c.builtin})); renderChanManager(); };
+
+
+/* ---------- Recipes ----------
+   Jason's recipes already exist in MarginEdge, costed, with real quantities. Retyping
+   177 of them into a training page would guarantee two versions that drift apart, so
+   this reads a MarginEdge export instead and keeps recipeId as the identity, which
+   makes a re-import an update rather than a pile of duplicates.
+
+   Cost is deliberately NOT in the same tier as the method. A barista needs to know it
+   is 20 oz of malt powder; nobody on the floor needs the plate cost. Ingredients and
+   notes are rank 1, money is rank 4 -- the same bar as Sales. */
+const RECIPE_MONEY_RANK = 4;
+function _canSeeRecipeCost(){ return myRank() >= RECIPE_MONEY_RANK; }
+function _money(n){ return (n==null||isNaN(n)) ? '' : '$'+Number(n).toFixed(2); }
+function _qty(n){
+  if(n==null||isNaN(n)) return '';
+  const x=Number(n);
+  return (Math.abs(x-Math.round(x))<0.001) ? String(Math.round(x)) : String(+x.toFixed(2));
+}
+function _unitLbl(u,q){
+  if(!u) return '';
+  const w=String(u).toLowerCase().replace(/_/g,' ');
+  const one=Math.abs(Number(q)-1)<0.001;
+  return one ? w : (w.endsWith('s')?w:w+'s');
+}
+
+async function vRecipes(v){
+  if(!canSee('recipes')){ go('home'); return; }
+  setTitle('Recipes','How everything is made');
+  v.innerHTML='<div class="muted">Loading…</div>';
+  const r=await sb.from('day_items').select('*').eq('kind','recipe').order('title');
+  const rows=(r.data||[]).map(x=>{ let d={}; try{ d=JSON.parse(x.detail||'{}'); }catch(e){} return {row:x,d}; });
+  state._recipes=rows;
+  _renderRecipes(v);
+}
+
+function _renderRecipes(v){
+  const rows=state._recipes||[];
+  const q=((state.ctx.q||'')+'').toLowerCase();
+  const showMoney=_canSeeRecipeCost();
+  let h='';
+
+  if(showMoney){
+    h+=`<div class="card" style="padding:13px 15px;margin-bottom:12px">
+      <div class="row" style="gap:10px;align-items:center;flex-wrap:wrap">
+        <div style="flex:1;min-width:190px">
+          <div style="font-weight:600;font-size:14px">Recipes come from MarginEdge</div>
+          <div class="faint" style="font-size:12.5px;margin-top:2px">Run the pull script, then load the two files here. Re-loading updates what changed — it never makes duplicates.</div>
+        </div>
+        <input type="file" id="recFiles" accept=".json" multiple style="font-size:13px;max-width:250px"/>
+        <button class="btn" style="width:auto" onclick="recipesImport()">Load</button>
+      </div>
+      <div id="recImportMsg"></div>
+    </div>`;
+  }
+
+  if(!rows.length){
+    h+=`<div class="card" style="padding:26px;text-align:center" class="faint">
+      <div class="muted">No recipes loaded yet.</div></div>`;
+    v.innerHTML=h; return;
+  }
+
+  h+=`<div class="card" style="padding:11px 13px;margin-bottom:12px">
+    <input id="recSearch" value="${esc(state.ctx.q||'')}" placeholder="Search recipes or an ingredient…" oninput="recipeSearch(this.value)"
+      style="width:100%;padding:10px 12px;border:1px solid var(--line2);border-radius:8px;background:var(--card);color:var(--ink);font-family:inherit;font-size:15px"/>
+  </div>`;
+
+  const match=o=>{
+    if(!q) return true;
+    if((o.row.title||'').toLowerCase().includes(q)) return true;
+    if((o.d.type||'').toLowerCase().includes(q)) return true;
+    return (o.d.ing||[]).some(i=>(i.n||'').toLowerCase().includes(q));
+  };
+  const shown=rows.filter(match).filter(o=>!o.d.inactive);
+
+  if(!shown.length){
+    h+=`<div class="card" style="padding:24px;text-align:center"><span class="muted">Nothing matches “${esc(state.ctx.q||'')}”.</span></div>`;
+    v.innerHTML=h; return;
+  }
+
+  const groups={};
+  shown.forEach(o=>{ const g=o.d.type||'Other'; (groups[g]=groups[g]||[]).push(o); });
+  const names=Object.keys(groups).sort();
+
+  names.forEach(g=>{
+    h+=`<div class="sec">${esc(g)} <span class="faint" style="font-weight:400">· ${groups[g].length}</span></div><div class="card">`;
+    groups[g].forEach(o=>{
+      const d=o.d, id=o.row.id;
+      const open=state.ctx.open==id;
+      const y=(d.yield&&d.yield!=1)?` · makes ${_qty(d.yield)} ${_unitLbl(d.unit,d.yield)}`:'';
+      h+=`<div class="lesson-row" style="cursor:pointer;align-items:flex-start" onclick="recipeOpen(${id})">
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:500">${esc(o.row.title)}</div>
+          <div class="faint" style="font-size:12.5px">${(d.ing||[]).length} ingredient${(d.ing||[]).length===1?'':'s'}${y}</div>
+        </div>
+        ${showMoney&&d.cost!=null?`<div style="text-align:right;min-width:74px">
+            <div style="font-size:13.5px;font-weight:600">${_money(d.cost)}</div>
+            ${d.plate!=null?`<div class="faint" style="font-size:11.5px">${Math.round(d.plate*100)}% plate</div>`:''}
+          </div>`:''}
+        <i class="ti ti-chevron-${open?'up':'down'}" style="opacity:.5"></i>
+      </div>`;
+      if(open){
+        const ing=(d.ing||[]).slice().sort((a,b)=>(a.p||0)-(b.p||0));
+        h+=`<div style="padding:4px 14px 16px 14px;border-bottom:1px solid var(--line)">`;
+        if(ing.length){
+          h+=`<table style="width:100%;border-collapse:collapse;font-size:14px">`;
+          ing.forEach(i=>{
+            h+=`<tr>
+              <td style="padding:5px 10px 5px 0;white-space:nowrap;font-variant-numeric:tabular-nums;color:var(--ink2);width:1%">${esc(_qty(i.q))} ${esc(_unitLbl(i.u,i.q))}</td>
+              <td style="padding:5px 0">${esc(i.n||'')}${i.note?`<div class="faint" style="font-size:12.5px">${esc(i.note)}</div>`:''}</td>
+              ${showMoney?`<td style="padding:5px 0;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums" class="faint">${_money(i.c)}</td>`:''}
+            </tr>`;
+          });
+          h+=`</table>`;
+        } else {
+          h+=`<div class="faint" style="font-size:14px">No ingredients listed in MarginEdge for this one.</div>`;
+        }
+        if(showMoney && (d.price!=null || d.cost!=null)){
+          h+=`<div class="faint" style="font-size:12.5px;margin-top:10px">${d.price!=null?'Menu price '+_money(d.price)+' · ':''}${d.cost!=null?'costs '+_money(d.cost):''}${d.updated?' · costed '+esc(String(d.updated).slice(0,10)):''}</div>`;
+        }
+        h+=`</div>`;
+      }
+    });
+    h+=`</div>`;
+  });
+  v.innerHTML=h;
+  const si=document.getElementById('recSearch');
+  if(si && state.ctx.q){ si.focus(); si.setSelectionRange(si.value.length,si.value.length); }
+}
+
+window.recipeSearch=function(t){ state.ctx.q=t; state.ctx.open=null; _renderRecipes(document.getElementById('view')); };
+window.recipeOpen=function(id){ state.ctx.open = (state.ctx.open==id) ? null : id; _renderRecipes(document.getElementById('view')); };
+
+/* Reads the two files the pull script writes. Identity is MarginEdge's recipeId, kept in
+   detail, so loading the same export twice updates rather than duplicates. Nothing is
+   deleted -- a recipe removed in MarginEdge simply stops being updated here. */
+window.recipesImport=async function(){
+  const msg=document.getElementById('recImportMsg');
+  const say=(t,bad)=>{ if(msg) msg.innerHTML=`<div class="msg ${bad?'err':'ok'}" style="margin-top:9px">${esc(t)}</div>`; };
+  const f=document.getElementById('recFiles');
+  const files=(f&&f.files)?Array.from(f.files):[];
+  if(!files.length){ say('Pick recipes.json and recipeIngredients.json first.',true); return; }
+
+  let recs=null, ings=null;
+  for(const file of files){
+    let parsed; try{ parsed=JSON.parse(await file.text()); }catch(e){ say('Could not read '+file.name+' — '+e.message,true); return; }
+    const arr=Array.isArray(parsed)?parsed:(Object.values(parsed).find(x=>Array.isArray(x))||[]);
+    if(arr.length && arr[0] && arr[0].ingredientName!==undefined) ings=arr;
+    else if(arr.length && arr[0] && arr[0].recipeName!==undefined) recs=arr;
+  }
+  if(!recs){ say('No recipes file in that selection.',true); return; }
+  say('Reading '+recs.length+' recipes…');
+
+  const byRecipe={};
+  (ings||[]).forEach(i=>{ (byRecipe[i.recipeId]=byRecipe[i.recipeId]||[]).push({
+    n:i.ingredientName, q:i.quantity, u:i.unit, c:i.ingredientCost,
+    p:i.ingredientPosition, note:(i.notes||'')||undefined, sub:i.subRecipeId||undefined }); });
+
+  const ex=await sb.from('day_items').select('id,detail').eq('kind','recipe');
+  const seen={};
+  (ex.data||[]).forEach(row=>{ try{ const d=JSON.parse(row.detail||'{}'); if(d.rid) seen[d.rid]=row.id; }catch(e){} });
+
+  const pack=r=>JSON.stringify({
+    rid:r.recipeId, type:r.recipeTypeName||'Other', cat:r.recipeCategoryType,
+    yield:r.yieldQuantity, unit:r.unit, cost:r.recipeCost, price:r.menuPrice,
+    plate:r.plateCostPercentage, updated:r.lastRecipeCostUpdate,
+    inactive:!!r.isInactive, ing:byRecipe[r.recipeId]||[] });
+
+  const toAdd=[], toUpd=[];
+  recs.forEach(r=>{
+    const detail=pack(r);
+    if(seen[r.recipeId]) toUpd.push({id:seen[r.recipeId],detail});
+    else toAdd.push({kind:'recipe',on_date:null,title:(r.recipeName||'Untitled').slice(0,140),detail,created_by:state.user.id});
+  });
+
+  try{
+    for(let i=0;i<toAdd.length;i+=50){
+      const e=await sb.from('day_items').insert(toAdd.slice(i,i+50));
+      if(e&&e.error) throw e.error;
+      say('Adding… '+Math.min(i+50,toAdd.length)+' of '+toAdd.length);
+    }
+    for(let i=0;i<toUpd.length;i++){
+      const u=toUpd[i];
+      const e=await sb.from('day_items').update({detail:u.detail}).eq('id',u.id);
+      if(e&&e.error) throw e.error;
+      if(i%25===0) say('Updating… '+i+' of '+toUpd.length);
+    }
+  }catch(e){ say('Stopped: '+e.message,true); return; }
+
+  say(`Done — ${toAdd.length} new, ${toUpd.length} updated.`);
+  await vRecipes(document.getElementById('view'));
+};
+
