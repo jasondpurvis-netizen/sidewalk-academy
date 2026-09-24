@@ -282,21 +282,25 @@ const RECIPE_TONES=[
   {g:'linear-gradient(135deg,#5C7CE0,#2F4BA8)', ic:'ti-flask'},
   {g:'linear-gradient(135deg,#C9962E,#8E6510)', ic:'ti-egg'},
   {g:'linear-gradient(135deg,#6E7B8A,#41505E)', ic:'ti-tools-kitchen-2'},
-  {g:'linear-gradient(135deg,#B0539B,#78256A)', ic:'ti-cookie'}
+  {g:'linear-gradient(135deg,#B0539B,#78256A)', ic:'ti-chef-hat'}
 ];
 function _recTone(name,i){
   const n=(name||'').toLowerCase();
   const pick=k=>RECIPE_TONES[k];
+  /* order matters: 'Breakfast Bagels' contains 'bagel', so the more specific
+     name has to be tested first or three categories share one loaf icon. */
+  if(n.includes('breakfast')||n.includes('egg')) return pick(6);
+  if(n.includes('lunch')||n.includes('sandwich')) return pick(7);
   if(n.includes('drink')&&n.includes('prep')) return pick(5);
   if(n.includes('drink')||n.includes('coffee')||n.includes('espresso')) return pick(0);
   if(n.includes('cream cheese')||n.includes('cheese')) return pick(4);
-  if(n.includes('dough')||n.includes('bagel')&&n.includes('prep')) return pick(2);
+  if(n.includes('toast')||n.includes('avocado')||n.includes('salad')) return pick(3);
+  if(n.includes('dough')) return pick(8);
   if(n.includes('bagel')) return pick(2);
   if(n.includes('base')) return pick(1);
-  if(n.includes('breakfast')||n.includes('egg')) return pick(6);
-  if(n.includes('lunch')||n.includes('sandwich')) return pick(7);
-  if(n.includes('toast')||n.includes('avocado')||n.includes('salad')) return pick(3);
-  return RECIPE_TONES[i%RECIPE_TONES.length];
+  /* Anything unrecognised gets the neutral slate, not whatever tone the loop
+     happened to land on -- 'Other' was arriving dressed as a coffee cup. */
+  return {g:'linear-gradient(135deg,#8C96A3,#5A6675)', ic:'ti-bowl'};
 }
 function _qty(n){
   if(n==null||isNaN(n)) return '';
