@@ -2,7 +2,7 @@
 /* A stamp so any device can say which version it is actually running. Three times now a
    phone and a laptop on the same address have disagreed about what the app looks like,
    and there was no way to tell them apart except by describing the screen. */
-const BUILD = '2026-09-24-35';
+const BUILD = '2026-09-24-36';
 window.BUILD = BUILD;
 const SUPABASE_URL = "https://wjqcnxnwjqmuzrandgea.supabase.co";
 const SUPABASE_KEY = "sb_publishable_DQZclfAnv_MYQJLGcOdzdw_g4vMCiSC";
@@ -858,6 +858,16 @@ const HEROICON=(function(){
    on a roster of seventeen meant scrolling. Rather than three more bespoke filters, this
    one hides rows whose text does not match, which needs no re-render and no per-page
    knowledge of what a row contains. */
+/* The Academy's pages should reach each other the way Settings' sections do. Built from
+   one list so a new one cannot be added to the Academy and forgotten here. */
+const ACADEMY_PAGES=[['home','The Academy'],['recipes','Recipes'],['summary','Progress'],
+                     ['resources','Resources'],['build','Create training']];
+function academySibs(current){
+  const rows=ACADEMY_PAGES.filter(([p])=>p==='home'||canSee(p));
+  if(rows.length<2) return '';
+  return `<div class="sibs">`+rows.map(([p,l])=>
+    `<a onclick="go('${p}')"${p===current?' class="on"':''}>${esc(l)}</a>`).join('')+`</div>`;
+}
 function searchBox(id,placeholder,targetId){
   return `<div style="position:relative;margin:0 0 13px"><i class="ti ti-search" style="position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:15.5px;pointer-events:none"></i><input id="${id}" type="search" autocomplete="off" oninput="filterRows('${id}','${targetId}')" placeholder="${placeholder}" style="width:100%"/></div>`;
 }

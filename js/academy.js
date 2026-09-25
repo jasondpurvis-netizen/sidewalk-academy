@@ -7,7 +7,7 @@ function vAcat(v){
   const list=visibleTracks().filter(t=> isOps ? t.category==='operations' : (t.category||'development')!=='operations');
   const _tcard=t=>{ const done=trackDone(t.id); const ls=trackLessons(t.id); const dn=ls.filter(l=>isDone(l.id)).length; const pct=trackPct(t.id);
     return `<div class="card" style="padding:0;overflow:hidden;cursor:pointer" onclick="go('track',{tid:'${t.id}'})">${trackBanner(t,pct,done)}<div style="padding:15px 17px 17px"><div style="font-weight:600;font-size:15.5px;margin:0 0 3px">${esc(t.name)}</div><div class="muted" style="font-size:12.5px;margin-bottom:11px">${done?esc(t.cert):dn+' of '+ls.length+' modules'}</div><div class="bar"><i style="width:${pct}%"></i></div></div></div>`; };
-  let h=`<div class="crumb" onclick="go('home')">← Academy</div>`;
+  let h=`<div class="crumb" onclick="go('home')">← Academy</div>`+academySibs('home');
   h+=`<div style="position:relative;margin:0 0 16px"><i class="ti ti-search" style="position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:15.5px;pointer-events:none"></i><input id="acatSearch" type="search" autocomplete="off" oninput="acatFilter()" placeholder="Search ${esc(label)} — a station, a step, a word…" style="width:100%"/></div>`;
   h+=`<div id="acatResults"></div><div id="acatMain">`;
   h+=`<div class="grid">`+list.map(_tcard).join("")+`</div>`;
@@ -159,7 +159,7 @@ async function vSummary(v){
   const ord={notstarted:1,training:2,certified:3};
   learners.sort((a,b)=> (b.stalled-a.stalled) || (ord[a.status]-ord[b.status]) || (a.pct-b.pct) || (a.name||'').localeCompare(b.name||''));
   const stat=(n,l,c)=>`<div style="flex:1;text-align:center;padding:14px 8px"><div style="font-size:26px;font-weight:700;color:${c}">${n}</div><div class="faint" style="font-size:12.5px">${l}</div></div>`;
-  let h=`<div class="card row" style="margin-bottom:18px;align-items:stretch">${stat(learners.length,'On the team','var(--ink)')}<div style="width:1px;background:var(--line)"></div>${stat(nNew,'Not started','var(--amber)')}<div style="width:1px;background:var(--line)"></div>${stat(nTrain,'In training','var(--brand)')}<div style="width:1px;background:var(--line)"></div>${stat(nCert,'Certified','var(--green)')}</div>`;
+  let h=academySibs('summary')+`<div class="card row" style="margin-bottom:18px;align-items:stretch">${stat(learners.length,'On the team','var(--ink)')}<div style="width:1px;background:var(--line)"></div>${stat(nNew,'Not started','var(--amber)')}<div style="width:1px;background:var(--line)"></div>${stat(nTrain,'In training','var(--brand)')}<div style="width:1px;background:var(--line)"></div>${stat(nCert,'Certified','var(--green)')}</div>`;
   h+=`<div class="card" style="padding:12px 15px;margin-bottom:16px"><b>This week</b> <span class="muted" style="font-size:14px">— ${weekDone} lesson${weekDone===1?'':'s'} completed across the team.${nStall?'':' Nice momentum.'}</span></div>`;
   if(nStall) h+=`<div class="card" style="padding:12px 15px;margin-bottom:16px;background:var(--amber-soft);border-color:var(--amber)"><b style="color:var(--amber)">⚠ ${nStall} ${nStall===1?'person has':'people have'} stalled</b> <span class="muted" style="font-size:14px">— no progress in ${STALL_DAYS}+ days. A quick check-in goes a long way.</span></div>`;
   const pill=l=> l.stalled?`<span class="pill" style="background:var(--amber-soft);color:var(--amber)">Stalled ${l.days}d</span>`: l.status==='certified'?`<span class="pill g">Certified ✓</span>`: l.status==='training'?`<span class="pill" style="background:var(--brand-soft);color:var(--brand)">In training</span>`:`<span class="pill" style="background:#F2F2F2;color:#888">Not started</span>`;
@@ -427,7 +427,7 @@ function _renderRecipes(v){
   }
 
   /* the categories */
-  h+=`<div class="crumb" onclick="go('home')">← Academy</div>`;
+  h+=`<div class="crumb" onclick="go('home')">← Academy</div>`+academySibs('recipes');
   h+=_recSearchBox('Search a recipe or an ingredient…');
   if(!all.length){
     h+=`<div class="card" style="padding:30px;text-align:center"><span class="muted">No recipes loaded yet.</span></div>`;
