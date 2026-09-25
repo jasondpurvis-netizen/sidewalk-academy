@@ -901,14 +901,19 @@ async function vBrain(v){
      restaurant is, and it gets edited for as long as the restaurant exists.
      Tiles, in the same language as the Academy and Settings, each carrying its own
      state so you can see at a glance what the schedule is being built from. */
+  /* Nine tiles on this page and two of them came out the same gold, because Set up
+     picked its colours separately from What it knows. One list, no repeats. */
   const BRAIN_TONE={
-    stations:['linear-gradient(135deg,#4A9CAD,#2A6E7A)','ti-layout-grid'],
-    skills:  ['linear-gradient(135deg,#8A5CF6,#5A2FC2)','ti-user-check'],
-    coverage:['linear-gradient(135deg,#C2402F,#8E2416)','ti-shield-check'],
-    leaders: ['linear-gradient(135deg,#C9962E,#8E6510)','ti-star'],
-    avail:   ['linear-gradient(135deg,#3FA06B,#227048)','ti-calendar-time'],
-    rules:   ['linear-gradient(135deg,#5C7CE0,#2F4BA8)','ti-gavel'],
-    pay:     ['linear-gradient(135deg,#B0539B,#78256A)','ti-coin']
+    stations:['linear-gradient(135deg,#4A9CAD,#2A6E7A)','ti-layout-grid'],     /* teal    */
+    skills:  ['linear-gradient(135deg,#8A5CF6,#5A2FC2)','ti-user-check'],      /* violet  */
+    coverage:['linear-gradient(135deg,#C2402F,#8E2416)','ti-shield-check'],    /* red     */
+    leaders: ['linear-gradient(135deg,#F4C43C,#C08A00)','ti-star'],            /* yellow  */
+    avail:   ['linear-gradient(135deg,#3FA06B,#227048)','ti-calendar-time'],   /* green   */
+    rules:   ['linear-gradient(135deg,#5C7CE0,#2F4BA8)','ti-gavel'],           /* indigo  */
+    pay:     ['linear-gradient(135deg,#B0539B,#78256A)','ti-coin'],            /* magenta */
+    notify:  ['linear-gradient(135deg,#38A0D8,#1B6795)','ti-bell'],            /* sky     */
+    _setup:  ['linear-gradient(135deg,#D4573D,#9E2F1A)','ti-list-check'],      /* clay    */
+    _settings:['linear-gradient(135deg,#6E7B8A,#41505E)','ti-settings']        /* slate   */
   };
   /* Getting started and Settings left the sidebar, so the Brain has to hold their doors.
      Two tiles, same language the Academy uses, under what the restaurant knows. */
@@ -923,11 +928,11 @@ async function vBrain(v){
 
   h += `<div class="sec">What it knows</div><div class="grid">`;
   shown.forEach(p=>{
-    const t=BRAIN_TONE[p.k]||['linear-gradient(135deg,#6E7B8A,#41505E)','ti-adjustments'];
+    const t=BRAIN_TONE[p.k]||['linear-gradient(135deg,#7FA82E,#4E7010)','ti-adjustments']; /* lime: used by nothing else */
     h += `<div class="card tile" onclick="${p.act}">
       <div class="tile-top" style="background:${t[0]}">
         <i class="ti ${t[1]}"></i><i class="ti ${t[1]} bg"></i>
-        <span style="position:absolute;top:9px;right:10px;display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,.92);border-radius:999px;padding:3px 9px;font-size:11.5px;font-weight:700;color:${p.done?'var(--good)':'var(--soon)'}">
+        <span class="${p.done?'earned':''}" style="position:absolute;top:9px;right:10px;${p.done?'':'display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,.92);border-radius:999px;padding:3px 9px;font-size:11.5px;font-weight:700;color:var(--soon)'}">
           <i class="ti ${p.done?'ti-check':'ti-dots'}" style="font-size:12px;color:inherit;opacity:1"></i>${p.done?'Set':(p.soft?'Optional':'Needed')}
         </span>
       </div>
@@ -1508,7 +1513,7 @@ async function vCatering(v){
         <option value="0">on the day</option><option value="1" selected>1 day before</option>
         <option value="2">2 days before</option><option value="3">3 days before</option><option value="7">a week before</option>
       </select>
-      <button class="btn pri" style="width:auto;margin-left:auto" onclick="catAdd()">Add the order</button>
+      <button class="btn pri go" style="width:auto;margin-left:auto" onclick="catAdd()">Add the order</button>
     </div>
     <div class="faint" style="font-size:12.5px;margin-top:8px">It lands on the calendar on the day, and a heads-up lands on Today the morning prep starts — so a big order stops being a surprise.</div>
     <div id="catMsg"></div>
