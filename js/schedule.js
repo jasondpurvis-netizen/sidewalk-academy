@@ -157,7 +157,7 @@ window.coractDel=async function(id,name){ if(!canCoractWrite())return; if(!confi
 window.printCoract=async function(name){ if(!canCoractView()){ alert('Past entries are not visible to you.'); return; } const entries=await loadCoract(name); await loadPositions(); await loadProfiles(); const pos=posOf(name); const p=profileOf(name)||{}; const hired=p.hired||''; const brand=(state.settings&&state.settings.brand_color)||'#4A9CAD'; const shop=(state.settings&&state.settings.academy_name)||'Sidewalk'; const rows=entries.map(e=>`<tr><td>${esc(fmtDay(_d(e.on_date)))}</td><td>${esc(coractType(e.type)[1])}</td><td>${esc(coractLevel(e.level)[1])}</td><td>${esc(e.note).replace(/\n/g,'<br>')}</td><td>${esc(e.byName||'')}</td></tr>`).join(''); const w=window.open('','_blank'); if(!w)return; w.document.write(`<!doctype html><html><head><meta charset=utf-8><title>${esc(name)} — Corrective actions</title><style>@page{margin:.6in}body{font-family:Helvetica,Arial,sans-serif;color:#1a1a1a;font-size:12px;line-height:1.5}h1{font-size:20px;margin:0 0 2px}.sub{color:#555;margin-bottom:14px}.hd{border-bottom:3px solid ${brand};padding-bottom:8px;margin-bottom:14px}table{width:100%;border-collapse:collapse;margin-top:8px}th,td{border:1px solid #ccc;padding:7px 8px;text-align:left;vertical-align:top}th{background:#f2f2f2;font-size:10px;text-transform:uppercase;letter-spacing:.04em}td{font-size:12px}.meta{font-size:11px;color:#666;margin-top:16px}.pbar{position:fixed;top:10px;right:10px}.pbar button{padding:8px 14px;border:0;background:${brand};color:#fff;border-radius:6px;cursor:pointer}@media print{.pbar{display:none}}</style></head><body><div class=pbar><button onclick="window.print()">Print</button></div><div class=hd><h1>Corrective Action Record</h1><div class=sub>${esc(shop)}</div></div><div><b>Employee:</b> ${esc(name)} &nbsp;&middot;&nbsp; <b>Position:</b> ${esc(pos)}${hired?` &nbsp;&middot;&nbsp; <b>Hire date:</b> ${esc(hired)}`:''}</div>${entries.length?`<table><thead><tr><th>Date</th><th>Type</th><th>Level</th><th>Details</th><th>Logged by</th></tr></thead><tbody>${rows}</tbody></table>`:'<p style="margin-top:14px">No corrective actions on record.</p>'}<div class=meta>Generated ${new Date().toLocaleDateString()} &middot; ${entries.length} entr${entries.length===1?'y':'ies'} &middot; Confidential</div></body></html>`); w.document.close(); setTimeout(()=>{try{w.focus();w.print();}catch(e){}},400); };
 async function teamCorract(v){
   if(!canCorract()){ v.innerHTML='<div class="card" style="padding:22px;text-align:center"><div class="faint">Write-ups are limited by your restaurant\u2019s settings.</div></div>'; return; }
-  v.innerHTML='<div class="muted">Loading…</div>';
+  v.innerHTML='<div class="waiting"><i></i><i></i><i></i></div>';
   await loadPositions(); await loadArchived();
   /* The tab lists who has entries and how many, which is itself the record --
      a writer who may not read gets the roster, not the tally. */
@@ -176,7 +176,7 @@ async function teamCorract(v){
 function posSelect(name,cur){ return `<select onchange="setPos('${esc(name).replace(/'/g,"\\'")}',this.value);var d=this.parentNode.querySelector('.posdot');if(d)d.style.background=window.POSCOL(this.value)" style="">${POS_PICK.map(o=>`<option value="${o}"${o===cur?' selected':''}>${o}</option>`).join('')}</select>`; }
 async function schBoard(v){
   const isAdmin=myRank()>=3||hasGrant('schedule'); /* schedule building tools = Manager and up (or a person granted Schedule access); others get a read-only published view */
-  if(!v.querySelector('.board')) v.innerHTML='<div class="muted">Loading…</div>'; // keep the current week's grid on screen while the new one loads — no blank flash on week-switch
+  if(!v.querySelector('.board')) v.innerHTML='<div class="waiting"><i></i><i></i><i></i></div>'; // keep the current week's grid on screen while the new one loads — no blank flash on week-switch
   if(!state.ctx.wk){ try{ const _sw=localStorage.getItem('sched_wk'); if(_sw) state.ctx.wk=_sw; }catch(e){} }
   const base = state.ctx.wk ? wkDate(state.ctx.wk) : weekStart(new Date());
   const start=weekStart(base); const days=[...Array(7)].map((_,i)=>{ const d=new Date(start); d.setDate(d.getDate()+i); return d; });
@@ -1239,7 +1239,7 @@ async function schAvail(v){
   const isAdmin=state.profile&&state.profile.role==='admin';
   const mgr=myRank()>=3||hasGrant('schedule'); // team-availability grid is a scheduling tool — any manager (or granted scheduler), not just the owner
   const me=myRosterName()||state.profile.name;
-  v.innerHTML='<div class="muted">Loading…</div>';
+  v.innerHTML='<div class="waiting"><i></i><i></i><i></i></div>';
   const [ra,rpf,rsh]=await Promise.all([ sb.from('availability').select('*'), sb.from('profiles').select('name,role'), sb.from('shifts').select('person_name'), loadPositions(), loadArchived() ]);
   const byPerson={}; (ra.data||[]).forEach(r=>{ const p=byPerson[r.person_name]=byPerson[r.person_name]||{}; p[r.weekday]=r; });
   window._avail=byPerson;
@@ -1360,7 +1360,7 @@ async function schPool(v){
   const isAdmin=state.profile&&state.profile.role==='admin';
   const mgr=myRank()>=3||hasGrant('schedule'); // approving trades is a scheduling job — any manager, not just the owner
   const me=myRosterName()||state.profile.name;
-  v.innerHTML='<div class="muted">Loading…</div>';
+  v.innerHTML='<div class="waiting"><i></i><i></i><i></i></div>';
   const today=new Date(); const todayIso=isoDate(today); const end=new Date(); end.setDate(end.getDate()+21); const endIso=isoDate(end);
   const [rsh,rpl,rpf]=await Promise.all([
     sb.from('shifts').select('*').gte('on_date',todayIso).lte('on_date',endIso).order('on_date'),
@@ -1550,7 +1550,7 @@ window.repWeek=function(n){ if(n===0){ state.ctx.wk=isoDate(weekStart(new Date()
 async function vSales(v){
   if(!canSee(state.page)){ go('home'); return; }
   setTitle('Sales','Real numbers from your POS — daily, weekly, monthly');
-  v.innerHTML='<div class="muted">Loading…</div>';
+  v.innerHTML='<div class="waiting"><i></i><i></i><i></i></div>';
   const now=new Date(); const y=now.getFullYear(); const iso=d=>isoDate(d);
   const curWS=weekStart(now); const lastWS=new Date(curWS); lastWS.setDate(lastWS.getDate()-7);
   const [rh,rsh,rpay,rcov,rds]=await Promise.all([ sb.from('day_items').select('on_date,detail').eq('kind','hourly').gte('on_date',(y-1)+'-01-01').lte('on_date',iso(now)), sb.from('shifts').select('person_name,on_date,start_time,end_time').gte('on_date',isoDate(lastWS)).lte('on_date',iso(now)), sb.from('pay_rates').select('person_name,wage'), sb.from('day_items').select('detail').eq('kind','covrules').order('id',{ascending:false}).limit(1).maybeSingle(), sb.from('day_sales').select('on_date,sales').gte('on_date',(y-1)+'-01-01').lte('on_date',iso(now)) ]);
@@ -1608,7 +1608,7 @@ async function vSales(v){
 async function vSalesHist(v){
   if(!canSee('saleshist')){ go('home'); return; }
   setTitle('Sales history',"Load last year's hourly sales so the scheduler sees the real curve");
-  v.innerHTML='<div class="muted">Loading…</div>';
+  v.innerHTML='<div class="waiting"><i></i><i></i><i></i></div>';
   const r=await sb.from('day_items').select('on_date').eq('kind','hourly');
   const dates=(r.data||[]).map(x=>x.on_date).filter(Boolean).sort();
   const have=dates.length, first=dates[0], last=dates[dates.length-1];
@@ -1638,7 +1638,7 @@ const CL_DEFAULTS=[
 async function vChecklists(v){
   const isAdmin=state.profile&&state.profile.role==='admin';
   setTitle('Checklists','Open, close & clean — checked off, with photo proof');
-  v.innerHTML='<div class="muted">Loading…</div>';
+  v.innerHTML='<div class="waiting"><i></i><i></i><i></i></div>';
   const d0=state.ctx.clDate||isoDate(new Date());
   let rt=await sb.from('day_items').select('*').eq('kind','cltmpl').order('created_at');
   if(!(rt.data||[]).length && isAdmin){ for(const t of CL_DEFAULTS){ await sb.from('day_items').insert({kind:'cltmpl',title:t.title,on_date:null,detail:JSON.stringify({items:t.items}),created_by:state.user.id}); } rt=await sb.from('day_items').select('*').eq('kind','cltmpl').order('created_at'); }
@@ -1680,7 +1680,7 @@ window.clDelTmpl=async function(tid){ if(!confirm('Delete this checklist entirel
 async function vClock(v){
   if(!canSee(state.page)){ go('home'); return; }
   setTitle('Time Clock','Tap your name to clock in or out');
-  v.innerHTML='<div class="muted">Loading…</div>';
+  v.innerHTML='<div class="waiting"><i></i><i></i><i></i></div>';
   const today=isoDate(new Date());
   const [rp,rsh]=await Promise.all([ sb.from('day_items').select('*').eq('kind','punch').eq('on_date',today), sb.from('shifts').select('*').eq('on_date',today) ]);
   await loadPositions(); await loadArchived();
@@ -1703,7 +1703,7 @@ window.clockOut=async function(p){ const punch=window._punch||{}; const rec=punc
 
 /* ---------- Who's on: live timeline + time off + closed days ---------- */
 async function schWhoson(v){
-  v.innerHTML='<div class="muted">Loading…</div>';
+  v.innerHTML='<div class="waiting"><i></i><i></i><i></i></div>';
   const todayIso=isoDate(new Date()); const now=new Date(); const nowH=now.getHours()+now.getMinutes()/60;
   const [rsh,rto]=await Promise.all([ sb.from('shifts').select('*').eq('on_date',todayIso).order('start_time'), sb.from('time_off').select('*').eq('status','approved') ]);
   await loadPositions();
@@ -1737,7 +1737,7 @@ async function schWhoson(v){
 async function vSetup(v){
   if(!canSee(state.page)){ go('home'); return; }
   setTitle('Setup','Your step-by-step guide — do these in order to go live');
-  v.innerHTML='<div class="muted">Loading…</div>';
+  v.innerHTML='<div class="waiting"><i></i><i></i><i></i></div>';
   const [rav,rprof,rpay,rcov,rsh,rds,rpo]=await Promise.all([
     sb.from('availability').select('person_name').limit(1),
     sb.from('day_items').select('title,detail').eq('kind','profile'),
@@ -1797,7 +1797,7 @@ window.setupSaveGoal=async function(){ const val=+((document.getElementById('set
   go('setup'); };
 
 async function teamCerts(v){
-  v.innerHTML='<div class="muted">Loading…</div>';
+  v.innerHTML='<div class="waiting"><i></i><i></i><i></i></div>';
   try{ await loadProfiles(); await loadPositions(); await loadArchived(); }catch(e){}
   const people=Object.keys(window._posMap||{}).filter(n=>!isArchived(n)).sort();
   const r=await sb.from('certifications').select('*').order('expires_on',{ascending:true});

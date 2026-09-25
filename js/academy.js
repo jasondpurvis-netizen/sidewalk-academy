@@ -136,7 +136,7 @@ function vLesson(v){
 }
 async function vSummary(v){
   setTitle("Team progress","Who's where — and who needs a nudge");
-  v.innerHTML=`<div class="muted">Loading…</div>`;
+  v.innerHTML='<div class="waiting"><i></i><i></i><i></i></div>';
   const { data:profiles } = await sb.from("profiles").select("*");
   const { data:prog } = await sb.from("progress").select("user_id,lesson_id,at");
   await loadPositions(); await loadArchived();
@@ -205,7 +205,7 @@ async function vCommunity(v){
   const ch = state.ctx.ch || 'announcements';
   const tag = (state.ctx.tag||'').toLowerCase();
   setTitle("Community", tag?('Posts tagged '+tag):"Talk it through together");
-  if(!state.community){ v.innerHTML=`<div class="muted">Loading…</div>`; const [p,c,m,rx,rd,pf,cd]=await Promise.all([ sb.from('posts').select('*').order('created_at',{ascending:false}), sb.from('comments').select('*').order('created_at'), sb.from('channel_modes').select('*'), sb.from('reactions').select('*'), sb.from('channel_reads').select('*').eq('user_id',state.user.id), sb.from('profiles').select('id,name,avatar_url'), sb.from('day_items').select('title,detail').eq('kind','chandef') ]); const chandefs=(cd.data||[]).map(r=>{ try{ const d=typeof r.detail==='string'?JSON.parse(r.detail||'{}'):(r.detail||{}); d.id=d.id||r.title; return d; }catch(e){ return null; } }).filter(x=>x&&x.id); state.community={posts:p.data||[],comments:c.data||[],modes:m.data||[],reactions:rx.data||[],reads:rd.data||[],profiles:pf.data||[],chandefs}; }
+  if(!state.community){ v.innerHTML='<div class="waiting"><i></i><i></i><i></i></div>'; const [p,c,m,rx,rd,pf,cd]=await Promise.all([ sb.from('posts').select('*').order('created_at',{ascending:false}), sb.from('comments').select('*').order('created_at'), sb.from('channel_modes').select('*'), sb.from('reactions').select('*'), sb.from('channel_reads').select('*').eq('user_id',state.user.id), sb.from('profiles').select('id,name,avatar_url'), sb.from('day_items').select('title,detail').eq('kind','chandef') ]); const chandefs=(cd.data||[]).map(r=>{ try{ const d=typeof r.detail==='string'?JSON.parse(r.detail||'{}'):(r.detail||{}); d.id=d.id||r.title; return d; }catch(e){ return null; } }).filter(x=>x&&x.id); state.community={posts:p.data||[],comments:c.data||[],modes:m.data||[],reactions:rx.data||[],reads:rd.data||[],profiles:pf.data||[],chandefs}; }
   const allCh=effectiveChannels();
   const canCh=id=>{ const cc=allCh.find(x=>x.id===id); if(!cc||cc.hidden) return false; return isLeader || cc.memberVisible; };
   if(!canCh(ch)){ go('community',{ch:'announcements'}); return; }
@@ -372,7 +372,7 @@ async function vRecipes(v){
      one, so Recipes was the only screen that opened with no name on it. */
   setTitle('Recipes','Every recipe and exactly what goes in it');
   if(!state._recipes){
-    v.innerHTML='<div class="muted">Loading…</div>';
+    v.innerHTML='<div class="waiting"><i></i><i></i><i></i></div>';
     const r=await sb.from('day_items').select('*').eq('kind','recipe').order('title');
     state._recipes=(r.data||[]).map(x=>{ let d={}; try{ d=JSON.parse(x.detail||'{}'); }catch(e){} return {id:x.id,name:x.title,d}; })
                                 .filter(o=>!o.d.inactive);

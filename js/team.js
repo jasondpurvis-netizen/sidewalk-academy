@@ -38,7 +38,7 @@ window.offerTrainingSave=async function(tid){
   vTeamSkills(document.getElementById('view'));
 };
 async function vTeamSkills(v){
-  v.innerHTML='<div class="muted">Loading…</div>';
+  v.innerHTML='<div class="waiting"><i></i><i></i><i></i></div>';
   await loadProfiles(); await loadPositions(); await loadArchived();
   const base=(state.settings&&Array.isArray(state.settings.stations)&&state.settings.stations.length)?state.settings.stations:['Bake / Prep','Register','Bar / Espresso'];
   const extra=new Set(); Object.keys(window._profiles||{}).forEach(n=>{ ((window._profiles[n]||{}).roles||[]).forEach(r=>{ if(base.indexOf(r)<0) extra.add(r); }); });
@@ -564,7 +564,7 @@ window._payLoad = async function(){
 async function vPay(v){
   if(!canSee(state.page)){ go('home'); return; }
   setTitle('Pay rates','Leadership only — what you pay, in one place');
-  v.innerHTML='<div class="muted">Loading…</div>';
+  v.innerHTML='<div class="waiting"><i></i><i></i><i></i></div>';
   window._payInline=true;
   await _payLoad();
   v.innerHTML='<div class="card" style="padding:13px 15px;margin-bottom:14px;display:flex;gap:10px;align-items:center">'
@@ -816,7 +816,7 @@ window.goEdit=function(what){
 async function vBrain(v){
   if(!canSee('brain')){ go('home'); return; }
   setTitle('The Brain','What your restaurant knows about itself — everything auto-draft needs, in one place');
-  v.innerHTML='<div class="muted">Loading…</div>';
+  v.innerHTML='<div class="waiting"><i></i><i></i><i></i></div>';
   await loadSettings(); await loadPositions(); await loadProfiles(); await loadArchived();
   const [rcov, rav, rpay, rrev] = await Promise.all([
     sb.from('day_items').select('detail').eq('kind','covrules').order('id',{ascending:false}).limit(1).maybeSingle(),
@@ -1286,7 +1286,7 @@ window._scSave=async function(){
 };
 
 async function teamRoster(v){
-  v.innerHTML='<div class="muted">Loading…</div>';
+  v.innerHTML='<div class="waiting"><i></i><i></i><i></i></div>';
   const [rpf,rsh]=await Promise.all([ sb.from('profiles').select('id,name,role'), sb.from('shifts').select('person_name') ]);
   await loadPositions(); await loadProfiles(); await loadArchived();
   const set=new Set(); rosterNames().forEach(n=>set.add(n)); (rsh.data||[]).forEach(s=>{ if(s.person_name)set.add(s.person_name); });
@@ -1301,7 +1301,7 @@ async function teamRoster(v){
   v.innerHTML=h;
 }
 async function teamFormer(v){
-  v.innerHTML='<div class="muted">Loading…</div>';
+  v.innerHTML='<div class="waiting"><i></i><i></i><i></i></div>';
   await loadPositions();
   const r=await sb.from('day_items').select('*').eq('kind','archived');
   const archRows=(r.data||[]).map(x=>{ let d={}; try{d=JSON.parse(x.detail||'{}');}catch(e){} return {id:x.id,name:x.title,d}; }).sort((a,b)=>a.name.localeCompare(b.name));
@@ -1317,7 +1317,7 @@ const ONBOARD_STEPS=['I-9 employment eligibility verified','E-Verify submitted',
 async function vOnboarding(v){
   if(!canSee(state.page)){ go('home'); return; }
   setTitle('New Hires','Bring a new hire up to speed — checklist, training, and their review milestones');
-  v.innerHTML='<div class="muted">Loading…</div>';
+  v.innerHTML='<div class="waiting"><i></i><i></i><i></i></div>';
   const [rh,rs,rv,rd]=await Promise.all([
     sb.from('hires').select('*').order('start_date',{ascending:false}),
     sb.from('onboarding_steps').select('*').order('position'),
@@ -1409,7 +1409,7 @@ async function vCalendar(v){
   const pad=n=>String(n).padStart(2,'0'); const first=y+'-'+pad(m)+'-01'; const last=y+'-'+pad(m)+'-'+pad(dim);
   let data;
   if(state.calCache && state.calCache.ym===ym){ data=state.calCache.data; }
-  else { v.innerHTML='<div class="muted">Loading…</div>'; const r=await sb.from('day_items').select('*').gte('on_date',first).lte('on_date',last).order('created_at'); data=r.data||[]; state.calCache={ym,data}; }
+  else { v.innerHTML='<div class="waiting"><i></i><i></i><i></i></div>'; const r=await sb.from('day_items').select('*').gte('on_date',first).lte('on_date',last).order('created_at'); data=r.data||[]; state.calCache={ym,data}; }
   const CAL_HIDE=new Set(['pos','ojr','mission','vision','pool','archived','pdates','profile','covrules','stations','daylog','cltmpl','clrun','actual','punch','hourly']);
   const byd={}; (data||[]).forEach(it=>{ if(!CAL_KINDS[it.kind])return; (byd[it.on_date]=byd[it.on_date]||[]).push(it); }); // whitelist: only real calendar kinds show — never internal rows like csconfig
   const hol={}; usHolidays(y).forEach(x=>hol[x.date]=x);
@@ -1469,7 +1469,7 @@ const CAT_LEAD_LBL={0:'on the day',1:'1 day before',2:'2 days before',3:'3 days 
 async function vCatering(v){
   if(!canSee('catering')){ go('home'); return; }
   setTitle('Catering','Orders, and when prep starts');
-  v.innerHTML='<div class="muted">Loading…</div>';
+  v.innerHTML='<div class="waiting"><i></i><i></i><i></i></div>';
   const today=isoDate(new Date());
   const r=await sb.from('day_items').select('*').eq('kind','catering').order('on_date');
   const all=r.data||[];

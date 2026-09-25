@@ -2,7 +2,7 @@
 async function vLists(v){
   if(!canSee('lists')){ go('home'); return; }
   setTitle('Checklists','Running lists your team keeps — supplies, prep, whatever you need');
-  v.innerHTML='<div class="muted">Loading…</div>';
+  v.innerHTML='<div class="waiting"><i></i><i></i><i></i></div>';
   const isAdmin=(typeof myRank==='function')?myRank()>=3:false;
   const [rl,rit]=await Promise.all([ sb.from('day_items').select('*').eq('kind','list').order('created_at'), sb.from('day_items').select('*').eq('kind','listitem').order('created_at') ]);
   const lists=(rl.data||[]).map(x=>{ let d={}; try{d=JSON.parse(x.detail||'{}')}catch(e){} return {id:x.id,name:x.title||'List',icon:d.icon||'📋'}; });
@@ -30,7 +30,7 @@ window.listDelete=async function(listId){ if(!confirm('Delete this whole list an
 async function vRecovery(v){
   if(!canSee('recovery')){ go('home'); return; }
   setTitle('Guest recovery',"Make it right — guests we owe something, and who signed it off");
-  v.innerHTML='<div class="muted">Loading…</div>';
+  v.innerHTML='<div class="waiting"><i></i><i></i><i></i></div>';
   const r=await sb.from('day_items').select('*').eq('kind','recovery').order('created_at',{ascending:false});
   const items=(r.data||[]).map(x=>{ let d={}; try{d=JSON.parse(x.detail||'{}')}catch(e){} return {id:x.id,done:!!x.done,d}; });
   const open=items.filter(i=>!i.done); const done=items.filter(i=>i.done);
@@ -80,14 +80,24 @@ async function vToday(v){
   /* The band below carries the greeting and the date; repeating them in the header put
      the same two facts on screen twice before anything useful. */
   setTitle('Today', '');
-  v.innerHTML='<div class="muted">Loading…</div>';
-  const [ri,rr,rn,ru,rsh,rmv] = await Promise.all([
+  v.innerHTML='<div class="waiting"><i></i><i></i><i></i></div>';
+  /* Today used to make one batch of six calls and then five more, one after another --
+     fix-its, reviews, notifications, to-dos, certifications -- each waiting for the last
+     to come back. Six round trips end to end, about a second of blank screen. They do not
+     depend on each other, so they are all asked for at once. */
+  const [ri,rr,rn,ru,rsh,rmv,_rmR,_rHire,_rRev,_rNotif,_rTodo,_rCert] = await Promise.all([
     sb.from('day_items').select('*').eq('on_date',iso).order('created_at'),
     sb.from('rotations').select('*').order('title'),
     sb.from('log_entries').select('*').gte('on_date',_hoff).order('created_at',{ascending:false}).limit(10),
     sb.from('day_items').select('*').gte('on_date',iso).order('on_date').limit(60),
     sb.from('shifts').select('*').eq('on_date',iso),
     sb.from('day_items').select('*').in('kind',['mission','vision']),
+    sb.from('day_items').select('*').eq('kind','fixit').eq('done',false).order('created_at'),
+    sb.from('hires').select('*'),
+    sb.from('day_items').select('detail').eq('kind','review'),
+    loadNotifs().catch(()=>[]),
+    loadTodoData(iso,today).catch(()=>({})),
+    sb.from('certifications').select('person_name,cert_type,expires_on').not('expires_on','is',null),
     loadDates(), loadArchived()
   ]);
   const items=ri.data||[], rots=rr.data||[], notes=rn.data||[], _calAll=(ru.data||[]).filter(u=>['catering','delivery','holiday','event','order','note','people','training','task','rm','clean'].includes(u.kind)),
@@ -125,15 +135,15 @@ async function vToday(v){
     else if(visibleTracks().length){ hL+=`<div class="sec">Your training</div><div class="card" style="padding:22px;text-align:center"><div style="font-size:26px;margin-bottom:8px">🎓</div><div style="font-weight:600;margin-bottom:4px">You're all caught up</div><div class="muted" style="font-size:14px">Every module you've been assigned is complete. Nice work.</div></div>`; }
     v.innerHTML=hL; return;
   }
-  let fixVis=[]; try{ const rmR=await sb.from('day_items').select('*').eq('kind','fixit').eq('done',false).order('created_at'); const rmAll=(rmR.data||[]).map(x=>{let d={};try{d=JSON.parse(x.detail||'{}')}catch(e){} return {id:x.id,d};}); fixVis=_rank>=3?rmAll:rmAll.filter(x=>x.d.anyone||(x.d.assignees||[]).indexOf(meRoster)>=0||(x.d.assignees||[]).indexOf(meName)>=0); fixVis.sort((a,b)=>(b.d.safety?1:0)-(a.d.safety?1:0)); }catch(e){}
+  let fixVis=[]; try{ const rmR=_rmR; const rmAll=(rmR.data||[]).map(x=>{let d={};try{d=JSON.parse(x.detail||'{}')}catch(e){} return {id:x.id,d};}); fixVis=_rank>=3?rmAll:rmAll.filter(x=>x.d.anyone||(x.d.assignees||[]).indexOf(meRoster)>=0||(x.d.assignees||[]).indexOf(meName)>=0); fixVis.sort((a,b)=>(b.d.safety?1:0)-(a.d.safety?1:0)); }catch(e){}
   const hToday=usHolidays(new Date().getFullYear()).find(x=>x.date===iso);
   const isOJR=!!(ojrItem&&ojrItem.detail&&String(ojrItem.detail).toLowerCase().indexOf((meRoster||meName||'').toLowerCase())>=0);
-  let revDue=[]; if(_rank>=3){ try{ const [rhh,rvv]=await Promise.all([ sb.from('hires').select('*'), sb.from('day_items').select('detail').eq('kind','review') ]); const rmap={}; (rvv.data||[]).forEach(x2=>{ let d={};try{d=typeof x2.detail==='string'?JSON.parse(x2.detail||'{}'):(x2.detail||{})}catch(e){} if(d.hireId!=null)(rmap[d.hireId]=rmap[d.hireId]||[]).push(d.milestone); }); (rhh.data||[]).forEach(hh=>{ if(!hh.start_date)return; reviewMilestones(hh.start_date).forEach(m=>{ const due=isoDate(new Date(_d(hh.start_date).getTime()+m.d*864e5)); if((rmap[hh.id]||[]).indexOf(m.k)<0 && due<=iso){ revDue.push({name:hh.name,label:m.l}); } }); }); }catch(e){} }
+  let revDue=[]; if(_rank>=3){ try{ const rhh=_rHire, rvv=_rRev; const rmap={}; (rvv.data||[]).forEach(x2=>{ let d={};try{d=typeof x2.detail==='string'?JSON.parse(x2.detail||'{}'):(x2.detail||{})}catch(e){} if(d.hireId!=null)(rmap[d.hireId]=rmap[d.hireId]||[]).push(d.milestone); }); (rhh.data||[]).forEach(hh=>{ if(!hh.start_date)return; reviewMilestones(hh.start_date).forEach(m=>{ const due=isoDate(new Date(_d(hh.start_date).getTime()+m.d*864e5)); if((rmap[hh.id]||[]).indexOf(m.k)<0 && due<=iso){ revDue.push({name:hh.name,label:m.l}); } }); }); }catch(e){} }
   /* First thing anyone sees when they open the app, so it should be worth looking at and
      it should say something. The old header said "Good afternoon, Jason" and the date --
      true, and useless. This carries the state of the day, which is the one thing a GM
      wants before they have taken their coat off. */
-  const _needRows=buildTodayFocus({ fixVis, dueRots, orders, ppl, other, todayCelebs, hToday, ojrItem, isOJR, rank:_rank, revDue }); try{ const _nf=await loadNotifs(); const _un=_nf.filter(n=>n.unread); if(_un.length) _needRows.unshift({p:-1,border:'#2F7F91',emoji:'\u{1F514}',title:_un.length===1?_un[0].title:_un.length+' new updates',sub:_un.slice(0,2).map(n=>n.body).filter(Boolean).join(' \u00b7 '),act:(_un[0].act||"go('today')")+';markNotifsSeen()',btn:'See'}); }catch(e){};
+  const _needRows=buildTodayFocus({ fixVis, dueRots, orders, ppl, other, todayCelebs, hToday, ojrItem, isOJR, rank:_rank, revDue }); try{ const _nf=_rNotif||[]; const _un=_nf.filter(n=>n.unread); if(_un.length) _needRows.unshift({p:-1,border:'#2F7F91',emoji:'\u{1F514}',title:_un.length===1?_un[0].title:_un.length+' new updates',sub:_un.slice(0,2).map(n=>n.body).filter(Boolean).join(' \u00b7 '),act:(_un[0].act||"go('today')")+';markNotifsSeen()',btn:'See'}); }catch(e){};
   const _needCount=(function(){ try{ return _needRows.length; }catch(e){ return 0; } })();
   const _bandLine = _needCount
       ? (_needCount===1?'One thing needs you':_needCount+' things need you')
@@ -160,9 +170,9 @@ async function vToday(v){
      rather than to act, and they are still edited there. */
 
   if(isAdmin) h+=`<div id="whyEdit" style="display:${(mtext||vtext)?'none':'block'};margin:-10px 0 18px"><div class="card" style="padding:14px 16px"><textarea id="wbmission" placeholder="Mission — why we exist" style="width:100%;min-height:50px;margin-bottom:8px">${esc(mtext)}</textarea><textarea id="wbvision" placeholder="Vision — where we're going" style="width:100%;min-height:50px">${esc(vtext)}</textarea><div class="row" style="margin-top:8px"><button class="btn pri" style="width:auto;margin-left:auto" onclick="saveMV()">Save</button></div></div></div>`;
-  const _todo=await loadTodoData(iso,today); const _todoItems=_todo.todoItems||[], _dueRems=_todo.dueRems||[], _allRems=_todo.allRems||[];
+  const _todo=_rTodo||{}; const _todoItems=_todo.todoItems||[], _dueRems=_todo.dueRems||[], _allRems=_todo.allRems||[];
   const _hn=notes.filter(x=>!x.resolved);
-  let _certSoon=[]; try{ const _rc=await sb.from('certifications').select('person_name,cert_type,expires_on').not('expires_on','is',null); _certSoon=(_rc.data||[]).map(c=>{ const dd=new Date(c.expires_on+'T00:00:00'); return {p:c.person_name,ct:c.cert_type,days:Math.ceil((dd.getTime()-Date.now())/864e5)}; }).filter(c=>c.days<=60).sort((a,b)=>a.days-b.days); }catch(e){} /* 60 days, not 30: a ServSafe or a food handler card takes weeks to book, sit and receive, so a month's notice is already late. */
+  let _certSoon=[]; try{ const _rc=_rCert; _certSoon=(_rc.data||[]).map(c=>{ const dd=new Date(c.expires_on+'T00:00:00'); return {p:c.person_name,ct:c.cert_type,days:Math.ceil((dd.getTime()-Date.now())/864e5)}; }).filter(c=>c.days<=60).sort((a,b)=>a.days-b.days); }catch(e){} /* 60 days, not 30: a ServSafe or a food handler card takes weeks to book, sit and receive, so a month's notice is already late. */
   /* Every section used to be a 4px coloured stripe inside one shared grey card, so six
      different kinds of thing read as one undifferentiated list. Each is its own card now,
      with the colour carried by a medallion rather than a hairline -- the same language the

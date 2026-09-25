@@ -23,9 +23,9 @@
      onto black -- which is the other half of how a teal icon arrived looking black.
      A restaurant with its own logo still gets it: the script below replaces these once
      the page knows whose restaurant it is. -->
-<link rel="apple-touch-icon" id="lAppIcon" sizes="180x180" href="/icons/2026-09-24-37/touch-180.png" />
-<link rel="icon" id="lFavicon" type="image/png" sizes="32x32" href="/icons/2026-09-24-37/icon-32.png" />
-<link rel="icon" type="image/png" sizes="192x192" href="/icons/2026-09-24-37/icon-192.png" />
+<link rel="apple-touch-icon" id="lAppIcon" sizes="180x180" href="/icons/2026-09-24-38/touch-180.png" />
+<link rel="icon" id="lFavicon" type="image/png" sizes="32x32" href="/icons/2026-09-24-38/icon-32.png" />
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/2026-09-24-38/icon-192.png" />
 <link rel="manifest" id="lManifest" href="/manifest.webmanifest" />
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
@@ -226,6 +226,30 @@
   .wrap select{cursor:pointer}
   .wrap input:focus-visible,.wrap textarea:focus-visible,.wrap select:focus-visible{
     outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
+  /* Nothing in the app moved. Every change was instant and hard, so a page that took a
+     moment to fetch its data read as broken rather than busy. Short and shallow -- enough
+     to say "this arrived", not enough to wait for. */
+  @media (prefers-reduced-motion: no-preference){
+    #view > *{animation:rise .22s cubic-bezier(.22,.8,.3,1) both}
+    #view > *:nth-child(2){animation-delay:.03s}
+    #view > *:nth-child(3){animation-delay:.06s}
+    #view > *:nth-child(4){animation-delay:.09s}
+    #view > *:nth-child(n+5){animation-delay:.11s}
+    #pagehero > *{animation:fade .18s ease both}
+    .card,.tile{transition:transform .14s cubic-bezier(.22,.8,.3,1),box-shadow .14s ease}
+    .tile:hover{transform:translateY(-2px);box-shadow:0 14px 30px rgba(16,24,40,.12)}
+    .tile:active{transform:translateY(0)}
+    .btn:active{transform:scale(.975)}
+    .sibs a,.schtab{transition:color .12s ease,background .12s ease,border-color .12s ease}
+  }
+  @keyframes rise{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
+  @keyframes fade{from{opacity:0}to{opacity:1}}
+  /* and something to look at while the first data is on its way, instead of white */
+  .waiting{display:flex;flex-direction:column;gap:12px}
+  .waiting i{display:block;height:74px;border-radius:12px;background:linear-gradient(90deg,var(--bg) 25%,#EFEDE9 37%,var(--bg) 63%);background-size:400% 100%;animation:sweep 1.3s ease-in-out infinite}
+  .waiting i:first-child{height:118px}
+  @keyframes sweep{from{background-position:100% 0}to{background-position:0 0}}
+  @media (prefers-reduced-motion: reduce){.waiting i{animation:none}}
   .pband{position:relative;overflow:hidden;border-radius:14px;padding:26px 28px 24px;margin-bottom:16px;
     background:linear-gradient(135deg,var(--tealdark) 0%,var(--tealmid) 58%,var(--teallite) 100%);
     box-shadow:0 14px 34px rgba(20,72,82,.26)}
@@ -379,12 +403,12 @@
      did another, and the two devices disagreed with no way to tell why. A new query string
      is a new URL, so a stale copy cannot answer for it. Bump it with BUILD on every
      release. -->
-<script src="js/core.js?v=2026-09-24-37"></script>
-<script src="js/academy.js?v=2026-09-24-37"></script>
-<script src="js/community.js?v=2026-09-24-37"></script>
-<script src="js/lists.js?v=2026-09-24-37"></script>
-<script src="js/today.js?v=2026-09-24-37"></script>
-<script src="js/schedule.js?v=2026-09-24-37"></script>
-<script src="js/team.js?v=2026-09-24-37"></script>
+<script src="js/core.js?v=2026-09-24-38"></script>
+<script src="js/academy.js?v=2026-09-24-38"></script>
+<script src="js/community.js?v=2026-09-24-38"></script>
+<script src="js/lists.js?v=2026-09-24-38"></script>
+<script src="js/today.js?v=2026-09-24-38"></script>
+<script src="js/schedule.js?v=2026-09-24-38"></script>
+<script src="js/team.js?v=2026-09-24-38"></script>
 </body>
 </html>
