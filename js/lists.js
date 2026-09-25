@@ -212,8 +212,26 @@ async function vToday(v){
    telling you anything. */
   h+=`<div class="card" style="padding:0;overflow:hidden;margin-bottom:16px"><div style="height:4px;background:linear-gradient(90deg,var(--tealdark),var(--tealmid))"></div><div style="display:flex;align-items:center;gap:11px;padding:14px 17px 4px"><span style="width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,#2E6B7A,#4A9CAD);display:flex;align-items:center;justify-content:center;flex:none"><i class="ti ti-users" style="font-size:18px;color:#fff"></i></span><div style="font-weight:700;font-size:15.5px;letter-spacing:-.016em">On the floor today</div>${shifts.length?`<div class="faint" style="margin-left:auto;font-size:13px">${shifts.length} on</div>`:''}</div><div style="padding:6px 17px 16px">`
   + (shifts.length
-      ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:10px">`+shifts.map(s2=>{ const inits=(s2.person_name||'?').split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
-          return `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg)"><span class="av" style="background:linear-gradient(135deg,#2E6B7A,#4A9CAD);color:#fff;flex:none">${esc(inits)}</span><div style="min-width:0;flex:1"><div style="font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(s2.person_name||'—')}</div><div class="faint" style="font-size:12px">${s2.start_time?fmtClock(s2.start_time):''}${s2.end_time?'–'+fmtClock(s2.end_time):''}</div></div></div>`; }).join('')+`</div>`
+      /* A grid of faces looks tidy and answers nothing. A shift runs in time order --
+         who opens, who comes in next, who closes -- so the list runs that way too, and
+         whoever is on right now is marked. */
+      ? (function(){
+          const nowMin=(function(){const d=new Date();return d.getHours()*60+d.getMinutes();})();
+          const mins=t=>{ const a=String(t||'').split(':'); return a.length<2?null:(+a[0])*60+(+a[1]); };
+          const ordered=shifts.slice().sort((a,b)=>String(a.start_time||'').localeCompare(String(b.start_time||'')));
+          return ordered.map((s2,k)=>{
+            const inits=(s2.person_name||'?').split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
+            const st=mins(s2.start_time), en=mins(s2.end_time);
+            const onNow = st!=null && en!=null && nowMin>=st && nowMin<en;
+            return `<div style="display:flex;align-items:center;gap:12px;padding:11px 0;${k?'border-top:1px solid var(--line)':''}">
+              <span class="av" style="background:${onNow?'linear-gradient(135deg,#2E6B7A,#4A9CAD)':'var(--bg)'};color:${onNow?'#fff':'var(--muted)'};flex:none;${onNow?'':'border:1px solid var(--line)'}">${esc(inits)}</span>
+              <div style="min-width:0;flex:1">
+                <div style="font-weight:600;font-size:15px;letter-spacing:-.012em">${esc(s2.person_name||'\u2014')}${onNow?' <span style="font-weight:600;font-size:12px;color:var(--brand)">on now</span>':''}</div>
+                ${s2.role?`<div class="faint" style="font-size:12.5px">${esc(s2.role)}</div>`:''}
+              </div>
+              <div style="font-weight:600;font-size:14.5px;font-variant-numeric:tabular-nums;white-space:nowrap;color:${onNow?'var(--ink)':'var(--ink2)'}">${s2.start_time?esc(fmtClock(s2.start_time)):''}${s2.end_time?' \u2013 '+esc(fmtClock(s2.end_time)):''}</div>
+            </div>`; }).join('');
+        })()
       /* "No one scheduled today." read like the app had lost the schedule. It had not --
          nothing has been published for this week. Say which, and offer the way out. */
       : `<div style="display:flex;align-items:center;gap:13px;flex-wrap:wrap"><div style="flex:1;min-width:190px"><div style="font-weight:600;font-size:14.5px">No shifts published for today</div><div class="muted" style="font-size:13.5px;margin-top:2px">Nothing is lost \u2014 this week has not been published yet.</div></div><button class="btn" style="width:auto" onclick="go('schedule')">Open the schedule</button></div>`)

@@ -231,7 +231,8 @@ async function schBoard(v){
      hunt. The grid is still one tap away for anyone who wants to see who else is on. */
   if(!isAdmin){
     const meName = myRosterName() || (state.profile&&state.profile.name) || '';
-    const mine = shifts.filter(s2=>s2.person_name===meName && s2.on_date>=days[0] && s2.on_date<=days[6])
+    const _d0=isoDate(days[0]), _d6=isoDate(days[6]);
+    const mine = shifts.filter(s2=>s2.person_name===meName && s2.on_date>=_d0 && s2.on_date<=_d6)
                        .sort((a,b)=>(a.on_date||'').localeCompare(b.on_date||'')||String(a.start_time||'').localeCompare(String(b.start_time||'')));
     const hours = mine.reduce((t,s2)=>{
       if(!s2.start_time||!s2.end_time) return t;
@@ -245,7 +246,7 @@ async function schBoard(v){
       </div></div>`;
 
     if(!mine.length){
-      h+=`<div class="card nothing"><div class="n-ttl">You are not on this week</div><div class="n-sub">Nothing is scheduled for you between ${esc(fmtDay(_d(days[0])))} and ${esc(fmtDay(_d(days[6])))}.</div></div>`;
+      h+=`<div class="card nothing"><div class="n-ttl">You are not on this week</div><div class="n-sub">Nothing is scheduled for you between ${esc(fmtDay(days[0]))} and ${esc(fmtDay(days[6]))}.</div></div>`;
     } else {
       h+=`<div class="card" style="padding:0;overflow:hidden">`+mine.map(s2=>{
         const isToday = s2.on_date===todayIso;
