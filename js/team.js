@@ -1581,10 +1581,10 @@ async function vSettings(v){
     <div style="font-size:15.5px;font-weight:600;letter-spacing:-.012em;margin-bottom:4px">On your phone's home screen</div>
     <div class="faint" style="font-size:14px;margin-bottom:14px;line-height:1.5">Saved to a home screen this opens like an app, with your name and logo on the icon &mdash; not a browser tab.</div>
     <div class="row" style="gap:15px;align-items:center;margin-bottom:14px">
-      <img id="appIconPrev" alt="" onerror="this.style.visibility='hidden'" style="width:60px;height:60px;border-radius:14px;box-shadow:0 2px 8px rgba(16,24,40,.18);flex:none;background:var(--bg);object-fit:cover"/>
+      <img id="appIconPrev" alt="The icon this app uses on a home screen" src="/icons/${esc(BUILD)}/icon-192.png" onerror="this.style.visibility='hidden'" style="width:60px;height:60px;border-radius:14px;box-shadow:0 2px 8px rgba(16,24,40,.18);flex:none;object-fit:contain;display:block"/>
       <div style="min-width:0">
         <div style="font-size:14px;font-weight:600;letter-spacing:-.01em">${esc(s.academy_name||'Academy')}</div>
-        <div class="faint" style="font-size:12.5px;margin-top:2px">Drawn from your logo and brand colour above. Save this page and it updates.</div>
+        <div class="faint" style="font-size:12.5px;margin-top:2px">This is the icon that lands on the home screen.</div>
       </div>
     </div>
     <div class="faint" style="font-size:13px;line-height:1.6">
@@ -1632,7 +1632,7 @@ async function vSettings(v){
          <div class="tile-body"><div class="tile-title">${esc(label)}</div><div class="tile-sub">${esc(desc)}</div></div>
        </div>`).join('')+`</div>`;
   }
-  try{ const _ip=document.getElementById('appIconPrev'); if(_ip){ if(window._appIconUrl) _ip.src=window._appIconUrl; else { applyAppIdentity().then(function(){ if(window._appIconUrl) _ip.src=window._appIconUrl; }); } } }catch(e){}
+  /* The preview is the real icon file the manifest points at, so what you see here is exactly what lands on the phone. It used to wait on a generator that was switched off, and showed an empty box. */
   const ci=document.getElementById('setcolor'); if(ci) ci.addEventListener('input',e=>applyBrand(e.target.value));
   /* these only exist when a section is open now */
   try{ if(typeof grantSel==='function') grantSel(); }catch(e){}

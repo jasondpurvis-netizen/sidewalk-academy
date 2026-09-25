@@ -2,13 +2,33 @@
 /* A stamp so any device can say which version it is actually running. Three times now a
    phone and a laptop on the same address have disagreed about what the app looks like,
    and there was no way to tell them apart except by describing the screen. */
-const BUILD = '2026-09-24-39';
+const BUILD = '2026-09-24-40';
 window.BUILD = BUILD;
 const SUPABASE_URL = "https://wjqcnxnwjqmuzrandgea.supabase.co";
 const SUPABASE_KEY = "sb_publishable_DQZclfAnv_MYQJLGcOdzdw_g4vMCiSC";
 const __RECOVERY_HASH = (typeof location!=='undefined' && location.hash) ? location.hash : '';
 const __RECOVERY_SEARCH = (typeof location!=='undefined' && location.search) ? location.search : '';
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { detectSessionInUrl: false, flowType: 'implicit', persistSession: true, autoRefreshToken: true } });
+
+/* ---------- Make sure the app is not running last week's code ----------
+   Everything the page loads is versioned, so the only way to be stale is for the page
+   itself to be stale -- which is exactly what happens to an app saved to a home screen:
+   its own cache, no address bar, no obvious way to force a reload. version.txt is the
+   truth. If it disagrees with what is running, reload once, quietly. The session flag
+   stops it looping if a deploy is halfway out and the two disagree for a moment. */
+(function(){
+  setTimeout(async function(){
+    try{
+      const r = await fetch('/version.txt?t=' + Date.now(), { cache: 'no-store' });
+      if(!r.ok) return;
+      const live = (await r.text()).trim();
+      if(!live || live === BUILD) { try{ sessionStorage.removeItem('sw_reloaded'); }catch(e){} return; }
+      if(sessionStorage.getItem('sw_reloaded') === live) return;
+      sessionStorage.setItem('sw_reloaded', live);
+      location.reload();
+    }catch(e){}
+  }, 1500);
+})();
 
 /* ---------- When a read fails, say so instead of showing an empty list ----------
    A signed-out or expired session makes every read come back "permission denied", and
