@@ -910,7 +910,6 @@ async function vBrain(v){
     rules:   ['linear-gradient(135deg,#5C7CE0,#2F4BA8)','ti-gavel'],
     pay:     ['linear-gradient(135deg,#B0539B,#78256A)','ti-coin']
   };
-  }
   /* Getting started and Settings left the sidebar, so the Brain has to hold their doors.
      Two tiles, same language the Academy uses, under what the restaurant knows. */
   h += `<div class="sec" style="margin-top:0">Set up</div><div class="grid" style="margin-bottom:34px">`
@@ -942,6 +941,7 @@ async function vBrain(v){
     h += `<div class="card" style="padding:15px 18px;margin-top:16px;background:#F7EEDC;border-color:#E4CFA3">
       <div style="font-weight:700;font-size:14px;color:#7A5B1E;margin-bottom:5px">What auto-draft cannot do yet</div>
       <div style="font-size:14px;line-height:1.7;color:#7A5B1E">${blocking.map(b=>'&bull; '+esc(b.why)).join('<br>')}</div></div>`;
+  }
 
   v.innerHTML = h;
 }
