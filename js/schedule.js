@@ -220,6 +220,51 @@ async function schBoard(v){
   if(isAdmin) h+=`<div class="sched-actions"><button class="btn" id="schAutoDraft" style="width:auto" onclick="autoDraft()"><i class="ti ti-wand"></i> Auto-draft</button><button class="btn" style="width:auto" onclick="copyLastWeek()"><i class="ti ti-copy"></i> Copy week</button><button class="btn" style="width:auto" onclick="readMyWeek()"><i class="ti ti-sparkles"></i> Read my week</button>${pub?`<button class="btn" style="width:auto" onclick="whatChanged()"><i class="ti ti-arrows-diff"></i> What changed</button>`:''}<button class="btn pri go" id="schPublish" style="width:auto" onclick="publishWeek()"><i class="ti ti-send"></i> ${pub?'Re-publish':'Publish'}</button></div>`;
   h+=`</div>`;
   if(!isAdmin && !pub){ h+=`<div class="card" style="padding:30px 22px;text-align:center;margin-top:14px"><div style="font-size:26px;color:var(--brand);margin-bottom:8px"><i class="ti ti-calendar-time"></i></div><div style="font-weight:600;margin-bottom:3px">Not posted yet</div><div class="faint" style="font-size:14px">This week's schedule shows here once leadership publishes it.</div></div>`; v.innerHTML=h; return; }
+
+  /* ---------- A team member asks one question ----------
+     "When do I work?" -- and they ask it on a phone. The seven-day grid is 850px wide
+     inside a sideways scroll, so answering that meant panning around a table hunting for
+     your own row. Filtering it to one row did not help: it was still a table.
+
+     Anybody who cannot build the schedule gets their own week as a list instead. Days
+     they are on, in order, with the station and the hours. Nothing to pan, nothing to
+     hunt. The grid is still one tap away for anyone who wants to see who else is on. */
+  if(!isAdmin){
+    const meName = myRosterName() || (state.profile&&state.profile.name) || '';
+    const mine = shifts.filter(s2=>s2.person_name===meName && s2.on_date>=days[0] && s2.on_date<=days[6])
+                       .sort((a,b)=>(a.on_date||'').localeCompare(b.on_date||'')||String(a.start_time||'').localeCompare(String(b.start_time||'')));
+    const hours = mine.reduce((t,s2)=>{
+      if(!s2.start_time||!s2.end_time) return t;
+      const p=x=>{const a=String(x).split(':');return (+a[0])+(+a[1]||0)/60;};
+      let d=p(s2.end_time)-p(s2.start_time); if(d<0) d+=24; return t+d; },0);
+
+    h+=`<div class="card" style="padding:16px 18px;margin-bottom:14px">
+      <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap">
+        <div style="font-weight:700;font-size:17px;letter-spacing:-.02em">Your week</div>
+        <div class="faint" style="font-size:13.5px;margin-left:auto">${mine.length} shift${mine.length===1?'':'s'}${hours?' \u00b7 '+(Math.round(hours*10)/10)+' hours':''}</div>
+      </div></div>`;
+
+    if(!mine.length){
+      h+=`<div class="card nothing"><div class="n-ttl">You are not on this week</div><div class="n-sub">Nothing is scheduled for you between ${esc(fmtDay(_d(days[0])))} and ${esc(fmtDay(_d(days[6])))}.</div></div>`;
+    } else {
+      h+=`<div class="card" style="padding:0;overflow:hidden">`+mine.map(s2=>{
+        const isToday = s2.on_date===todayIso;
+        const d=_d(s2.on_date);
+        return `<div class="lesson-row" style="padding:14px 17px;${isToday?'background:var(--brand-soft)':''}">
+          <div style="min-width:82px">
+            <div style="font-weight:700;font-size:15px;letter-spacing:-.014em">${esc(d.toLocaleDateString(undefined,{weekday:'short'}))}${isToday?' <span style="font-weight:600;color:var(--brand);font-size:12.5px">today</span>':''}</div>
+            <div class="faint" style="font-size:12.5px">${esc(d.toLocaleDateString(undefined,{month:'short',day:'numeric'}))}</div>
+          </div>
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:600;font-size:16px;letter-spacing:-.015em;font-variant-numeric:tabular-nums">${s2.start_time?esc(fmtClock(s2.start_time)):''}${s2.end_time?' \u2013 '+esc(fmtClock(s2.end_time)):''}</div>
+            ${s2.role?`<div class="faint" style="font-size:13px">${esc(s2.role)}</div>`:''}
+          </div></div>`;
+      }).join('')+`</div>`;
+      h+=`<div style="text-align:center;margin-top:14px"><button class="btn" style="width:auto" onclick="state.ctx.allweek=!state.ctx.allweek;schBoard(document.getElementById('schbody')||document.getElementById('view'))"><i class="ti ti-users"></i> ${state.ctx.allweek?'Hide the rest of the team':'See who else is on'}</button></div>`;
+    }
+    if(!state.ctx.allweek){ v.innerHTML=h; return; }
+    h+=`<div style="height:18px"></div>`;
+  }
   if(isAdmin){ const _r5=[['Pick week'],['Auto-draft'],['Review flags'],['Adjust'],['Publish']]; const _cur5=pub?6:(shifts.length?4:2);
     h+=`<div class="card" id="schRhythm" style="padding:11px 14px;margin-bottom:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;flex:1;min-width:0">`+_r5.map(function(s5,i5){ var n5=i5+1; var d5=pub||n5<_cur5; var a5=!pub&&n5===_cur5; return '<div style="display:flex;align-items:center;gap:6px"><div style="width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:800;background:'+(d5?'#1B7B3F':(a5?'var(--brand)':'var(--line)'))+';color:'+(d5||a5?'#fff':'var(--muted)')+'">'+(d5?'✓':n5)+'</div><span style="font-size:12.5px;font-weight:'+(a5?'800':'600')+';color:'+(a5?'var(--brand)':(d5?'var(--ink)':'var(--muted)'))+'">'+s5[0]+'</span></div>'+(i5<4?'<span style="color:var(--line2);font-size:12.5px">›</span>':''); }).join('')+`</div><button class="btn" style="width:auto;padding:6px 12px;font-size:12.5px;flex:none" onclick="startSchedTour()"><i class="ti ti-help-circle"></i> Show me how</button></div>`;
     if(!shifts.length){ h+=`<div class="card" style="padding:20px 18px;margin-bottom:14px;background:var(--brand-soft);border-color:var(--brand-line);text-align:center"><div style="font-size:26px;margin-bottom:6px">🗓️</div><div style="font-weight:800;font-size:15.5px;margin-bottom:4px">No schedule for this week yet</div><div class="faint" style="font-size:14px;margin-bottom:14px;line-height:1.55;max-width:470px;margin-left:auto;margin-right:auto">Coming from another app, you'd drag every shift by hand. Here, <b>Auto-draft</b> builds the whole week in one click — from your team, availability and coverage — then you just adjust and publish.</div><button class="btn pri" style="width:auto" onclick="autoDraft()"><i class="ti ti-wand"></i> Auto-draft this week</button></div>`; }
