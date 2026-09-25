@@ -2,7 +2,7 @@
 /* A stamp so any device can say which version it is actually running. Three times now a
    phone and a laptop on the same address have disagreed about what the app looks like,
    and there was no way to tell them apart except by describing the screen. */
-const BUILD = '2026-09-24-18';
+const BUILD = '2026-09-24-19';
 window.BUILD = BUILD;
 const SUPABASE_URL = "https://wjqcnxnwjqmuzrandgea.supabase.co";
 const SUPABASE_KEY = "sb_publishable_DQZclfAnv_MYQJLGcOdzdw_g4vMCiSC";
@@ -604,8 +604,8 @@ const ROLE_LABELS={5:'Owner',4:'GM',3:'Manager',2:'Supervisor',1:'Team member'};
 /* Defaults follow how workforce apps actually behave: everyone can SEE the schedule and run the
    checklists; only leaders can build or change them. Editing is gated inside each page by rank,
    so opening a page is not the same as being able to change it. */
-const PERM_DEFAULT={catering:3,recipes:1,brain:3,whiteboard:1,home:1,ask:1,journal:1,build:4,setup:4,team:3,ownership:2,onboarding:3,today:1,rm:1,schedule:1,checklists:1,sales:4,saleshist:4,costsmart:4,calendar:3,lists:1,recovery:1,community:1,resources:1,downloads:1,settings:5,pay:5,clock:5};
-const PERM_LABELS_EXTRA={setup:'Getting started',onboarding:'New hires',ownership:'Who owns what',saleshist:'Sales history import',costsmart:'Right-size the labour',pay:'Pay rates',today:'Today',checklists:'Open & close',lists:'Checklists',recovery:'Guest recovery',build:'Create training',logbook:'Shift log',community:'Messages',rm:'Fix-it list'};
+const PERM_DEFAULT={coract_write:2,coract_view:3,catering:3,recipes:1,brain:3,whiteboard:1,home:1,ask:1,journal:1,build:4,setup:4,team:3,ownership:2,onboarding:3,today:1,rm:1,schedule:1,checklists:1,sales:4,saleshist:4,costsmart:4,calendar:3,lists:1,recovery:1,community:1,resources:1,downloads:1,settings:5,pay:5,clock:5};
+const PERM_LABELS_EXTRA={coract_write:'Write-ups \u2014 who can write one',coract_view:'Write-ups \u2014 who can read them',setup:'Getting started',onboarding:'New hires',ownership:'Who owns what',saleshist:'Sales history import',costsmart:'Right-size the labour',pay:'Pay rates',today:'Today',checklists:'Open & close',lists:'Checklists',recovery:'Guest recovery',build:'Create training',logbook:'Shift log',community:'Messages',rm:'Fix-it list'};
 /* A person exists twice: the login they created (profiles.name, often just a first name) and the roster
    record the owner entered (e.g. "Presley Elizondo"). Matching those by exact string silently demoted
    every leader to rank 1. Resolve the roster name properly: an explicit link wins, then exact, then
