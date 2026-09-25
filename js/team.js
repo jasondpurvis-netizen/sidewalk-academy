@@ -4,7 +4,7 @@
    sees it in exactly the place they would have anyway. */
 window.offerTraining=async function(tid, label){
   const tr=(state.tracks||[]).find(t=>t.id===tid); if(!tr) return;
-  await loadProfiles(); await loadPositions(); await loadArchived();
+  await Promise.all([loadProfiles(), loadPositions(), loadArchived()]);
   const people=Object.keys(window._posMap||{}).filter(n=>posOf(n)!=='Owner'&&!isArchived(n)).sort();
   let m=document.getElementById('otM'); if(m) m.remove();
   m=document.createElement('div'); m.id='otM';
@@ -39,7 +39,7 @@ window.offerTrainingSave=async function(tid){
 };
 async function vTeamSkills(v){
   v.innerHTML='<div class="waiting"><i></i><i></i><i></i></div>';
-  await loadProfiles(); await loadPositions(); await loadArchived();
+  await Promise.all([loadProfiles(), loadPositions(), loadArchived()]);
   const base=(state.settings&&Array.isArray(state.settings.stations)&&state.settings.stations.length)?state.settings.stations:['Bake / Prep','Register','Bar / Espresso'];
   const extra=new Set(); Object.keys(window._profiles||{}).forEach(n=>{ ((window._profiles[n]||{}).roles||[]).forEach(r=>{ if(base.indexOf(r)<0) extra.add(r); }); });
   const cols=[...base, ...extra];
@@ -378,7 +378,7 @@ window._impCommit=async function(){
     if(wr.error && msg){ msg.style.color='#7A6224'; msg.textContent='People imported, but pay rates did not save: '+wr.error.message; }
   }
   var m=document.getElementById('impModal'); if(m) m.remove();
-  try{ await loadPositions(); await loadProfiles(); }catch(e){}
+  try{ await Promise.all([loadPositions(), loadProfiles()]); }catch(e){}
   try{ go('team',{ttab:'roster'}); }catch(e){ location.reload(); }
 };
 
@@ -544,7 +544,7 @@ window.dispName=function(n){
    some were missed, some sat below minimum wage, and nobody could see that at a glance.
    One screen, every rate visible, anything under the legal floor flagged. */
 window._payLoad = async function(){
-  await loadPositions(); await loadProfiles(); await loadArchived();
+  await Promise.all([loadPositions(), loadProfiles(), loadArchived()]);
   const people = rosterNames().filter(n=>!isArchived(n) && posOf(n)!=='Owner').sort();
   const r = await sb.from('pay_rates').select('person_name,wage');
   const cur = {}; (r.data||[]).forEach(x=>cur[x.person_name]=+x.wage);
@@ -676,7 +676,9 @@ window._paySave = async function(){
    reaches nobody, because you stop telling people in person. Same shape as pay: one screen,
    everybody visible, gaps flagged. */
 window.openContactEditor = async function(){
-  await loadSettings(); await loadPositions(); await loadProfiles(); await loadArchived();
+  /* Four loads, one after another, before the batch below even started -- the Brain was
+     making five round trips in series. None of them wait on each other. */
+  await Promise.all([loadSettings(), loadPositions(), loadProfiles(), loadArchived()]);
   const people = rosterNames().filter(n=>!isArchived(n)).sort();
   let accts=[];
   try{ const r=await sb.from('profiles').select('name'); accts=(r.data||[]).map(x=>x.name); }catch(e){}
@@ -817,7 +819,7 @@ async function vBrain(v){
   if(!canSee('brain')){ go('home'); return; }
   setTitle('The Brain','What your restaurant knows about itself — everything auto-draft needs, in one place');
   v.innerHTML='<div class="waiting"><i></i><i></i><i></i></div>';
-  await loadSettings(); await loadPositions(); await loadProfiles(); await loadArchived();
+  await loadSettings(); await Promise.all([loadPositions(), loadProfiles(), loadArchived()]);
   const [rcov, rav, rpay, rrev] = await Promise.all([
     sb.from('day_items').select('detail').eq('kind','covrules').order('id',{ascending:false}).limit(1).maybeSingle(),
     sb.from('availability').select('person_name'),
@@ -1184,7 +1186,7 @@ window.markNotifsSeen=function(){
    So: rename, merge or drop stations, and carry everyone's skills across as you go.
    Merging is the important one -- deleting Coffee would lose who can run the bar. */
 window.openStationClean=async function(){
-  await loadProfiles(); await loadPositions(); await loadArchived();
+  await Promise.all([loadProfiles(), loadPositions(), loadArchived()]);
   const people=rosterNames().filter(n=>!isArchived(n));
   const list=(state.settings&&Array.isArray(state.settings.stations))?state.settings.stations.slice():[];
   const seen={}; people.forEach(n=>{ (((window._profiles||{})[n]||{}).roles||[]).forEach(st=>{ if(st&&list.indexOf(st)<0) list.push(st); }); });
@@ -1288,7 +1290,7 @@ window._scSave=async function(){
 async function teamRoster(v){
   v.innerHTML='<div class="waiting"><i></i><i></i><i></i></div>';
   const [rpf,rsh]=await Promise.all([ sb.from('profiles').select('id,name,role'), sb.from('shifts').select('person_name') ]);
-  await loadPositions(); await loadProfiles(); await loadArchived();
+  await Promise.all([loadPositions(), loadProfiles(), loadArchived()]);
   const set=new Set(); rosterNames().forEach(n=>set.add(n)); (rsh.data||[]).forEach(s=>{ if(s.person_name)set.add(s.person_name); });
   const roster=[...set].filter(n=>n&&!isArchived(n)&&n!=='__OPEN__'&&n!=='__open__');
   const groups={}; roster.forEach(n=>{ (groups[posOf(n)]=groups[posOf(n)]||[]).push(n); });

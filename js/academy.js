@@ -139,7 +139,7 @@ async function vSummary(v){
   v.innerHTML='<div class="waiting"><i></i><i></i><i></i></div>';
   const { data:profiles } = await sb.from("profiles").select("*");
   const { data:prog } = await sb.from("progress").select("user_id,lesson_id,at");
-  await loadPositions(); await loadArchived();
+  await Promise.all([loadPositions(), loadArchived()]);
   const total = state.tracks.reduce((a,t)=>a+trackLessons(t.id).length,0);
   const byUser={}, lastAt={};
   (prog||[]).forEach(p=>{ byUser[p.user_id]=(byUser[p.user_id]||0)+1; if(p.at&&(!lastAt[p.user_id]||p.at>lastAt[p.user_id]))lastAt[p.user_id]=p.at; });

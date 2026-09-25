@@ -327,7 +327,7 @@ async function vRM(v){
   if(!canSee('rm')){ go('home'); return; }
   setTitle('Fix-it list',"Repairs & maintenance — what needs fixing, and who's on it");
   v.innerHTML='<div class="muted">Loading…</div>';
-  try{ await loadPositions(); await loadArchived(); }catch(e){}
+  try{ await Promise.all([loadPositions(), loadArchived()]); }catch(e){}
   const r=await sb.from('day_items').select('*').eq('kind','fixit').order('created_at',{ascending:false});
   const items=(r.data||[]).map(x=>{let d={};try{d=JSON.parse(x.detail||'{}')}catch(e){} return {id:x.id,done:!!x.done,d};});
   const open=items.filter(i=>!i.done); const fixed=items.filter(i=>i.done); open.sort((a,b)=>(b.d.safety?1:0)-(a.d.safety?1:0));
@@ -378,7 +378,7 @@ window.rmEdit=async function(id){
   if(r.error||!r.data){ alert('Could not open that item.'); return; }
   let d={}; try{ d=JSON.parse(r.data.detail||'{}')||{}; }catch(e){ d={}; }
   window._rmEditing={id:id, d:d};
-  try{ await loadPositions(); await loadArchived(); }catch(e){}
+  try{ await Promise.all([loadPositions(), loadArchived()]); }catch(e){}
   const team=Object.keys(window._posMap||{}).filter(n=>n&&!isArchived(n)).sort((a,b)=>a.localeCompare(b));
   const asg=Array.isArray(d.assignees)?d.assignees:[];
   const inp='width:100%'; /* look comes from the one field style; this only carries layout */

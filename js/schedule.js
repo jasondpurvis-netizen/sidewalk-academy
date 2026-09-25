@@ -154,11 +154,11 @@ window.caFilePicked=function(el){
   lbl.textContent=f? f.name.slice(0,34) : 'Attach the signed copy';
 };
 window.coractDel=async function(id,name){ if(!canCoractWrite())return; if(!confirm('Delete this entry? It will be removed from the record.'))return; const r=await sb.from('day_items').delete().eq('id',id); if(r&&r.error)return; openCorract(name); };
-window.printCoract=async function(name){ if(!canCoractView()){ alert('Past entries are not visible to you.'); return; } const entries=await loadCoract(name); await loadPositions(); await loadProfiles(); const pos=posOf(name); const p=profileOf(name)||{}; const hired=p.hired||''; const brand=(state.settings&&state.settings.brand_color)||'#4A9CAD'; const shop=(state.settings&&state.settings.academy_name)||'Sidewalk'; const rows=entries.map(e=>`<tr><td>${esc(fmtDay(_d(e.on_date)))}</td><td>${esc(coractType(e.type)[1])}</td><td>${esc(coractLevel(e.level)[1])}</td><td>${esc(e.note).replace(/\n/g,'<br>')}</td><td>${esc(e.byName||'')}</td></tr>`).join(''); const w=window.open('','_blank'); if(!w)return; w.document.write(`<!doctype html><html><head><meta charset=utf-8><title>${esc(name)} — Corrective actions</title><style>@page{margin:.6in}body{font-family:Helvetica,Arial,sans-serif;color:#1a1a1a;font-size:12px;line-height:1.5}h1{font-size:20px;margin:0 0 2px}.sub{color:#555;margin-bottom:14px}.hd{border-bottom:3px solid ${brand};padding-bottom:8px;margin-bottom:14px}table{width:100%;border-collapse:collapse;margin-top:8px}th,td{border:1px solid #ccc;padding:7px 8px;text-align:left;vertical-align:top}th{background:#f2f2f2;font-size:10px;text-transform:uppercase;letter-spacing:.04em}td{font-size:12px}.meta{font-size:11px;color:#666;margin-top:16px}.pbar{position:fixed;top:10px;right:10px}.pbar button{padding:8px 14px;border:0;background:${brand};color:#fff;border-radius:6px;cursor:pointer}@media print{.pbar{display:none}}</style></head><body><div class=pbar><button onclick="window.print()">Print</button></div><div class=hd><h1>Corrective Action Record</h1><div class=sub>${esc(shop)}</div></div><div><b>Employee:</b> ${esc(name)} &nbsp;&middot;&nbsp; <b>Position:</b> ${esc(pos)}${hired?` &nbsp;&middot;&nbsp; <b>Hire date:</b> ${esc(hired)}`:''}</div>${entries.length?`<table><thead><tr><th>Date</th><th>Type</th><th>Level</th><th>Details</th><th>Logged by</th></tr></thead><tbody>${rows}</tbody></table>`:'<p style="margin-top:14px">No corrective actions on record.</p>'}<div class=meta>Generated ${new Date().toLocaleDateString()} &middot; ${entries.length} entr${entries.length===1?'y':'ies'} &middot; Confidential</div></body></html>`); w.document.close(); setTimeout(()=>{try{w.focus();w.print();}catch(e){}},400); };
+window.printCoract=async function(name){ if(!canCoractView()){ alert('Past entries are not visible to you.'); return; } const entries=await loadCoract(name); await Promise.all([loadPositions(), loadProfiles()]); const pos=posOf(name); const p=profileOf(name)||{}; const hired=p.hired||''; const brand=(state.settings&&state.settings.brand_color)||'#4A9CAD'; const shop=(state.settings&&state.settings.academy_name)||'Sidewalk'; const rows=entries.map(e=>`<tr><td>${esc(fmtDay(_d(e.on_date)))}</td><td>${esc(coractType(e.type)[1])}</td><td>${esc(coractLevel(e.level)[1])}</td><td>${esc(e.note).replace(/\n/g,'<br>')}</td><td>${esc(e.byName||'')}</td></tr>`).join(''); const w=window.open('','_blank'); if(!w)return; w.document.write(`<!doctype html><html><head><meta charset=utf-8><title>${esc(name)} — Corrective actions</title><style>@page{margin:.6in}body{font-family:Helvetica,Arial,sans-serif;color:#1a1a1a;font-size:12px;line-height:1.5}h1{font-size:20px;margin:0 0 2px}.sub{color:#555;margin-bottom:14px}.hd{border-bottom:3px solid ${brand};padding-bottom:8px;margin-bottom:14px}table{width:100%;border-collapse:collapse;margin-top:8px}th,td{border:1px solid #ccc;padding:7px 8px;text-align:left;vertical-align:top}th{background:#f2f2f2;font-size:10px;text-transform:uppercase;letter-spacing:.04em}td{font-size:12px}.meta{font-size:11px;color:#666;margin-top:16px}.pbar{position:fixed;top:10px;right:10px}.pbar button{padding:8px 14px;border:0;background:${brand};color:#fff;border-radius:6px;cursor:pointer}@media print{.pbar{display:none}}</style></head><body><div class=pbar><button onclick="window.print()">Print</button></div><div class=hd><h1>Corrective Action Record</h1><div class=sub>${esc(shop)}</div></div><div><b>Employee:</b> ${esc(name)} &nbsp;&middot;&nbsp; <b>Position:</b> ${esc(pos)}${hired?` &nbsp;&middot;&nbsp; <b>Hire date:</b> ${esc(hired)}`:''}</div>${entries.length?`<table><thead><tr><th>Date</th><th>Type</th><th>Level</th><th>Details</th><th>Logged by</th></tr></thead><tbody>${rows}</tbody></table>`:'<p style="margin-top:14px">No corrective actions on record.</p>'}<div class=meta>Generated ${new Date().toLocaleDateString()} &middot; ${entries.length} entr${entries.length===1?'y':'ies'} &middot; Confidential</div></body></html>`); w.document.close(); setTimeout(()=>{try{w.focus();w.print();}catch(e){}},400); };
 async function teamCorract(v){
   if(!canCorract()){ v.innerHTML='<div class="card" style="padding:22px;text-align:center"><div class="faint">Write-ups are limited by your restaurant\u2019s settings.</div></div>'; return; }
   v.innerHTML='<div class="waiting"><i></i><i></i><i></i></div>';
-  await loadPositions(); await loadArchived();
+  await Promise.all([loadPositions(), loadArchived()]);
   /* The tab lists who has entries and how many, which is itself the record --
      a writer who may not read gets the roster, not the tally. */
   if(!canCoractView()){ v.innerHTML='<div class="card" style="padding:22px;text-align:center"><div class="faint">You can add a write-up from a person\u2019s profile. Past entries are not visible to you.</div></div>'; return; }
@@ -617,7 +617,7 @@ window.fillShift=async function(id){
   const s=(window._shifts||{})[id]; if(!s)return;
   const wd=(new Date(s.on_date+'T00:00').getDay()+6)%7;
   const [rav,rto,rpf,rsh]=await Promise.all([ sb.from('availability').select('person_name,weekday,can_work,note'), sb.from('time_off').select('*').eq('status','approved'), sb.from('profiles').select('name,role'), sb.from('shifts').select('person_name,on_date') ]);
-  await loadPositions(); await loadArchived();
+  await Promise.all([loadPositions(), loadArchived()]);
   const set=new Set(); rosterNames().forEach(n=>set.add(n)); (rsh.data||[]).forEach(x=>{ if(x.person_name&&x.person_name!=='__OPEN__')set.add(x.person_name); });
   const people=[...set].filter(n=>n&&!isArchived(n));
   const avMap={}; (rav.data||[]).forEach(a=>{ (avMap[a.person_name]=avMap[a.person_name]||{})[a.weekday]={can_work:a.can_work,note:a.note}; });
@@ -725,7 +725,7 @@ window.cwDo=async function(fromWs){ const ov=document.getElementById('cwOv'); if
   let rows=(r.data||[]).map(s=>{ const nd=new Date(s.on_date+'T00:00:00'); nd.setDate(nd.getDate()+diffDays); return {person_name:s.person_name,role:s.role,on_date:isoDate(nd),start_time:s.start_time,end_time:s.end_time,kind:s.kind,user_id:s.user_id,note:s.note}; });
   if(!rows.length){ alert('That week had no shifts.'); return; }
   try{
-    await loadPositions(); await loadArchived();
+    await Promise.all([loadPositions(), loadArchived()]);
     const isoTo=rows.map(x=>x.on_date).sort();
     const [rto, rav] = await Promise.all([
       sb.from('time_off').select('person_name,start_date,end_date,status').eq('status','approved'),
@@ -788,7 +788,7 @@ window.autoDraft=async function(opts){
   }
   // inputs
   const [rav,rto,rpay,rsal]=await Promise.all([ sb.from('availability').select('person_name,weekday,can_work,note'), sb.from('time_off').select('*').eq('status','approved'), sb.from('pay_rates').select('*'), sb.from('day_sales').select('*').gte('on_date',isoDays[0]).lte('on_date',isoDays[6]) ]);
-  await loadPositions(); await loadProfiles(); await loadArchived();
+  await Promise.all([loadPositions(), loadProfiles(), loadArchived()]);
   const R=lawRules(); const otW=R.ot_weekly_hrs||40; const minRest=R.min_rest_between_shifts_hrs;
   const avMap={}; (rav.data||[]).forEach(a=>{ (avMap[a.person_name]=avMap[a.person_name]||{})[a.weekday]={can_work:a.can_work,note:a.note}; });
   const onLeave=(person,iso)=> (rto.data||[]).some(t=>t.person_name===person && iso>=t.start_date && iso<=(t.end_date||t.start_date));
@@ -1683,7 +1683,7 @@ async function vClock(v){
   v.innerHTML='<div class="waiting"><i></i><i></i><i></i></div>';
   const today=isoDate(new Date());
   const [rp,rsh]=await Promise.all([ sb.from('day_items').select('*').eq('kind','punch').eq('on_date',today), sb.from('shifts').select('*').eq('on_date',today) ]);
-  await loadPositions(); await loadArchived();
+  await Promise.all([loadPositions(), loadArchived()]);
   const punch={}; (rp.data||[]).forEach(x=>{ let d={}; try{d=JSON.parse(x.detail||'{}');}catch(e){} punch[x.title]={id:x.id,sessions:d.sessions||[]}; });
   window._punch=punch; window._punchDate=today;
   const schBy={}; (rsh.data||[]).forEach(s=>{ if(s.person_name&&s.person_name!=='__OPEN__') (schBy[s.person_name]=schBy[s.person_name]||[]).push(s); });
@@ -1747,7 +1747,7 @@ async function vSetup(v){
     sb.from('day_sales').select('on_date').limit(1),
     sb.from('posts').select('id').limit(1)
   ]);
-  await loadPositions(); await loadArchived();
+  await Promise.all([loadPositions(), loadArchived()]);
   const roster=rosterNames();
   const profs={}; (rprof.data||[]).forEach(x=>{try{profs[x.title]=JSON.parse(x.detail||'{}');}catch(e){}});
   const anyRoles=roster.some(n=>Array.isArray((profs[n]||{}).roles)&&profs[n].roles.length);
@@ -1798,7 +1798,7 @@ window.setupSaveGoal=async function(){ const val=+((document.getElementById('set
 
 async function teamCerts(v){
   v.innerHTML='<div class="waiting"><i></i><i></i><i></i></div>';
-  try{ await loadProfiles(); await loadPositions(); await loadArchived(); }catch(e){}
+  try{ await Promise.all([loadProfiles(), loadPositions(), loadArchived()]); }catch(e){}
   const people=Object.keys(window._posMap||{}).filter(n=>!isArchived(n)).sort();
   const r=await sb.from('certifications').select('*').order('expires_on',{ascending:true});
   if(r&&r.error){ v.innerHTML='<div class="card" style="padding:20px"><div class="muted">Couldn’t load certifications: '+esc(r.error.message)+'</div></div>'; return; }
@@ -1855,7 +1855,7 @@ const AREA_TREE_CSS=`.ocwrap{overflow-x:auto;padding:8px 2px 6px}
 async function loadAreas(){ const r=await sb.from('day_items').select('*').eq('kind','area'); return (r.data||[]).map(x=>{ let d={}; try{ d=typeof x.detail==='string'?JSON.parse(x.detail||'{}'):(x.detail||{}); }catch(e){} return {id:x.id, name:x.title, owner:d.owner||'', icon:d.icon||'ti-flag', desc:d.desc||'', order:+d.order||0, helpers:Array.isArray(d.helpers)?d.helpers:[]}; }).sort((a,b)=>a.order-b.order||a.name.localeCompare(b.name)); }
 async function teamAreas(v){
   const isAdmin=state.profile&&state.profile.role==='admin';
-  await loadPositions(); await loadArchived();
+  await Promise.all([loadPositions(), loadArchived()]);
   const areas=await loadAreas();
   const roster=Object.keys(window._posMap||{}).filter(n=>n&&!isArchived(n)&&posOf(n)!=='Owner').sort((a,b)=>a.localeCompare(b));
   const owners=Object.keys(window._posMap||{}).filter(n=>posOf(n)==='Owner'&&!isArchived(n));
