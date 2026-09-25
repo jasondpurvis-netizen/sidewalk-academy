@@ -1284,14 +1284,19 @@ async function vOnboarding(v){
   if(!canSee(state.page)){ go('home'); return; }
   setTitle('New Hires','Bring a new hire up to speed — checklist, training, and their review milestones');
   v.innerHTML='<div class="muted">Loading…</div>';
-  const [rh,rs,rv]=await Promise.all([
+  const [rh,rs,rv,rd]=await Promise.all([
     sb.from('hires').select('*').order('start_date',{ascending:false}),
     sb.from('onboarding_steps').select('*').order('position'),
-    sb.from('day_items').select('*').eq('kind','review')
+    sb.from('day_items').select('*').eq('kind','review'),
+    sb.from('day_items').select('*').eq('kind','hiredoc')
   ]);
   await loadPositions();
   const byHire={}; (rs.data||[]).forEach(s=>{ (byHire[s.hire_id]=byHire[s.hire_id]||[]).push(s); });
   const revByHire={}; (rv.data||[]).forEach(x=>{ let d={}; try{ d=typeof x.detail==='string'?JSON.parse(x.detail||'{}'):(x.detail||{}); }catch(e){} d._id=x.id; if(d.hireId!=null)(revByHire[d.hireId]=revByHire[d.hireId]||[]).push(d); });
+  /* Paperwork lives beside the hire rather than in somebody's email: the signed
+     handbook, the food handler card, the offer letter. Kept as its own rows so no
+     table had to change, and so a document outlives the checklist it came with. */
+  const docsByHire={}; (rd.data||[]).forEach(x=>{ let d={}; try{ d=JSON.parse(x.detail||'{}'); }catch(e){} (docsByHire[x.title]=docsByHire[x.title]||[]).push({id:x.id,url:d.url||'',name:d.name||'Document',at:d.at||''}); });
   window._revByHire=revByHire; window._hires=rh.data||[];
   const todayIso=isoDate(new Date());
   const dueList=[]; (rh.data||[]).forEach(hh=>{ if(!hh.start_date)return; reviewMilestones(hh.start_date).forEach(m=>{ const due=isoDate(new Date(_d(hh.start_date).getTime()+m.d*864e5)); if(!(revByHire[hh.id]||[]).some(r=>r.milestone===m.k) && due<=todayIso){ dueList.push({hh,m,due}); } }); });
@@ -1302,11 +1307,42 @@ async function vOnboarding(v){
   if(!(rh.data||[]).length) h+=`<div class="card" style="padding:26px;text-align:center"><div class="faint">No one in their track right now. Add a hire above to start a checklist and review schedule.</div></div>`;
   h+=(rh.data||[]).map(hh=>{ const st=byHire[hh.id]||[]; const done=st.filter(s=>s.done).length; const pct=st.length?Math.round(done/st.length*100):0; const pos=posOf(hh.name); const c=POS_COL[pos]||'#94A3B8'; const revs=revByHire[hh.id]||[];
     const tl = hh.start_date ? (`<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:11px"><div class="faint" style="font-size:15.5px;font-weight:600;text-transform:none;letter-spacing:-.012em;margin-bottom:8px">Review milestones</div><div class="row" style="gap:6px;flex-wrap:wrap">`+reviewMilestones(hh.start_date).map(m=>{ const due=new Date(_d(hh.start_date).getTime()+m.d*864e5); const dueIso=isoDate(due); const rc=revs.filter(r=>r.milestone===m.k); const has=rc.length>0; const isDue=!has&&dueIso<=todayIso; return `<button onclick="openReviewMenu(${hh.id},'${m.k}')" style="border:1px solid ${has?'var(--green)':(isDue?'var(--brand)':'var(--line2)')};background:${has?'rgba(27,123,63,.10)':(isDue?'var(--brand-soft)':'var(--bg)')};color:${has?'var(--green)':(isDue?'var(--brand)':'var(--muted)')};border-radius:8px;padding:5px 10px;font-size:12.5px;font-weight:600;cursor:pointer;text-align:left">${has?'✓ ':(isDue?'● ':'')}${esc(m.l)}<div style="font-weight:400;font-size:11.5px;opacity:.85">${has?rc.length+' submitted':due.toLocaleDateString(undefined,{month:'short',day:'numeric'})}</div></button>`; }).join('')+`</div></div>`) : `<div class="faint" style="font-size:12.5px;margin-top:9px">Add a start date to schedule review milestones.</div>`;
-    return `<div class="card" style="padding:15px;margin-bottom:12px"><div class="row"><div style="flex:1;min-width:0"><div style="font-weight:600">${esc(hh.name)} <span class="pill" style="background:${c}14;color:${c};font-size:12.5px;font-weight:600;margin-left:4px">${esc(pos)}</span></div><div class="faint" style="font-size:12.5px">Starts ${hh.start_date||'—'} · ${done} of ${st.length} steps</div></div><div style="width:110px"><div class="bar"><i style="width:${pct}%"></i></div></div><button class="btn" style="width:auto;padding:4px 9px;margin-left:10px" onclick="delHire(${hh.id})">✕</button></div><div style="margin-top:10px;border-top:1px solid var(--line);padding-top:8px">${st.map(s=>`<label style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:14px;cursor:pointer"><input type="checkbox" ${s.done?'checked':''} onchange="toggleStep(${s.id},this.checked)"/> <span style="${s.done?'text-decoration:line-through;color:#999':''}">${esc(s.label)}</span></label>`).join('')}</div>${tl}</div>`;
+    return `<div class="card" style="padding:15px;margin-bottom:12px"><div class="row"><div style="flex:1;min-width:0"><div style="font-weight:600">${esc(hh.name)} <span class="pill" style="background:${c}14;color:${c};font-size:12.5px;font-weight:600;margin-left:4px">${esc(pos)}</span></div><div class="faint" style="font-size:12.5px">Starts ${hh.start_date||'—'} · ${done} of ${st.length} steps</div></div><div style="width:110px"><div class="bar"><i style="width:${pct}%"></i></div></div><button class="btn" style="width:auto;padding:4px 9px;margin-left:10px" onclick="delHire(${hh.id})">✕</button></div><div style="margin-top:10px;border-top:1px solid var(--line);padding-top:8px">${st.map(s=>`<label style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:14px;cursor:pointer"><input type="checkbox" ${s.done?'checked':''} onchange="toggleStep(${s.id},this.checked)"/> <span style="${s.done?'text-decoration:line-through;color:#999':''}">${esc(s.label)}</span></label>`).join('')}</div>${tl}${(function(){
+      const docs=docsByHire[String(hh.id)]||[];
+      return `<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px">
+        <div class="faint" style="font-size:12.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;margin-bottom:7px">Paperwork</div>
+        ${docs.length? docs.map(dc=>`<div class="row" style="gap:8px;align-items:center;padding:4px 0">
+            <i class="ti ti-file-text" style="color:var(--muted)"></i>
+            <a href="${esc(dc.url)}" target="_blank" rel="noopener" download style="flex:1;min-width:0;font-size:14px;color:var(--brand);text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(dc.name)}</a>
+            <button class="btn" style="width:auto;padding:3px 9px;font-size:12.5px" onclick="delHireDoc(${dc.id})">Remove</button>
+          </div>`).join('')
+          : `<div class="faint" style="font-size:13px;margin-bottom:6px">Nothing filed yet.</div>`}
+        <label style="display:inline-flex;align-items:center;gap:7px;font-size:13.5px;color:var(--ink2);cursor:pointer;border:1px dashed var(--line2);border-radius:9px;padding:6px 11px;margin-top:6px">
+          <i class="ti ti-upload"></i><span>Add a document</span>
+          <input type="file" accept="image/*,.pdf" onchange="addHireDoc(${hh.id},this)" style="display:none"/>
+        </label>
+      </div>`;
+    })()}</div>`;
   }).join('');
   v.innerHTML=h;
 }
 window.addHire=async function(){ const name=val('hname'); if(!name)return; const pos=(document.getElementById('hpos')||{}).value||'Team Member'; const ins=await sb.from('hires').insert({name,role:pos,start_date:document.getElementById('hdate').value||null}).select(); if(ins.error){alert(ins.error.message);return;} const hid=ins.data&&ins.data[0]&&ins.data[0].id; if(hid) await sb.from('onboarding_steps').insert(ONBOARD_STEPS.map((l,i)=>({hire_id:hid,label:l,position:i}))); await setPos(name,pos); vOnboarding(document.getElementById('view')); };
+window.addHireDoc=async function(hireId, el){
+  const f=el.files&&el.files[0]; if(!f) return;
+  el.disabled=true;
+  let url=null; try{ url=await uploadMedia(f); }catch(e){}
+  el.disabled=false; el.value='';
+  if(!url){ alert('That did not upload. Nothing was filed.'); return; }
+  const r=await sb.from('day_items').insert({kind:'hiredoc', title:String(hireId), on_date:null,
+    detail:JSON.stringify({url, name:f.name.slice(0,80), at:new Date().toISOString()}), created_by:state.user.id});
+  if(r&&r.error){ alert('That did not save. '+r.error.message); return; }
+  vOnboarding(document.getElementById('view'));
+};
+window.delHireDoc=async function(id){
+  if(!confirm('Remove this document from the file?')) return;
+  await sb.from('day_items').delete().eq('id',id);
+  vOnboarding(document.getElementById('view'));
+};
 window.toggleStep=async function(id,done){ await sb.from('onboarding_steps').update({done}).eq('id',id); };
 window.delHire=async function(id){ await sb.from('onboarding_steps').delete().eq('hire_id',id); await sb.from('hires').delete().eq('id',id); vOnboarding(document.getElementById('view')); };
 /* ---------- New-hire review milestones + self/leadership forms ---------- */
@@ -1509,7 +1545,7 @@ async function vSettings(v){
     <div style="font-size:15.5px;font-weight:600;letter-spacing:-.012em;margin-bottom:4px">On your phone's home screen</div>
     <div class="faint" style="font-size:14px;margin-bottom:14px;line-height:1.5">Saved to a home screen this opens like an app, with your name and logo on the icon &mdash; not a browser tab.</div>
     <div class="row" style="gap:15px;align-items:center;margin-bottom:14px">
-      <img id="appIconPrev" alt="Home screen icon preview" style="width:60px;height:60px;border-radius:14px;box-shadow:0 2px 8px rgba(16,24,40,.18);flex:none;background:var(--bg)"/>
+      <img id="appIconPrev" alt="" onerror="this.style.visibility='hidden'" style="width:60px;height:60px;border-radius:14px;box-shadow:0 2px 8px rgba(16,24,40,.18);flex:none;background:var(--bg);object-fit:cover"/>
       <div style="min-width:0">
         <div style="font-size:14px;font-weight:600;letter-spacing:-.01em">${esc(s.academy_name||'Academy')}</div>
         <div class="faint" style="font-size:12.5px;margin-top:2px">Drawn from your logo and brand colour above. Save this page and it updates.</div>

@@ -368,6 +368,9 @@ function _recSearchBox(ph){
 
 async function vRecipes(v){
   if(!canSee('recipes')){ go('home'); return; }
+  /* Every other page carries a header; this one was built inside out and never got
+     one, so Recipes was the only screen that opened with no name on it. */
+  setTitle('Recipes','Every recipe and exactly what goes in it');
   if(!state._recipes){
     v.innerHTML='<div class="muted">Loading…</div>';
     const r=await sb.from('day_items').select('*').eq('kind','recipe').order('title');
