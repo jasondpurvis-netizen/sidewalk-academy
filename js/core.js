@@ -2,7 +2,7 @@
 /* A stamp so any device can say which version it is actually running. Three times now a
    phone and a laptop on the same address have disagreed about what the app looks like,
    and there was no way to tell them apart except by describing the screen. */
-const BUILD = '2026-09-24-47';
+const BUILD = '2026-09-24-48';
 window.BUILD = BUILD;
 const SUPABASE_URL = "https://wjqcnxnwjqmuzrandgea.supabase.co";
 const SUPABASE_KEY = "sb_publishable_DQZclfAnv_MYQJLGcOdzdw_g4vMCiSC";
@@ -374,6 +374,7 @@ window.toggleAdd=function(id,on,focusId){
     if(f) f.focus();
     c.scrollIntoView({behavior:'smooth',block:'nearest'});
   }
+  try{ if(window._refreshBrand) window._refreshBrand(); }catch(e){}
 };
 /* The button that opens it. Same shape everywhere: one primary action, a quiet count
    beside it so the page says what is waiting before you have read anything. */
@@ -757,6 +758,19 @@ function _brandName(){
   const s=state.settings||{};
   return t.name || s.academy_name || 'Restaurant';
 }
+/* The sidebar is drawn once, and on some paths it is drawn before the restaurant's name
+   has come back -- so it said "Restaurant" and stayed that way for the whole session even
+   though the name was sitting in memory a moment later. Whoever loads the name puts it on
+   screen, rather than hoping the order happens to work out. */
+window._refreshBrand=function(){
+  try{
+    const b=document.querySelector('.side .brand b'); if(!b) return;
+    const n=_brandName(); if(b.textContent===n) return;
+    b.textContent=n;
+    const lg=document.querySelector('.side .brand .lg');
+    if(lg && !document.querySelector('.side .brand img')) lg.textContent=(n||'A').charAt(0).toUpperCase();
+  }catch(e){}
+};
 function renderApp(){
   const isAdmin = state.profile && state.profile.role==="admin";
   const realAdmin = state.previewLIT ? (state._realRole==='admin') : isAdmin;
