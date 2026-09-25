@@ -1403,8 +1403,32 @@ async function schTimeoff(v){
   if(history.length){ h+=`<div class="sec">Past &amp; declined</div><div class="card">`+history.slice(0,20).map(t=>row(t)).join('')+`</div>`; }
   v.innerHTML=h;
 }
-window.addTimeOff=async function(){ const f=document.getElementById('tofrom').value; const t=document.getElementById('toto').value||f; const reason=document.getElementById('toreason').value.trim(); if(!f){ alert('Pick a start date.'); return; } await sb.from('time_off').insert({user_id:state.user.id, person_name:myRosterName()||state.profile.name, start_date:f, end_date:t, reason, status:'pending'}); schGo('timeoff'); };
-window.setTO=async function(id,st){ await sb.from('time_off').update({status:st}).eq('id',id); schGo('timeoff'); };
+/* An availability change told the scheduler the moment it was asked for; a time-off
+   request landed as a pending row nobody was told about, so it waited until somebody
+   happened to open the tab. Both are requests, both now announce themselves, and the
+   answer goes back to the person who asked. */
+window.addTimeOff=async function(){
+  const f=document.getElementById('tofrom').value; const t=document.getElementById('toto').value||f;
+  const reason=document.getElementById('toreason').value.trim();
+  if(!f){ alert('Pick a start date.'); return; }
+  const me=myRosterName()||state.profile.name;
+  const r=await sb.from('time_off').insert({user_id:state.user.id, person_name:me, start_date:f, end_date:t, reason, status:'pending'});
+  if(r&&r.error){ alert('That did not send.\n\n'+r.error.message); return; }
+  const when = (t&&t!==f) ? (fmtDay(_d(f))+' to '+fmtDay(_d(t))) : fmtDay(_d(f));
+  try{ await notify({title:'Time off to approve', body:me+' has asked for '+when+(reason?' \u2014 '+reason:'')+'.', act:"go('schedule',{stab:'timeoff'})"}); }catch(e){}
+  schGo('timeoff');
+};
+window.setTO=async function(id,st){
+  let who='',when='';
+  try{ const g=await sb.from('time_off').select('person_name,start_date,end_date').eq('id',id).maybeSingle();
+       if(g.data){ who=g.data.person_name||''; when=(g.data.end_date&&g.data.end_date!==g.data.start_date)? (fmtDay(_d(g.data.start_date))+' to '+fmtDay(_d(g.data.end_date))) : fmtDay(_d(g.data.start_date)); } }catch(e){}
+  const r=await sb.from('time_off').update({status:st}).eq('id',id);
+  if(r&&r.error){ alert('That did not save.\n\n'+r.error.message); return; }
+  if(who){ try{ await notify({ title: st==='approved'?'Time off approved':'Time off not approved',
+      body: (st==='approved'? 'Your time off for '+when+' is approved.' : 'Your request for '+when+' was not approved \u2014 have a word with your manager.'),
+      who: who, act:"go('schedule',{stab:'timeoff'})" }); }catch(e){} }
+  schGo('timeoff');
+};
 async function schLogbook(v){
   const isAdmin=state.profile&&state.profile.role==='admin';
   const d0=state.ctx.logDate||isoDate(new Date());
