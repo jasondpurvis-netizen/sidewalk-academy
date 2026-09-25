@@ -2,7 +2,7 @@
 /* A stamp so any device can say which version it is actually running. Three times now a
    phone and a laptop on the same address have disagreed about what the app looks like,
    and there was no way to tell them apart except by describing the screen. */
-const BUILD = '2026-09-24-41';
+const BUILD = '2026-09-24-42';
 window.BUILD = BUILD;
 const SUPABASE_URL = "https://wjqcnxnwjqmuzrandgea.supabase.co";
 const SUPABASE_KEY = "sb_publishable_DQZclfAnv_MYQJLGcOdzdw_g4vMCiSC";
@@ -430,19 +430,30 @@ function celebrate(title,sub,big,emoji){
 
 /* ---------- data ---------- */
 async function loadAll(){
-  const { data:tracks } = await sb.from("tracks").select("*").order("position");
-  const { data:lessons } = await sb.from("lessons").select("*").order("position");
-  const { data:prog } = await sb.from("progress").select("lesson_id");
-  state.tracks = tracks||[];
+  /* Eight queries, each one waiting for the last to come back, before the app could draw
+     anything at all. On a phone that is eight round trips of nothing -- and it was the
+     largest part of a fifteen-second blank screen on a cold start. None of them depend
+     on each other. */
+  const [rt, rl, rp, rr, rg, ra, rta] = await Promise.all([
+    sb.from("tracks").select("*").order("position"),
+    sb.from("lessons").select("*").order("position"),
+    sb.from("progress").select("lesson_id"),
+    sb.from("responses").select("lesson_id,text"),
+    sb.from('glossary').select('*'),
+    sb.from('assignments').select('*'),
+    sb.from('day_items').select('title,detail').eq('kind','trackassign')
+  ]);
+  state.tracks = rt.data||[];
   state.lessons = {};
-  (lessons||[]).forEach(l=>{ (state.lessons[l.track_id]=state.lessons[l.track_id]||[]).push(l); });
-  state.progress = new Set((prog||[]).map(p=>p.lesson_id));
-  const { data:resp } = await sb.from("responses").select("lesson_id,text");
-  state.responses = {}; (resp||[]).forEach(r=>{ state.responses[r.lesson_id]=r.text; });
-  const { data:gl } = await sb.from('glossary').select('*'); state.glossary = gl||[];
-  const { data:asg } = await sb.from('assignments').select('*'); state.assignments = asg||[];
-  try{ const { data:_ta } = await sb.from('day_items').select('title,detail').eq('kind','trackassign'); state.trackAssign={}; (_ta||[]).forEach(x=>{ let d={};try{d=typeof x.detail==='string'?JSON.parse(x.detail||'{}'):(x.detail||{})}catch(e){} const tid=(d&&d.track_id)||x.title; if(tid&&d&&Array.isArray(d.names)) state.trackAssign[tid]=d.names; }); }catch(e){ state.trackAssign=state.trackAssign||{}; }
-  try{ await loadCommunityUnread(); }catch(e){ window._communityUnread=0; }
+  (rl.data||[]).forEach(l=>{ (state.lessons[l.track_id]=state.lessons[l.track_id]||[]).push(l); });
+  state.progress = new Set((rp.data||[]).map(p=>p.lesson_id));
+  state.responses = {}; (rr.data||[]).forEach(r=>{ state.responses[r.lesson_id]=r.text; });
+  state.glossary = rg.data||[];
+  state.assignments = ra.data||[];
+  try{ state.trackAssign={}; (rta.data||[]).forEach(x=>{ let d={};try{d=typeof x.detail==='string'?JSON.parse(x.detail||'{}'):(x.detail||{});}catch(e){} state.trackAssign[x.title]=d; }); }catch(e){ state.trackAssign={}; }
+  /* The unread badge is not worth holding the app closed for. Let it arrive late and
+     repaint the nav when it does. */
+  loadCommunityUnread().then(function(){ try{ if(state.user) renderApp(); }catch(e){} }).catch(function(){ window._communityUnread=0; });
 }
 // Count community posts this person hasn't read, across the channels they can see. Feeds the nav badge
 // so a new message is visible the moment they open the app, instead of only inside Community.

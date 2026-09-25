@@ -1782,7 +1782,11 @@ async function boot(){
     if(window._pendingJoin){ const _c=window._pendingJoin; window._pendingJoin=null; const _r=await sb.rpc('join_restaurant',{p_code:_c}); if(_r&&!_r.error){ state.profile=null; await ensureProfile(); } }
     if(!state.profile || !state.profile.tenant_id){ renderNewRestaurant(); return; }
   }
-  await loadSettings();
+  /* Settings, positions and the whole Academy library were fetched one after another
+     before anything drew. They do not depend on each other, so they are asked for at
+     once and the app waits one round trip instead of three. */
+  const _bootLoads = Promise.all([ loadSettings(), loadPositions().catch(()=>{}), loadAll() ]);
+  await _bootLoads;
   /* Nine of thirteen logins had no last name. The app matches people to shifts by name,
      so those staff could not see their own schedule and showed up as a second person on
      the roster. Signup now demands a full name, but existing accounts predate that -- so
@@ -1798,7 +1802,7 @@ async function boot(){
     }
   }catch(e){}
   if(BILLING_LIVE){ const bs=billingState(); if(!bs.ok){ renderPaywall(bs); return; } }
-  try{ await loadPositions(); }catch(e){}
+  /* fetched above, with the rest */
   // Someone who signs up IS on the team. Put them on the roster as Unassigned so the owner can see
   // they joined and set their position, instead of them existing as an invisible login.
   try{
@@ -1808,7 +1812,7 @@ async function boot(){
       if(!(_ins&&_ins.error)) await loadPositions();
     }
   }catch(e){}
-  await loadAll();
+  /* fetched above, with the rest */
   if(!applyHash()){
     /* Today on the first open of a day, your own place after that. Landing on Today
        every single time meant a refresh in the middle of building a schedule threw the
