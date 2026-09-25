@@ -920,12 +920,9 @@ async function vBrain(v){
     + [['setup','Getting started','The short list that gets a new restaurant running','ti-list-check','linear-gradient(135deg,#C9962E,#8E6510)'],
        ['settings','Settings','Name, colour, logo, join code, labour rules and who can see what','ti-settings','linear-gradient(135deg,#6E7B8A,#41505E)']]
       .filter(r=>canSee(r[0]))
-      .map(([pg,label,desc,icon,grad])=>`<div class="card" style="padding:0;overflow:hidden;cursor:pointer" onclick="go('${pg}')">
-        <div style="height:74px;background:${grad};position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden">
-          <i class="ti ${icon}" style="font-size:30px;color:#fff;opacity:.97"></i>
-          <i class="ti ${icon}" style="position:absolute;right:-10px;bottom:-14px;font-size:76px;color:#fff;opacity:.11"></i>
-        </div>
-        <div style="padding:13px 15px 15px"><div style="font-weight:600;font-size:15.5px;margin-bottom:3px">${label}</div><div class="muted" style="font-size:12.5px;line-height:1.45">${desc}</div></div>
+      .map(([pg,label,desc,icon,grad])=>`<div class="card tile" onclick="go('${pg}')">
+        <div class="tile-top" style="background:${grad}"><i class="ti ${icon}"></i><i class="ti ${icon} bg"></i></div>
+        <div class="tile-body"><div class="tile-title">${label}</div><div class="tile-sub">${desc}</div></div>
       </div>`).join('') + `</div>`;
 
   v.innerHTML = h;
@@ -1602,12 +1599,9 @@ async function vSettings(v){
       +_parts[_sect];
   } else {
     v.innerHTML=`<div class="grid">`+SECTS.map(([k,label,desc,icon,grad])=>
-      `<div class="card" style="padding:0;overflow:hidden;cursor:pointer" onclick="go('settings',{sect:'${k}'})">
-         <div style="height:82px;background:${grad};position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden">
-           <i class="ti ${icon}" style="font-size:34px;color:#fff;opacity:.97"></i>
-           <i class="ti ${icon}" style="position:absolute;right:-12px;bottom:-16px;font-size:84px;color:#fff;opacity:.11"></i>
-         </div>
-         <div style="padding:14px 16px 16px"><div style="font-weight:600;font-size:15.5px;margin-bottom:3px">${esc(label)}</div><div class="muted" style="font-size:12.5px;line-height:1.45">${esc(desc)}</div></div>
+      `<div class="card tile" onclick="go('settings',{sect:'${k}'})">
+         <div class="tile-top" style="background:${grad}"><i class="ti ${icon}"></i><i class="ti ${icon} bg"></i></div>
+         <div class="tile-body"><div class="tile-title">${esc(label)}</div><div class="tile-sub">${esc(desc)}</div></div>
        </div>`).join('')+`</div>`;
   }
   try{ const _ip=document.getElementById('appIconPrev'); if(_ip){ if(window._appIconUrl) _ip.src=window._appIconUrl; else { applyAppIdentity().then(function(){ if(window._appIconUrl) _ip.src=window._appIconUrl; }); } } }catch(e){}

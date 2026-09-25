@@ -167,7 +167,7 @@ async function vToday(v){
      different kinds of thing read as one undifferentiated list. Each is its own card now,
      with the colour carried by a medallion rather than a hairline -- the same language the
      Academy uses, which is the page that actually looks like something. */
-  const _sub=(border,bg,fg,icon,label,inner,id)=>`<div ${id?`id="${id}" `:''}class="card" style="padding:0;overflow:hidden;margin-bottom:13px"><div style="height:4px;background:${border}"></div><div style="display:flex;align-items:center;gap:11px;padding:14px 17px 9px"><span style="width:34px;height:34px;border-radius:9px;background:${border};display:flex;align-items:center;justify-content:center;flex:none"><i class="ti ${icon}" style="font-size:18px;color:#fff"></i></span><div style="font-weight:700;font-size:15.5px;letter-spacing:-.016em;color:var(--ink)">${label}</div></div><div style="padding:0 17px 14px">${inner}</div></div>`;
+  const _sub=(border,bg,fg,icon,label,inner,id)=>`<div ${id?`id="${id}" `:''}class="card panel"><div class="panel-bar" style="background:${border}"></div><div class="panel-head"><span class="med" style="background:${border}"><i class="ti ${icon}"></i></span><div class="ttl">${label}</div></div><div class="panel-body">${inner}</div></div>`;
   const S=[];
   /* What is happening today, before anything else on the page. A 40-box catering at 11am is
      not "coming up" -- it is the morning. It leads because if it is missed, nothing else on
@@ -195,7 +195,7 @@ async function vToday(v){
       _clean+=`</div></div>`; }
   }
 
-  h+= S.length ? S.join('') : `<div class="card" style="padding:34px 22px;text-align:center;margin-bottom:13px"><div style="width:52px;height:52px;border-radius:14px;margin:0 auto 12px;background:linear-gradient(135deg,#3FA06B,#227048);display:flex;align-items:center;justify-content:center"><i class="ti ti-check" style="font-size:27px;color:#fff"></i></div><div style="font-weight:700;font-size:17px;letter-spacing:-.018em">Nothing needs you</div><div class="muted" style="font-size:14.5px;margin-top:4px">Everything on today is covered.</div></div>`;
+  h+= S.length ? S.join('') : `<div class="card nothing" style="margin-bottom:13px"><div style="width:52px;height:52px;border-radius:14px;margin:0 auto 12px;background:linear-gradient(135deg,#3FA06B,#227048);display:flex;align-items:center;justify-content:center"><i class="ti ti-check" style="font-size:27px;color:#fff"></i></div><div class="n-ttl">Nothing needs you</div><div class="n-sub">Everything on today is covered.</div></div>`;
   /* Order matters on the page people open first. What needs you, then who is actually
    here, and only then the things you add rather than read. Cleaning and the to-do box
    were sitting between the two, so the screen asked for input before it had finished

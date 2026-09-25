@@ -1195,8 +1195,8 @@ async function schTeam(v){
   const known=new Set(team.map(p=>p.name));
   (rsh.data||[]).forEach(s=>{ if(s.person_name&&!known.has(s.person_name)&&!isArchived(s.person_name)){ known.add(s.person_name); team.push({name:s.person_name,title:posOf(s.person_name),member:false}); } });
   const wage={}; (rpay.data||[]).forEach(p=>wage[p.person_name]=Number(p.wage)||0);
-  const seg=(k,l)=>`<button onclick="state.ctx.tv='${k}';schTeam(document.getElementById('schbody'))" style="padding:7px 14px;font-size:14px;font-weight:600;border:none;cursor:pointer;font-family:inherit;background:${tv===k?'var(--brand)':'var(--card)'};color:${tv===k?'#fff':'var(--muted)'}">${l}</button>`;
-  let h=`<div style="display:inline-flex;border:1px solid var(--line2);border-radius:8px;overflow:hidden;margin-bottom:16px">${seg('roster','Roster')}${seg('now','On the clock now')}</div>`;
+  const seg=(k,l)=>`<button class="schtab${tv===k?' on':''}" onclick="state.ctx.tv='${k}';schTeam(document.getElementById('schbody'))">${l}</button>`;
+  let h=`<div class="schtabs">${seg('roster','Roster')}${seg('now','On the clock now')}</div>`;
   if(tv==='now'){
     const now=new Date(); const nowH=now.getHours()+now.getMinutes()/60;
     const todays=(rtoday.data||[]).filter(s=>!isArchived(s.person_name)).slice().sort((a,b)=>(a.start_time||'').localeCompare(b.start_time||''));
@@ -1924,13 +1924,15 @@ async function vTeam(v){
   if(!canSee(state.page)){ go('home'); return; }
   let tab=state.ctx.ttab; if(!tab){ try{ tab=localStorage.getItem('teamTab'); }catch(e){} } if(!tab) tab='roster'; state.ctx.ttab=tab;
   setTitle('Team','Your people — profiles, progress & former team');
-  const seg=(k,l)=>`<button onclick="state.ctx.ttab='${k}';try{localStorage.setItem('teamTab','${k}')}catch(e){};vTeam(document.getElementById('view'))" style="padding:7px 15px;font-size:14px;font-weight:600;border:none;cursor:pointer;font-family:inherit;background:${tab===k?'var(--brand)':'var(--card)'};color:${tab===k?'#fff':'var(--muted)'}">${l}</button>`;
+  /* Team used a grey segmented pill while the Schedule used underlined tabs -- the same
+     job wearing two looks on two pages. One tab style in the app now: .schtabs. */
+  const seg=(k,l)=>`<button class="schtab${tab===k?' on':''}" onclick="state.ctx.ttab='${k}';try{localStorage.setItem('teamTab','${k}')}catch(e){};vTeam(document.getElementById('view'))">${l}</button>`;
   /* Six tabs for one page. Three of them are who somebody is -- the roster, what they
      can run, what they are certified on -- and those stay. Academy progress is training,
      so it belongs in The Academy. Write-ups and former team are records you consult about
      one person, not lists you scan, so they are reached from that person rather than
      from a tab sitting next to the roster everyone opens. */
-  v.innerHTML=`<div style="display:inline-flex;border:1px solid var(--line2);border-radius:8px;overflow:hidden;margin-bottom:18px;flex-wrap:wrap">${seg('roster','Roster')}${seg('skills','Skills')}${seg('certs','Certifications')}</div>
+  v.innerHTML=`<div class="schtabs">${seg('roster','Roster')}${seg('skills','Skills')}${seg('certs','Certifications')}</div>
     <div class="row" style="gap:9px;flex-wrap:wrap;margin:-8px 0 16px">
       <button class="btn" style="width:auto;font-size:13.5px" onclick="go('summary')"><i class="ti ti-chart-bar"></i> Training progress</button>
       <button class="btn" style="width:auto;font-size:13.5px" onclick="state.ctx.ttab='former';vTeam(document.getElementById('view'))"><i class="ti ti-user-off"></i> Former team</button>

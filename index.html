@@ -23,9 +23,9 @@
      onto black -- which is the other half of how a teal icon arrived looking black.
      A restaurant with its own logo still gets it: the script below replaces these once
      the page knows whose restaurant it is. -->
-<link rel="apple-touch-icon" id="lAppIcon" sizes="180x180" href="/icons/2026-09-24-27/touch-180.png" />
-<link rel="icon" id="lFavicon" type="image/png" sizes="32x32" href="/icons/2026-09-24-27/icon-32.png" />
-<link rel="icon" type="image/png" sizes="192x192" href="/icons/2026-09-24-27/icon-192.png" />
+<link rel="apple-touch-icon" id="lAppIcon" sizes="180x180" href="/icons/2026-09-24-28/touch-180.png" />
+<link rel="icon" id="lFavicon" type="image/png" sizes="32x32" href="/icons/2026-09-24-28/icon-32.png" />
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/2026-09-24-28/icon-192.png" />
 <link rel="manifest" id="lManifest" href="/manifest.webmanifest" />
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
@@ -194,6 +194,30 @@
   .scard .x:hover{opacity:1}
   .bt{padding:9px 5px;text-align:center;font-weight:600;border-top:2px solid var(--line2);font-size:12.5px}
   .bt-team{text-align:left;padding-left:14px;position:sticky;left:0;background:var(--card);z-index:1}
+  /* ---------- One of each ----------
+     Every screen had been designed on the day it was needed, so the app carried four
+     card treatments, three page headers and three tab strips doing the same jobs. These
+     are the one of each. New screens use them rather than inventing a fourth. */
+  .tile{padding:0;overflow:hidden;cursor:pointer;display:block}
+  .tile .tile-top{height:88px;position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden}
+  .tile .tile-top i.ti{font-size:34px;color:#fff;opacity:.97}
+  .tile .tile-top i.ti.bg{position:absolute;right:-12px;bottom:-16px;font-size:82px;opacity:.11}
+  .tile .tile-body{padding:14px 16px 16px}
+  .tile .tile-title{font-weight:600;font-size:15.5px;letter-spacing:-.012em;margin-bottom:3px}
+  .tile .tile-sub{font-size:12.5px;line-height:1.45;color:var(--muted)}
+  /* a card that leads with a coloured medallion -- Today's sections, and anything that
+     needs a heading with weight rather than a plain .sec above it */
+  .panel{padding:0;overflow:hidden;margin-bottom:13px}
+  .panel-bar{height:4px}
+  .panel-head{display:flex;align-items:center;gap:11px;padding:14px 17px 9px}
+  .panel-head .med{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex:none}
+  .panel-head .med i.ti{font-size:18px;color:#fff}
+  .panel-head .ttl{font-weight:700;font-size:15.5px;letter-spacing:-.016em;color:var(--ink)}
+  .panel-body{padding:0 17px 14px}
+  /* one empty state */
+  .nothing{padding:30px 22px;text-align:center}
+  .nothing .n-ttl{font-weight:700;font-size:16.5px;letter-spacing:-.018em}
+  .nothing .n-sub{color:var(--muted);font-size:14.5px;margin-top:4px}
   .schtabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin-bottom:22px;overflow-x:auto}
   .schtab{border:none;background:none;padding:11px 16px;font-size:14px;font-weight:560;color:var(--muted);border-bottom:2px solid transparent;white-space:nowrap;cursor:pointer;flex-shrink:0;font-family:inherit;letter-spacing:-.01em}
   .schtab:hover{color:var(--ink)}
@@ -275,12 +299,12 @@
      did another, and the two devices disagreed with no way to tell why. A new query string
      is a new URL, so a stale copy cannot answer for it. Bump it with BUILD on every
      release. -->
-<script src="js/core.js?v=2026-09-24-27"></script>
-<script src="js/academy.js?v=2026-09-24-27"></script>
-<script src="js/community.js?v=2026-09-24-27"></script>
-<script src="js/lists.js?v=2026-09-24-27"></script>
-<script src="js/today.js?v=2026-09-24-27"></script>
-<script src="js/schedule.js?v=2026-09-24-27"></script>
-<script src="js/team.js?v=2026-09-24-27"></script>
+<script src="js/core.js?v=2026-09-24-28"></script>
+<script src="js/academy.js?v=2026-09-24-28"></script>
+<script src="js/community.js?v=2026-09-24-28"></script>
+<script src="js/lists.js?v=2026-09-24-28"></script>
+<script src="js/today.js?v=2026-09-24-28"></script>
+<script src="js/schedule.js?v=2026-09-24-28"></script>
+<script src="js/team.js?v=2026-09-24-28"></script>
 </body>
 </html>

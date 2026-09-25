@@ -435,14 +435,14 @@ function _renderRecipes(v){
   const names=Object.keys(groups).sort((a,b)=>groups[b].length-groups[a].length);
   h+=`<div class="grid">`+names.map((n,i)=>{
     const t=_recTone(n), c=groups[n].length;
-    return `<div class="card" style="padding:0;overflow:hidden;cursor:pointer" onclick="recipeCat('${esc(n).replace(/'/g,"\\'")}')">
-      <div style="height:96px;background:${t.g};position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden">
-        ${_recIcon(t.ic,40,'#fff',.97)}
-        <span style="position:absolute;right:-14px;bottom:-18px;line-height:0">${_recIcon(t.ic,96,'#fff',.11)}</span>
+    return `<div class="card tile" onclick="recipeCat('${esc(n).replace(/'/g,"\\'")}')">
+      <div class="tile-top" style="background:${t.g}">
+        ${_recIcon(t.ic,34,'#fff',.97)}
+        <span style="position:absolute;right:-12px;bottom:-16px;line-height:0">${_recIcon(t.ic,82,'#fff',.11)}</span>
       </div>
-      <div style="padding:15px 17px 17px">
-        <div style="font-weight:600;font-size:15.5px;margin:0 0 3px">${esc(n)}</div>
-        <div class="muted" style="font-size:12.5px">${c} recipe${c===1?'':'s'}</div>
+      <div class="tile-body">
+        <div class="tile-title">${esc(n)}</div>
+        <div class="tile-sub">${c} recipe${c===1?'':'s'}</div>
       </div></div>`;
   }).join('')+`</div>`;
   h+=_recImportBox();
