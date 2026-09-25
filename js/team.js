@@ -406,59 +406,15 @@ window._skillStations=function(){
 window._skillPeople=function(){
   try{ return rosterNames().filter(function(n){ return !isArchived(n) && posOf(n)!=='Owner'; }).sort(); }catch(e){ return []; }
 };
-window.openSkillsSetup=function(){
-  window._ssStations=_skillStations(); window._ssIdx=0;
-  if(!window._ssStations.length){ alert('No stations set up yet. Add them under Settings first, or import a roster — station names come across with it.'); return; }
-  var w=document.createElement('div'); w.id='ssModal';
-  w.style.cssText='position:fixed;inset:0;z-index:10060;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:18px';
-  w.innerHTML='<div id="ssCard" style="background:var(--card,#fff);color:var(--ink,#111);border-radius:12px;max-width:560px;width:100%;max-height:88vh;overflow:auto;padding:22px 24px;box-shadow:0 20px 60px rgba(0,0,0,.3)"></div>';
-  document.body.appendChild(w);
-  _ssRender();
-};
-window._ssRender=function(){
-  var stations=window._ssStations, i=window._ssIdx, st=stations[i];
-  var people=_skillPeople();
-  var card=document.getElementById('ssCard'); if(!card) return;
-  if(i>=stations.length){
-    var counts=people.map(function(n){ return ((window._profiles[n]||{}).roles||[]).length; });
-    var trained=counts.filter(function(c){return c>0;}).length;
-    card.innerHTML='<div style="text-align:center;padding:14px 4px">'
-      +'<div style="font-size:34px;line-height:1">✓</div>'
-      +'<div style="font-weight:800;font-size:18px;margin-top:8px">Skills are set</div>'
-      +'<div class="muted" style="font-size:14px;margin-top:6px;line-height:1.6">'+trained+' of '+people.length+' people now have at least one station. The schedule builder will only put someone where they can actually work.</div>'
-      +'<button onclick="var m=document.getElementById(\'ssModal\');if(m)m.remove(); try{go(\'schedule\',{stab:\'team\'});}catch(e){}" style="margin-top:16px;background:var(--brand,#4a9cad);color:#fff;border:none;border-radius:8px;padding:11px 20px;font-weight:700;cursor:pointer">Done</button></div>';
-    return;
-  }
-  var can=people.filter(function(n){ return (((window._profiles[n]||{}).roles)||[]).indexOf(st)>=0; }).length;
-  var h='<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">'
-    +'<div><div class="muted" style="font-size:15.5px;font-weight:600;letter-spacing:-.012em;text-transform:none">Station '+(i+1)+' of '+stations.length+'</div>'
-    +'<div style="font-weight:800;font-size:18px;margin-top:3px">Who can work '+esc(st)+'?</div>'
-    +'<div class="muted" style="font-size:14px;margin-top:3px">Tap everyone who can be scheduled here on their own.</div></div>'
-    +'<button onclick="var m=document.getElementById(\'ssModal\');if(m)m.remove()" style="border:none;background:transparent;font-size:26px;cursor:pointer;line-height:1;color:inherit">&times;</button></div>';
-  h+='<div style="height:5px;background:var(--bg,#eef3f4);border-radius:99px;margin:14px 0 4px"><div style="height:5px;width:'+Math.round(i/stations.length*100)+'%;background:var(--brand,#4a9cad);border-radius:99px;transition:width .2s"></div></div>';
-  h+='<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:14px">'
-    + people.map(function(n){
-        var on=(((window._profiles[n]||{}).roles)||[]).indexOf(st)>=0;
-        return '<button onclick="_ssToggle('+JSON.stringify(n).replace(/"/g,'&quot;')+')" data-ssname="'+esc(n)+'" style="border:1.5px solid '+(on?'var(--brand,#4a9cad)':'var(--line2,#d5dde0)')+';background:'+(on?'var(--brand,#4a9cad)':'transparent')+';color:'+(on?'#fff':'inherit')+';border-radius:999px;padding:9px 15px;font-size:14px;font-weight:600;cursor:pointer">'+esc(n)+'</button>';
-      }).join('')
-    +'</div>';
-  h+='<div class="muted" style="font-size:12.5px;margin-top:12px" id="ssCount">'+can+' selected</div>';
-  h+='<div style="display:flex;gap:9px;margin-top:18px;align-items:center">'
-    +(i>0?'<button onclick="_ssGo(-1)" style="background:transparent;border:1px solid var(--line2,#d5dde0);border-radius:8px;padding:11px 16px;cursor:pointer;color:inherit">Back</button>':'')
-    +'<button onclick="_ssGo(1)" style="background:var(--brand,#4a9cad);color:#fff;border:none;border-radius:8px;padding:11px 20px;font-weight:700;cursor:pointer">'+(i===stations.length-1?'Finish':'Next')+'</button>'
-    +'<button onclick="_ssGo(1)" style="background:transparent;border:none;color:var(--muted,#6b8087);font-size:14px;cursor:pointer">Skip</button></div>';
-  card.innerHTML=h;
-};
-window._ssToggle=function(name){
-  var st=window._ssStations[window._ssIdx];
-  var d=window._profiles[name]||(window._profiles[name]={});
-  var roles=Array.isArray(d.roles)?d.roles:(d.roles=[]);
-  var k=roles.indexOf(st);
-  if(k<0) roles.push(st); else roles.splice(k,1);
-  try{ _saveProfileNow(name); }catch(e){}
-  _ssRender();
-};
-window._ssGo=function(step){ window._ssIdx=Math.max(0,window._ssIdx+step); _ssRender(); };
+/* ---------- One skills editor, not two ----------
+   Skills live in exactly one place: day_items kind 'profile', field roles (plus
+   skillLevels). Two different screens were writing it -- the Skills grid on Team, and a
+   station-by-station modal The Brain opened. Same dataset, two interfaces, so whichever
+   you used last silently won and neither showed you the other.
+
+   The modal is gone. The Brain sends you to the grid, which is the one that shows every
+   person against every station at once and is the only one that can show a gap. */
+window.openSkillsSetup=function(){ go('team',{ttab:'skills'}); };
 
 
 /* ---------- Concept templates ----------
