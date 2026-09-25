@@ -11,11 +11,25 @@ async function vSchedule(v){
   const stab=state.ctx.stab||'schedule';
   setTitle('Operations','Scheduling, team & the daily log — one place');
   const _w=document.querySelector('.wrap'); if(_w) _w.style.maxWidth='1180px';
-  const TABS=[['schedule','Schedule',1],['team','Who\u2019s working',3],['availability','Availability',1],['timeoff','Time off',1],['pool','Shift swaps',1],['reports','Reports',3]];
+  /* Reports is not in the tab bar. Every figure on it -- hours, labour cost, labour
+     percentage -- is already on the Schedule tab, and last year already sits under each
+     day of the grid, which is where it is useful because that is where you are deciding.
+     The page still works and can be pinned; it just no longer costs a tab. */
+  const TABS=[['schedule','Schedule',1],['team','Who\u2019s working',3],['availability','Availability',1],['timeoff','Time off',1],['pool','Shift swaps',1]];
   const tabs=TABS.filter(t=>myRank()>=t[2]); const allowed=new Set(tabs.map(t=>t[0])); const useTab=allowed.has(stab)?stab:'overview';
   v.innerHTML=`<div class="schtabs">`+tabs.map(t=>`<button class="schtab${useTab===t[0]?' on':''}" onclick="schGo('${t[0]}')">${t[1]}</button>`).join('')+`</div><div id="schbody"><div class="muted">Loading…</div></div>`;
   const body=document.getElementById('schbody');
   ({schedule:schBoard, team:schTeam, availability:schAvail, timeoff:schTimeoff, pool:schPool, reports:schReports}[useTab]||schBoard)(body);
+  /* Taking Reports off the tab bar should not make it unreachable -- the printable
+     week totals still have their use at month end. One quiet line under the schedule
+     rather than a permanent tab. */
+  if(useTab==='schedule'||!allowed.has(stab)){
+    const _f=document.createElement('div');
+    _f.className='faint';
+    _f.style.cssText='font-size:12.5px;text-align:center;margin:18px 0 4px';
+    _f.innerHTML='Need the week on paper? <a href="#" onclick="schGo(\'reports\');return false" style="color:var(--brand)">Week totals &amp; print</a>';
+    body.appendChild(_f);
+  }
 }
 window.schGo=function(t){ state.ctx.stab=t; try{ localStorage.setItem('sw_nav',JSON.stringify({p:state.page,c:state.ctx})); }catch(e){} vSchedule(document.getElementById('view')); };
 window.startSchedTour=function(){
