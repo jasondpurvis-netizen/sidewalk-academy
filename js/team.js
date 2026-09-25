@@ -933,13 +933,14 @@ async function vBrain(v){
   }
   /* Getting started and Settings left the sidebar, so the Brain has to hold their doors.
      Two tiles, same language the Academy uses, under what the restaurant knows. */
-  h += `<div class="sec" style="margin-top:22px">Set up</div><div class="grid">`
+  h += `<div class="subhead"><span class="sh-txt">Set up</span><span class="sh-line"></span></div><div class="grid">`
     + [['setup','Getting started','The short list that gets a new restaurant running','ti-list-check','linear-gradient(135deg,#C9962E,#8E6510)'],
        ['settings','Settings','Name, colour, logo, join code, labour rules and who can see what','ti-settings','linear-gradient(135deg,#6E7B8A,#41505E)']]
       .filter(r=>canSee(r[0]))
-      .map(([pg,label,desc,icon,grad])=>`<div class="card tile" onclick="go('${pg}')">
-        <div class="tile-top" style="background:${grad}"><i class="ti ${icon}"></i><i class="ti ${icon} bg"></i></div>
+      .map(([pg,label,desc,icon,grad])=>`<div class="card tile quiet" onclick="go('${pg}')">
+        <span class="q-ico" style="background:${grad}"><i class="ti ${icon}"></i></span>
         <div class="tile-body"><div class="tile-title">${label}</div><div class="tile-sub">${desc}</div></div>
+        <i class="ti ti-chevron-right" style="opacity:.4;flex:none"></i>
       </div>`).join('') + `</div>`;
 
   v.innerHTML = h;

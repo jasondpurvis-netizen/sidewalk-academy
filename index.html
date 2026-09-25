@@ -23,9 +23,9 @@
      onto black -- which is the other half of how a teal icon arrived looking black.
      A restaurant with its own logo still gets it: the script below replaces these once
      the page knows whose restaurant it is. -->
-<link rel="apple-touch-icon" id="lAppIcon" sizes="180x180" href="/icons/2026-09-24-31/touch-180.png" />
-<link rel="icon" id="lFavicon" type="image/png" sizes="32x32" href="/icons/2026-09-24-31/icon-32.png" />
-<link rel="icon" type="image/png" sizes="192x192" href="/icons/2026-09-24-31/icon-192.png" />
+<link rel="apple-touch-icon" id="lAppIcon" sizes="180x180" href="/icons/2026-09-24-32/touch-180.png" />
+<link rel="icon" id="lFavicon" type="image/png" sizes="32x32" href="/icons/2026-09-24-32/icon-32.png" />
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/2026-09-24-32/icon-192.png" />
 <link rel="manifest" id="lManifest" href="/manifest.webmanifest" />
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
@@ -38,7 +38,7 @@
     --brand:#4A9CAD; --brand-soft:#EAF4F6; --brand-line:#CDE6EB;
     --accent:#F4C43C; --accent-2:#E5A800; --accent-soft:#FDF3D6; --accent-line:#F2DE9A; --accent-ink:#6E5000;
     --tealdark:#2E6B7A; --tealmid:#4A9CAD; --teallite:#8FC3CE;
-    --bg:#F6F7F9; --card:#FFFFFF; --line:#E9ECEF; --line2:#DCE0E5;
+    --bg:#F7F6F3; --card:#FFFFFF; --line:#EAE8E4; --line2:#DCE0E5;
     --r1:8px; --r2:12px; --r3:12px;
     --green:#1D7A5A; --green-soft:#E4F2EC; --amber:#A9701A; --amber-soft:#F8EEDC;
   }
@@ -227,6 +227,15 @@
   .pband .pb-sub{color:rgba(255,255,255,.88);font-size:15px;line-height:1.5;margin-top:10px;max-width:56ch}
   .pband .pb-chip{margin-top:12px;display:inline-flex;align-items:center;gap:9px;background:rgba(255,255,255,.16);
     border:1px solid rgba(255,255,255,.26);border-radius:999px;padding:7px 15px}
+  /* A band with something to do in it puts the action beside the words rather than
+     under them, so the block stays short and the button is where the eye already is. */
+  .pband.with-cta{padding:22px 26px}
+  .pband.with-cta .pb-in{display:flex;align-items:center;gap:26px;flex-wrap:wrap}
+  .pband.with-cta .pb-words{flex:1;min-width:230px}
+  .pband.with-cta .pb-title{font-size:clamp(21px,2.7vw,26px)}
+  .pband.with-cta .pb-sub{font-size:14px;margin-top:7px;max-width:48ch}
+  .pband.with-cta .phero-cta{margin-top:0;flex:none}
+  @media(max-width:640px){.pband.with-cta .phero-cta{margin-top:14px}}
   .pband .phero-cta{margin-top:18px}
   @media(max-width:640px){.pband{padding:22px 20px 20px}.pband .pb-ghost{font-size:130px}}
   /* One meaning per colour. Red was "needs you" on Today and a warning elsewhere;
@@ -259,6 +268,16 @@
   .panel-head .ttl{font-weight:700;font-size:15.5px;letter-spacing:-.016em;color:var(--ink)}
   .panel-body{padding:0 17px 14px}
   /* one empty state */
+  /* A secondary group on a page -- Getting started and Settings under the Brain --
+     should not shout as loudly as the thing the page is actually about. */
+  .tile.quiet .tile-top{height:0}
+  .tile.quiet{display:flex;align-items:center;gap:13px;padding:14px 16px;cursor:pointer}
+  .tile.quiet .q-ico{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex:none}
+  .tile.quiet .q-ico i.ti{font-size:19px;color:#fff}
+  .tile.quiet .tile-body{padding:0;flex:1;min-width:0}
+  .subhead{display:flex;align-items:center;gap:12px;margin:30px 0 13px}
+  .subhead .sh-line{flex:1;height:1px;background:var(--line)}
+  .subhead .sh-txt{font-size:12px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--faint)}
   .nothing{padding:30px 22px;text-align:center}
   .nothing .n-ttl{font-weight:700;font-size:16.5px;letter-spacing:-.018em}
   .nothing .n-sub{color:var(--muted);font-size:14.5px;margin-top:4px}
@@ -343,12 +362,12 @@
      did another, and the two devices disagreed with no way to tell why. A new query string
      is a new URL, so a stale copy cannot answer for it. Bump it with BUILD on every
      release. -->
-<script src="js/core.js?v=2026-09-24-31"></script>
-<script src="js/academy.js?v=2026-09-24-31"></script>
-<script src="js/community.js?v=2026-09-24-31"></script>
-<script src="js/lists.js?v=2026-09-24-31"></script>
-<script src="js/today.js?v=2026-09-24-31"></script>
-<script src="js/schedule.js?v=2026-09-24-31"></script>
-<script src="js/team.js?v=2026-09-24-31"></script>
+<script src="js/core.js?v=2026-09-24-32"></script>
+<script src="js/academy.js?v=2026-09-24-32"></script>
+<script src="js/community.js?v=2026-09-24-32"></script>
+<script src="js/lists.js?v=2026-09-24-32"></script>
+<script src="js/today.js?v=2026-09-24-32"></script>
+<script src="js/schedule.js?v=2026-09-24-32"></script>
+<script src="js/team.js?v=2026-09-24-32"></script>
 </body>
 </html>

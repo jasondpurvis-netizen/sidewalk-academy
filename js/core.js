@@ -2,7 +2,7 @@
 /* A stamp so any device can say which version it is actually running. Three times now a
    phone and a laptop on the same address have disagreed about what the app looks like,
    and there was no way to tell them apart except by describing the screen. */
-const BUILD = '2026-09-24-31';
+const BUILD = '2026-09-24-32';
 window.BUILD = BUILD;
 const SUPABASE_URL = "https://wjqcnxnwjqmuzrandgea.supabase.co";
 const SUPABASE_KEY = "sb_publishable_DQZclfAnv_MYQJLGcOdzdw_g4vMCiSC";
@@ -1477,7 +1477,12 @@ window.csSaveTarget=async function(mode){ const g=id=>{const e=document.getEleme
 function heroTile(){ return `<svg class="phero-svg" width="100%" height="100%" viewBox="0 0 400 200" preserveAspectRatio="none"><defs><pattern id="swtile" width="40" height="40" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path d="M20 0 L40 20 L20 40 L0 20 Z" fill="none" stroke="#EAF7FA" stroke-width="1.1"/><circle cx="20" cy="20" r="2.2" fill="#EAF7FA"/><path d="M20 6 L20 34 M6 20 L34 20" stroke="#EAF7FA" stroke-width=".7"/></pattern></defs><rect width="400" height="200" fill="url(#swtile)" opacity=".13"/></svg>`; }
 /* The Academy's hero and Today's band were two teal blocks built weeks apart, so the two
    pages that open the app did not look like they came from the same product. One band. */
-function heroBanner(eyebrow,titleHTML,sub,ctaHTML,ghost){ return `<div class="pband"><i class="ti ${ghost||'ti-school'} pb-ghost"></i><div class="pb-in"><div class="pb-eyebrow">${eyebrow}</div><div class="pb-title">${titleHTML}</div>${sub?`<div class="pb-sub">${sub}</div>`:''}${ctaHTML||''}</div></div>`; }
+function heroBanner(eyebrow,titleHTML,sub,ctaHTML,ghost){
+  const wordsAndAction = ctaHTML
+    ? `<div class="pb-words"><div class="pb-eyebrow">${eyebrow}</div><div class="pb-title">${titleHTML}</div>${sub?`<div class="pb-sub">${sub}</div>`:''}</div>${ctaHTML}`
+    : `<div class="pb-eyebrow">${eyebrow}</div><div class="pb-title">${titleHTML}</div>${sub?`<div class="pb-sub">${sub}</div>`:''}`;
+  return `<div class="pband${ctaHTML?' with-cta':''}"><i class="ti ${ghost||'ti-school'} pb-ghost"></i><div class="pb-in">${wordsAndAction}</div></div>`;
+}
 function smartResume(){
   const vt=visibleTracks();
   const started=t=>trackLessons(t.id).some(x=>isDone(x.id));
