@@ -1137,7 +1137,25 @@ window._asSpread=async function(name,wd){
    Events are recorded as day_items rows (kind 'notif'), which inherits the tenant
    isolation already in place and needs no schema change. Push and email become delivery
    channels reading these same records later; the record is the thing that matters. */
+/* ---------- Practice mode ----------
+   Jason needs to publish weeks, approve time off and move shifts around while he learns
+   the thing, without seventeen people being told about every rehearsal. This is the one
+   gate every outgoing message passes through, so switching it off here switches it off
+   everywhere -- published schedules, time-off answers, availability approvals, training
+   assignments. Nothing is lost; nothing is sent.
+   A banner sits across the top of the app the whole time it is on, because a quiet
+   setting that is quietly forgotten is how a team stops being told anything. */
+function isQuiet(){ return !!(state.perms && state.perms._quiet); }
+window.toggleQuiet=async function(){
+  const perms=Object.assign({}, state.perms||{});
+  perms._quiet = !perms._quiet;
+  const r=await window._replaceKind('perms',{kind:'perms',title:'perms',on_date:null,detail:JSON.stringify(perms),created_by:state.user.id});
+  if(!r.ok){ alert('That did not save. '+window._replaceMsg(r)); return; }
+  state.perms=perms;
+  renderApp();
+};
 window.notify=async function(opts){
+  if(isQuiet()) return;
   try{
     const row={
       kind:'notif',
@@ -1570,6 +1588,13 @@ async function vSettings(v){
     <div style="margin-bottom:18px"><label style="display:block;font-size:14px;font-weight:600;margin-bottom:6px">Brand color</label><div class="row" style="gap:11px"><input id="setcolor" type="color" value="${s.brand_color||DEFAULT_BRAND}" style="width:54px;height:38px;cursor:pointer"/><span class="muted" style="font-size:14px">Pick your restaurant's color — the app matches it instantly.</span></div></div>
     <div style="margin-bottom:20px"><label style="display:block;font-size:14px;font-weight:600;margin-bottom:6px">Logo</label><div class="row" style="gap:12px">${s.logo_url?`<img src="${s.logo_url}" style="width:88px;height:48px;border-radius:10px;object-fit:contain;border:1px solid var(--line);background:#fff;padding:4px;box-sizing:border-box"/>`:`<div style="width:48px;height:48px;border-radius:12px;background:var(--brand);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:26px">${esc((s.academy_name||'A').charAt(0).toUpperCase())}</div>`}<div><input id="setlogo" type="file" accept="image/*" style="font-size:14px"/><div class="faint" style="font-size:12.5px;margin-top:4px">PNG or JPG, square works best.</div></div></div></div>
     <div style="margin-bottom:20px"><label style="display:block;font-size:14px;font-weight:600;margin-bottom:6px">Team join code</label><input id="setjoin" type="text" value="${esc(s.join_code||'')}" placeholder="e.g. SIDEWALK" style="width:100%;max-width:220px;letter-spacing:1px"/><div class="faint" style="font-size:12.5px;margin-top:6px">New team members enter this code to join — it keeps strangers out. Post it in the restaurant, or have them scan below.</div>${s.join_code?`<div style="margin-top:12px;display:flex;align-items:center;gap:14px"><img src="https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(location.origin+'/?join='+encodeURIComponent(s.join_code))}" style="width:104px;height:104px;border:1px solid var(--line);border-radius:12px;padding:6px;background:#fff"/><div class="muted" style="font-size:14px">Scan it and it opens the sign-up screen with the code <b>${esc(s.join_code)}</b> already filled in &mdash; they just add their name, email, and a password.</div></div><div class="row" style="gap:8px;margin-top:12px"><button class="btn" style="width:auto" onclick="copyInvite('${esc(s.join_code)}')"><i class="ti ti-copy"></i> Copy invite</button><button class="btn" style="width:auto" onclick="shareInvite('${esc(s.join_code)}')"><i class="ti ti-send"></i> Text / Email</button></div>`:''}</div>
+    <div style="margin:4px 0 20px;padding:14px 16px;border:1px solid var(--line2);border-radius:10px;background:var(--bg)">
+      <label style="display:flex;align-items:flex-start;gap:11px;cursor:pointer">
+        <input type="checkbox" id="setQuiet" ${isQuiet()?'checked':''} onchange="toggleQuiet()" style="margin-top:3px;flex:none"/>
+        <span><span style="font-weight:600;font-size:14px;display:block">Practice mode</span>
+        <span class="muted" style="font-size:13px;line-height:1.5">Nobody is told about anything while this is on &mdash; published schedules, time off, availability, training. Turn it off when you are ready for the team to start hearing from the app.</span></span>
+      </label>
+    </div>
     <div class="row"><button class="btn pri" style="width:auto" onclick="saveSettings()">Save</button><span class="muted" id="setmsg" style="font-size:14px;margin-left:10px"></span></div>
   </div>
   <div class="card" style="padding:14px 18px;max-width:480px;margin-top:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
@@ -1677,6 +1702,7 @@ window.addEventListener('beforeunload',function(e){ if(window._dirty){ e.prevent
 window.savePerms=async function(){
   const perms={}; document.querySelectorAll('.permSel').forEach(s=>{ perms[s.getAttribute('data-pg')]=+s.value; });
   const tv=document.getElementById('teamViewSel'); if(tv) perms._teamView=tv.value;
+  if(state.perms && state.perms._quiet) perms._quiet=true; /* saving the table must not silently switch notifications back on */
   const m=document.getElementById('permsg'); if(m){ m.style.color=''; m.textContent='Saving…'; }
   const _rk=await window._replaceKind('perms',{kind:'perms',title:'perms',on_date:null,detail:JSON.stringify(perms),created_by:state.user.id});
   if(!_rk.ok){ if(m){ m.style.color='#A32D2D'; m.textContent=window._replaceMsg(_rk); } return; } // never claim success on a failed write
