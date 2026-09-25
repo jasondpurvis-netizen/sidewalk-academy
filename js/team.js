@@ -910,6 +910,18 @@ async function vBrain(v){
     rules:   ['linear-gradient(135deg,#5C7CE0,#2F4BA8)','ti-gavel'],
     pay:     ['linear-gradient(135deg,#B0539B,#78256A)','ti-coin']
   };
+  }
+  /* Getting started and Settings left the sidebar, so the Brain has to hold their doors.
+     Two tiles, same language the Academy uses, under what the restaurant knows. */
+  h += `<div class="sec" style="margin-top:0">Set up</div><div class="grid" style="margin-bottom:34px">`
+    + [['setup','Getting started','The short list that gets a new restaurant running','ti-list-check','linear-gradient(135deg,#C9962E,#8E6510)'],
+       ['settings','Settings','Name, colour, logo, join code, labour rules and who can see what','ti-settings','linear-gradient(135deg,#6E7B8A,#41505E)']]
+      .filter(r=>canSee(r[0]))
+      .map(([pg,label,desc,icon,grad])=>`<div class="card tile" onclick="go('${pg}')">
+        <div class="tile-top" style="background:${grad}"><i class="ti ${icon}"></i><i class="ti ${icon} bg"></i></div>
+        <div class="tile-body"><div class="tile-title">${label}</div><div class="tile-sub">${desc}</div></div>
+      </div>`).join('') + `</div>`;
+
   h += `<div class="sec">What it knows</div><div class="grid">`;
   shown.forEach(p=>{
     const t=BRAIN_TONE[p.k]||['linear-gradient(135deg,#6E7B8A,#41505E)','ti-adjustments'];
@@ -930,18 +942,6 @@ async function vBrain(v){
     h += `<div class="card" style="padding:15px 18px;margin-top:16px;background:#F7EEDC;border-color:#E4CFA3">
       <div style="font-weight:700;font-size:14px;color:#7A5B1E;margin-bottom:5px">What auto-draft cannot do yet</div>
       <div style="font-size:14px;line-height:1.7;color:#7A5B1E">${blocking.map(b=>'&bull; '+esc(b.why)).join('<br>')}</div></div>`;
-  }
-  /* Getting started and Settings left the sidebar, so the Brain has to hold their doors.
-     Two tiles, same language the Academy uses, under what the restaurant knows. */
-  h += `<div class="subhead"><span class="sh-txt">Set up</span><span class="sh-line"></span></div><div class="grid">`
-    + [['setup','Getting started','The short list that gets a new restaurant running','ti-list-check','linear-gradient(135deg,#C9962E,#8E6510)'],
-       ['settings','Settings','Name, colour, logo, join code, labour rules and who can see what','ti-settings','linear-gradient(135deg,#6E7B8A,#41505E)']]
-      .filter(r=>canSee(r[0]))
-      .map(([pg,label,desc,icon,grad])=>`<div class="card tile quiet" onclick="go('${pg}')">
-        <span class="q-ico" style="background:${grad}"><i class="ti ${icon}"></i></span>
-        <div class="tile-body"><div class="tile-title">${label}</div><div class="tile-sub">${desc}</div></div>
-        <i class="ti ti-chevron-right" style="opacity:.4;flex:none"></i>
-      </div>`).join('') + `</div>`;
 
   v.innerHTML = h;
 }
@@ -1612,9 +1612,12 @@ async function vSettings(v){
   const _sect=state.ctx.sect;
   if(_sect && _parts[_sect]){
     const row=SECTS.find(x=>x[0]===_sect);
+    /* From Scheduling rules you can step straight to Who can see what. Going back to the
+       menu to choose the next one was a click that did nothing but re-show a list. */
+    const _sibs=`<div class="sibs">`+SECTS.map(x=>`<a onclick="go('settings',{sect:'${x[0]}'})"${x[0]===_sect?' class="on"':''}>${esc(x[1])}</a>`).join('')+`</div>`;
     v.innerHTML=`<div class="crumb" onclick="go('settings')">\u2190 Settings</div>`
       +`<div style="display:flex;align-items:center;gap:13px;margin:0 0 16px"><div style="width:46px;height:46px;border-radius:11px;background:${row[4]};display:flex;align-items:center;justify-content:center;flex:none"><i class="ti ${row[3]}" style="font-size:23px;color:#fff"></i></div><div><div style="font-weight:800;font-size:19px;letter-spacing:-.02em">${esc(row[1])}</div><div class="muted" style="font-size:13.5px">${esc(row[2])}</div></div></div>`
-      +_parts[_sect];
+      +_sibs+_parts[_sect];
   } else {
     v.innerHTML=`<div class="grid">`+SECTS.map(([k,label,desc,icon,grad])=>
       `<div class="card tile" onclick="go('settings',{sect:'${k}'})">

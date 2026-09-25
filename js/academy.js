@@ -413,6 +413,9 @@ function _renderRecipes(v){
     const list=all.filter(o=>(o.d.type||'Other')===cat);
     const t=_recTone(cat);
     h+=`<div class="crumb" onclick="recipeCat(null)">← Recipes</div>`;
+    /* Step between categories without going back to the grid first. */
+    const _names=[...new Set(all.map(o=>o.d.type||'Other'))].sort((a,b)=>a.localeCompare(b));
+    h+=`<div class="sibs">`+_names.map(n=>`<a onclick="recipeCat('${esc(n).replace(/'/g,"\\'")}')"${n===cat?' class="on"':''}>${esc(n)}</a>`).join('')+`</div>`;
     h+=`<div style="display:flex;align-items:center;gap:14px;margin:0 0 15px">
           <div style="width:52px;height:52px;border-radius:12px;background:${t.g};display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 8px 18px rgba(23,37,42,.2)">${_recIcon(t.ic,26,'#fff',1)}</div>
           <div><div style="font-weight:800;font-size:20px;letter-spacing:-.02em">${esc(cat)}</div>
