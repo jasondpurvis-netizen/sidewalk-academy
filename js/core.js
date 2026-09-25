@@ -2,7 +2,7 @@
 /* A stamp so any device can say which version it is actually running. Three times now a
    phone and a laptop on the same address have disagreed about what the app looks like,
    and there was no way to tell them apart except by describing the screen. */
-const BUILD = '2026-09-24-26';
+const BUILD = '2026-09-24-27';
 window.BUILD = BUILD;
 const SUPABASE_URL = "https://wjqcnxnwjqmuzrandgea.supabase.co";
 const SUPABASE_KEY = "sb_publishable_DQZclfAnv_MYQJLGcOdzdw_g4vMCiSC";
@@ -650,24 +650,29 @@ function canSee(page){ return myRank()>=permOf(page)||hasGrant(page); }
    screen because its icon lookup ran at load time and found no NAV_ALL. They are
    plain constants with no dependency on renderApp's locals, so they live here. */
 const NAV_MAIN=[["today","Today","ti-sun"],["schedule","Schedule","ti-calendar-week"],["team","Team","ti-users"]];
-const NAV_ACADEMY=[["home","Training","ti-school"],["recipes","Recipes","ti-chef-hat"],["resources","Resources","ti-files"],["build","Create training","ti-tools"]];
+/* Recipes, Resources, Create training and Progress are all tiles on the Academy page
+   already. Giving them a sidebar line as well is two doors to one room -- the same
+   duplication that once put pay rates in two places. One door: the Academy. */
+const NAV_ACADEMY=[["home","The Academy","ti-school"]];
 const NAV_OPS=[["logbook","Shift log","ti-clipboard-check"],["lists","Checklists","ti-list-details"],["rm","Fix-it list","ti-tool"],["recovery","Guest recovery","ti-heart-handshake"],["catering","Catering","ti-tools-kitchen-2"]];
 const NAV_TALK=[["community","Messages","ti-messages"]];
-const NAV_SETUP=[["brain","What it knows","ti-brain"],["setup","Getting started","ti-list-check"],["settings","Settings","ti-settings"]];
+/* Getting started is a one-time thing and Settings is already three tiles of its own.
+   Both belong inside the Brain rather than beside it. */
+const NAV_SETUP=[["brain","The Brain","ti-brain"]];
 /* Groups named after what you came to do, not where a thing is filed. "Operations" and
    "Set up" were cabinet labels. And The Brain is a place now rather than one page inside
    a setup list -- what the restaurant knows about itself is the thing everything else is
    built from, so it gets a section. */
-const NAV_ALL=[["",NAV_MAIN],["The Academy",NAV_ACADEMY],["Running the shift",NAV_OPS],["",NAV_TALK],["The Brain",NAV_SETUP]];
+const NAV_ALL=[["",NAV_MAIN],["",NAV_ACADEMY],["Running the shift",NAV_OPS],["",NAV_TALK],["",NAV_SETUP]];
 
 /* Every page that can be pinned, including the ones with no door of their own.
    A page with no label here cannot be pinned, which is the intent for the
    internal ones (lesson, track, acat) that only make sense from somewhere else. */
 const PAGE_LABEL={
-  today:'Today', schedule:'Schedule', team:'Team', home:'Training', recipes:'Recipes',
+  today:'Today', schedule:'Schedule', team:'Team', home:'The Academy', recipes:'Recipes',
   resources:'Resources', build:'Create training', logbook:'Shift log', lists:'Checklists',
   rm:'Fix-it list', recovery:'Guest recovery', catering:'Catering', community:'Messages',
-  brain:'What it knows', setup:'Getting started', settings:'Settings',
+  brain:'The Brain', setup:'Getting started', settings:'Settings',
   /* no door in the sidebar any more -- reachable by pinning, or from the page they belong to */
   ownership:'Who owns what', onboarding:'New hires', ask:'Find an answer',
   downloads:'Downloads', sales:'Sales', saleshist:'Sales history',
@@ -1510,8 +1515,13 @@ function vHome(v){
      than as a tab on Team next to the roster. */
   const ICON_PROG='<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#fff" stroke-width="1.8"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>';
   const prog=`<div class="entrycard" style="position:relative;overflow:hidden;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:22px;box-shadow:0 10px 26px rgba(23,37,42,.09);cursor:pointer" onclick="go('summary')"><div style="position:absolute;top:0;left:0;right:0;height:5px;background:linear-gradient(90deg,#3FA06B,#7FD0A4)"></div><div class="emedallion" style="background:linear-gradient(135deg,#3FA06B,#227048);box-shadow:0 8px 18px rgba(63,160,107,.34)">${ICON_PROG}</div><div style="font-weight:800;font-size:18px;letter-spacing:-.01em">Progress</div><div class="muted" style="font-size:14px;margin-top:5px;line-height:1.5">Who has finished what, and who is stuck.</div><div style="font-weight:600;font-size:15.5px;letter-spacing:-.012em;margin-top:14px;color:#227048">Open &rarr;</div></div>`;
-  if(_vt.length) h+=`<div class="entrygrid">${dev}${ops}${rec}${prog}</div>`;
-  else h+=`<div class="entrygrid">${rec}${prog}</div>`;
+  const ICON_FILE='<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#fff" stroke-width="1.8"><path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z"/><path d="M14 3v5h5"/></svg>';
+  const ICON_BUILD='<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#fff" stroke-width="1.8"><path d="M3 21l3-1 11-11-2-2L4 18z"/><path d="M15 5l4 4"/></svg>';
+  const _tile=(pg,label,desc,bar,med,sh,icon,ink)=>!canSee(pg)?'':`<div class="entrycard" style="position:relative;overflow:hidden;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:22px;box-shadow:0 10px 26px rgba(23,37,42,.09);cursor:pointer" onclick="go('${pg}')"><div style="position:absolute;top:0;left:0;right:0;height:5px;background:${bar}"></div><div class="emedallion" style="background:${med};box-shadow:0 8px 18px ${sh}">${icon}</div><div style="font-weight:800;font-size:18px;letter-spacing:-.01em">${label}</div><div class="muted" style="font-size:14px;margin-top:5px;line-height:1.5">${desc}</div><div style="font-weight:600;font-size:15.5px;letter-spacing:-.012em;margin-top:14px;color:${ink}">Open &rarr;</div></div>`;
+  const res=_tile('resources','Resources','Files and links your team needs to hand.','linear-gradient(90deg,#5C7CE0,#9DB1F0)','linear-gradient(135deg,#5C7CE0,#2F4BA8)','rgba(92,124,224,.34)',ICON_FILE,'#2F4BA8');
+  const bld=_tile('build','Create training','Write a new track, module or lesson.','linear-gradient(90deg,#B0539B,#D98FC8)','linear-gradient(135deg,#B0539B,#78256A)','rgba(176,83,155,.34)',ICON_BUILD,'#78256A');
+  if(_vt.length) h+=`<div class="entrygrid">${dev}${ops}${rec}${prog}${res}${bld}</div>`;
+  else h+=`<div class="entrygrid">${rec}${prog}${res}${bld}</div>`;
   v.innerHTML=h;
   /* Fill in the count once, quietly, so the card is not lying on a cold load. */
   if(state._recipeCount==null){

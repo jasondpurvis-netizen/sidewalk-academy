@@ -914,6 +914,20 @@ async function vBrain(v){
       <div style="font-weight:700;font-size:14px;color:#7A5B1E;margin-bottom:5px">What auto-draft cannot do yet</div>
       <div style="font-size:14px;line-height:1.7;color:#7A5B1E">${blocking.map(b=>'&bull; '+esc(b.why)).join('<br>')}</div></div>`;
   }
+  /* Getting started and Settings left the sidebar, so the Brain has to hold their doors.
+     Two tiles, same language the Academy uses, under what the restaurant knows. */
+  h += `<div class="sec" style="margin-top:22px">Set up</div><div class="grid">`
+    + [['setup','Getting started','The short list that gets a new restaurant running','ti-list-check','linear-gradient(135deg,#C9962E,#8E6510)'],
+       ['settings','Settings','Name, colour, logo, join code, labour rules and who can see what','ti-settings','linear-gradient(135deg,#6E7B8A,#41505E)']]
+      .filter(r=>canSee(r[0]))
+      .map(([pg,label,desc,icon,grad])=>`<div class="card" style="padding:0;overflow:hidden;cursor:pointer" onclick="go('${pg}')">
+        <div style="height:74px;background:${grad};position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden">
+          <i class="ti ${icon}" style="font-size:30px;color:#fff;opacity:.97"></i>
+          <i class="ti ${icon}" style="position:absolute;right:-10px;bottom:-14px;font-size:76px;color:#fff;opacity:.11"></i>
+        </div>
+        <div style="padding:13px 15px 15px"><div style="font-weight:600;font-size:15.5px;margin-bottom:3px">${label}</div><div class="muted" style="font-size:12.5px;line-height:1.45">${desc}</div></div>
+      </div>`).join('') + `</div>`;
+
   v.innerHTML = h;
 }
 
