@@ -2,7 +2,7 @@
 /* A stamp so any device can say which version it is actually running. Three times now a
    phone and a laptop on the same address have disagreed about what the app looks like,
    and there was no way to tell them apart except by describing the screen. */
-const BUILD = '2026-09-24-36';
+const BUILD = '2026-09-24-37';
 window.BUILD = BUILD;
 const SUPABASE_URL = "https://wjqcnxnwjqmuzrandgea.supabase.co";
 const SUPABASE_KEY = "sb_publishable_DQZclfAnv_MYQJLGcOdzdw_g4vMCiSC";
@@ -717,6 +717,15 @@ window.switchRestaurant=async function(tid){
   try{ localStorage.setItem('sw_nav', JSON.stringify({p:'today',c:{}})); }catch(e){}
   location.reload();
 };
+/* The sidebar said "Sidewalk Academy" with "Training" under it. The app stopped being a
+   training tool a long time ago -- it runs the schedule, the shift and the team -- so it
+   wears the restaurant's own name and nothing else. The training programme keeps its name
+   where it belongs, on the Academy page. */
+function _brandName(){
+  const t=state.tenant||{};
+  const s=state.settings||{};
+  return t.name || s.academy_name || 'Restaurant';
+}
 function renderApp(){
   const isAdmin = state.profile && state.profile.role==="admin";
   const realAdmin = state.previewLIT ? (state._realRole==='admin') : isAdmin;
@@ -765,7 +774,7 @@ function renderApp(){
   const _pins=[];
   root.innerHTML = `<div class="app">
     <aside class="side">
-      <div class="brand" onclick="go('whiteboard')" style="cursor:pointer${state.settings&&state.settings.logo_url?';flex-direction:column;align-items:flex-start;gap:9px;padding:20px 18px':''}">${state.settings&&state.settings.logo_url?`<img src="${state.settings.logo_url}" style="max-width:190px;max-height:64px;width:auto;height:auto;object-fit:contain;display:block" alt="logo"/><div><b>${esc((state.settings&&state.settings.academy_name)||'Academy')}</b><span>Training</span></div>`:`<div class="lg">${esc(((state.settings&&state.settings.academy_name)||'A').charAt(0).toUpperCase())}</div><div><b>${esc((state.settings&&state.settings.academy_name)||'Academy')}</b><span>Training</span></div>`}</div>
+      <div class="brand" onclick="go('whiteboard')" style="cursor:pointer${state.settings&&state.settings.logo_url?';flex-direction:column;align-items:flex-start;gap:9px;padding:20px 18px':''}">${state.settings&&state.settings.logo_url?`<img src="${state.settings.logo_url}" style="max-width:190px;max-height:64px;width:auto;height:auto;object-fit:contain;display:block" alt="logo"/><div><b>${esc(_brandName())}</b></div>`:`<div class="lg">${esc((_brandName()||'A').charAt(0).toUpperCase())}</div><div><b>${esc(_brandName())}</b></div>`}</div>
       ${(function(){
         const ms=(state.memberships||[]);
         if(ms.length<2) return '';
