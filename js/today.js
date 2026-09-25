@@ -15,11 +15,15 @@ async function vSchedule(v){
      percentage -- is already on the Schedule tab, and last year already sits under each
      day of the grid, which is where it is useful because that is where you are deciding.
      The page still works and can be pinned; it just no longer costs a tab. */
-  const TABS=[['schedule','Schedule',1],['team','Who\u2019s working',3],['availability','Availability',1],['timeoff','Time off',1],['pool','Shift swaps',1]];
+  const TABS=[['schedule','Schedule',1],['team','Who\u2019s working',3],['whenwork','When people can work',1],['pool','Shift swaps',1]];
+  /* Old links -- saved pages, and the notifications sent when somebody asks for time off
+     or an availability change -- still say availability/timeoff. Send them to the tab
+     that now answers both rather than dropping them on the schedule. */
+  if(stab==='availability'||stab==='timeoff') stab='whenwork';
   const tabs=TABS.filter(t=>myRank()>=t[2]); const allowed=new Set(tabs.map(t=>t[0])); const useTab=allowed.has(stab)?stab:'overview';
   v.innerHTML=`<div class="schtabs">`+tabs.map(t=>`<button class="schtab${useTab===t[0]?' on':''}" onclick="schGo('${t[0]}')">${t[1]}</button>`).join('')+`</div><div id="schbody"><div class="muted">Loading…</div></div>`;
   const body=document.getElementById('schbody');
-  ({schedule:schBoard, team:schTeam, availability:schAvail, timeoff:schTimeoff, pool:schPool, reports:schReports}[useTab]||schBoard)(body);
+  ({schedule:schBoard, team:schTeam, whenwork:schWhenWork, availability:schWhenWork, timeoff:schWhenWork, pool:schPool, reports:schReports}[useTab]||schBoard)(body);
   /* Taking Reports off the tab bar should not make it unreachable -- the printable
      week totals still have their use at month end. One quiet line under the schedule
      rather than a permanent tab. */

@@ -1220,6 +1220,21 @@ h+=`<div class="faint" style="font-size:14px;margin-bottom:14px">${team.length} 
   v.innerHTML=h;
 }
 const AV_DOW=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+/* ---------- When people can work ----------
+   Availability and Time off were two tabs asking one question: can I put this person on
+   this day. They are not the same thing -- availability is the week somebody normally
+   works, time off is a one-off request for named dates -- so they stay clearly apart
+   inside, under their own headings. Two sections, one answer, one place to look. */
+async function schWhenWork(v){
+  v.innerHTML='<div class="muted">Loading\u2026</div>';
+  v.innerHTML='<div id="wwAvail"></div><div id="wwTimeOff" style="margin-top:26px"></div>';
+  const a=document.getElementById('wwAvail'), t=document.getElementById('wwTimeOff');
+  a.innerHTML='<div class="sec" style="margin-top:0">Their usual week</div><div class="faint" style="font-size:13px;margin:-6px 0 12px">The days and hours somebody normally works. Changes come here for approval.</div><div id="wwAvailBody"><div class="muted">Loading\u2026</div></div>';
+  t.innerHTML='<div class="sec">Time off requests</div><div class="faint" style="font-size:13px;margin:-6px 0 12px">One-off dates somebody has asked for. Approving one keeps them off the draft.</div><div id="wwTimeOffBody"><div class="muted">Loading\u2026</div></div>';
+  try{ await schAvail(document.getElementById('wwAvailBody')); }catch(e){ document.getElementById('wwAvailBody').innerHTML='<div class="faint">Could not load availability.</div>'; }
+  try{ await schTimeoff(document.getElementById('wwTimeOffBody')); }catch(e){ document.getElementById('wwTimeOffBody').innerHTML='<div class="faint">Could not load time off.</div>'; }
+}
+
 async function schAvail(v){
   const isAdmin=state.profile&&state.profile.role==='admin';
   const mgr=myRank()>=3||hasGrant('schedule'); // team-availability grid is a scheduling tool — any manager (or granted scheduler), not just the owner
@@ -1910,7 +1925,17 @@ async function vTeam(v){
   let tab=state.ctx.ttab; if(!tab){ try{ tab=localStorage.getItem('teamTab'); }catch(e){} } if(!tab) tab='roster'; state.ctx.ttab=tab;
   setTitle('Team','Your people — profiles, progress & former team');
   const seg=(k,l)=>`<button onclick="state.ctx.ttab='${k}';try{localStorage.setItem('teamTab','${k}')}catch(e){};vTeam(document.getElementById('view'))" style="padding:7px 15px;font-size:14px;font-weight:600;border:none;cursor:pointer;font-family:inherit;background:${tab===k?'var(--brand)':'var(--card)'};color:${tab===k?'#fff':'var(--muted)'}">${l}</button>`;
-  v.innerHTML=`<div style="display:inline-flex;border:1px solid var(--line2);border-radius:8px;overflow:hidden;margin-bottom:18px;flex-wrap:wrap">${seg('roster','Roster')}${seg('skills','Skills')}${seg('certs','Certifications')}${seg('progress','Academy progress')}${canCorract()?seg('corract','Corrective actions'):''}${seg('former','Former team')}</div><div id="teambody"><div class="muted">Loading…</div></div>`;
+  /* Six tabs for one page. Three of them are who somebody is -- the roster, what they
+     can run, what they are certified on -- and those stay. Academy progress is training,
+     so it belongs in The Academy. Write-ups and former team are records you consult about
+     one person, not lists you scan, so they are reached from that person rather than
+     from a tab sitting next to the roster everyone opens. */
+  v.innerHTML=`<div style="display:inline-flex;border:1px solid var(--line2);border-radius:8px;overflow:hidden;margin-bottom:18px;flex-wrap:wrap">${seg('roster','Roster')}${seg('skills','Skills')}${seg('certs','Certifications')}</div>
+    <div class="row" style="gap:9px;flex-wrap:wrap;margin:-8px 0 16px">
+      <button class="btn" style="width:auto;font-size:13.5px" onclick="go('summary')"><i class="ti ti-chart-bar"></i> Training progress</button>
+      <button class="btn" style="width:auto;font-size:13.5px" onclick="state.ctx.ttab='former';vTeam(document.getElementById('view'))"><i class="ti ti-user-off"></i> Former team</button>
+      ${canCorract()?`<button class="btn" style="width:auto;font-size:13.5px" onclick="state.ctx.ttab='corract';vTeam(document.getElementById('view'))"><i class="ti ti-file-alert"></i> Write-ups</button>`:''}
+    </div><div id="teambody"><div class="muted">Loading…</div></div>`;
   const body=document.getElementById('teambody');
   if(tab==='corract'){ teamCorract(body); return; }
   if(tab==='progress'){ vSummary(body); return; }
