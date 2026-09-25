@@ -23,9 +23,9 @@
      onto black -- which is the other half of how a teal icon arrived looking black.
      A restaurant with its own logo still gets it: the script below replaces these once
      the page knows whose restaurant it is. -->
-<link rel="apple-touch-icon" id="lAppIcon" sizes="180x180" href="/icons/2026-09-24-30/touch-180.png" />
-<link rel="icon" id="lFavicon" type="image/png" sizes="32x32" href="/icons/2026-09-24-30/icon-32.png" />
-<link rel="icon" type="image/png" sizes="192x192" href="/icons/2026-09-24-30/icon-192.png" />
+<link rel="apple-touch-icon" id="lAppIcon" sizes="180x180" href="/icons/2026-09-24-31/touch-180.png" />
+<link rel="icon" id="lFavicon" type="image/png" sizes="32x32" href="/icons/2026-09-24-31/icon-32.png" />
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/2026-09-24-31/icon-192.png" />
 <link rel="manifest" id="lManifest" href="/manifest.webmanifest" />
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
@@ -229,6 +229,19 @@
     border:1px solid rgba(255,255,255,.26);border-radius:999px;padding:7px 15px}
   .pband .phero-cta{margin-top:18px}
   @media(max-width:640px){.pband{padding:22px 20px 20px}.pband .pb-ghost{font-size:130px}}
+  /* One meaning per colour. Red was "needs you" on Today and a warning elsewhere;
+     amber was used for both "coming up" and "careful". Named here so a screen picks a
+     meaning rather than a colour, and so they cannot drift apart again.
+       stop  = wrong now, and somebody has to act
+       soon  = coming, or worth knowing before it bites
+       good  = nothing to do
+       calm  = information, no urgency */
+  :root{
+    --stop:#C2402F; --stop-soft:#FCEDEB;
+    --soon:#B7791F; --soon-soft:#FDF4E1;
+    --good:#2A7549; --good-soft:#E9F5EE;
+    --calm:#5C6B7A; --calm-soft:#F1F4F6;
+  }
   .tile{padding:0;overflow:hidden;cursor:pointer;display:block}
   .tile .tile-top{height:88px;position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden}
   .tile .tile-top i.ti{font-size:34px;color:#fff;opacity:.97}
@@ -330,12 +343,12 @@
      did another, and the two devices disagreed with no way to tell why. A new query string
      is a new URL, so a stale copy cannot answer for it. Bump it with BUILD on every
      release. -->
-<script src="js/core.js?v=2026-09-24-30"></script>
-<script src="js/academy.js?v=2026-09-24-30"></script>
-<script src="js/community.js?v=2026-09-24-30"></script>
-<script src="js/lists.js?v=2026-09-24-30"></script>
-<script src="js/today.js?v=2026-09-24-30"></script>
-<script src="js/schedule.js?v=2026-09-24-30"></script>
-<script src="js/team.js?v=2026-09-24-30"></script>
+<script src="js/core.js?v=2026-09-24-31"></script>
+<script src="js/academy.js?v=2026-09-24-31"></script>
+<script src="js/community.js?v=2026-09-24-31"></script>
+<script src="js/lists.js?v=2026-09-24-31"></script>
+<script src="js/today.js?v=2026-09-24-31"></script>
+<script src="js/schedule.js?v=2026-09-24-31"></script>
+<script src="js/team.js?v=2026-09-24-31"></script>
 </body>
 </html>

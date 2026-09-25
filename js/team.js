@@ -895,19 +895,36 @@ async function vBrain(v){
     </div>
   </div>`;
 
-  h += `<div class="sec">What it knows</div><div class="card" style="padding:0;overflow:hidden">`;
-  shown.forEach((p,i)=>{
-    h += `<div style="display:flex;gap:13px;align-items:flex-start;padding:15px 17px;${i?'border-top:1px solid var(--line)':''}">
-      <i class="ti ${p.done?'ti-circle-check':'ti-circle-dashed'}" style="font-size:18px;flex:none;margin-top:1px;color:${p.done?'#2C6E4B':'var(--muted)'}"></i>
-      <div style="flex:1;min-width:0">
-        <div style="font-weight:700;font-size:14px">${esc(p.label)} ${p.soft?'<span class="faint" style="font-weight:500;font-size:12.5px">· optional</span>':''}</div>
-        <div class="faint" style="font-size:12.5px;margin-top:1px">${esc(p.detail)}</div>
-        ${p.done?'':`<div class="faint" style="font-size:12.5px;margin-top:5px;line-height:1.5">${esc(p.why)}</div>`}
+  /* This was a checklist: a row per thing, a tick, and a button that sent you somewhere
+     else to do it. A checklist is something you finish and never open again, which is
+     the opposite of what the Brain is for -- it is the standing answer to what this
+     restaurant is, and it gets edited for as long as the restaurant exists.
+     Tiles, in the same language as the Academy and Settings, each carrying its own
+     state so you can see at a glance what the schedule is being built from. */
+  const BRAIN_TONE={
+    stations:['linear-gradient(135deg,#4A9CAD,#2A6E7A)','ti-layout-grid'],
+    skills:  ['linear-gradient(135deg,#8A5CF6,#5A2FC2)','ti-user-check'],
+    coverage:['linear-gradient(135deg,#C2402F,#8E2416)','ti-shield-check'],
+    leaders: ['linear-gradient(135deg,#C9962E,#8E6510)','ti-star'],
+    avail:   ['linear-gradient(135deg,#3FA06B,#227048)','ti-calendar-time'],
+    rules:   ['linear-gradient(135deg,#5C7CE0,#2F4BA8)','ti-gavel'],
+    pay:     ['linear-gradient(135deg,#B0539B,#78256A)','ti-coin']
+  };
+  h += `<div class="sec">What it knows</div><div class="grid">`;
+  shown.forEach(p=>{
+    const t=BRAIN_TONE[p.k]||['linear-gradient(135deg,#6E7B8A,#41505E)','ti-adjustments'];
+    h += `<div class="card tile" onclick="${p.act}">
+      <div class="tile-top" style="background:${t[0]}">
+        <i class="ti ${t[1]}"></i><i class="ti ${t[1]} bg"></i>
+        <span style="position:absolute;top:9px;right:10px;display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,.92);border-radius:999px;padding:3px 9px;font-size:11.5px;font-weight:700;color:${p.done?'var(--good)':'var(--soon)'}">
+          <i class="ti ${p.done?'ti-check':'ti-dots'}" style="font-size:12px;color:inherit;opacity:1"></i>${p.done?'Set':(p.soft?'Optional':'Needed')}
+        </span>
       </div>
-      <button class="btn" style="width:auto;padding:7px 13px;font-size:12.5px;flex:none" onclick="${p.act}">${esc(p.cta)}</button>
-    </div>`;
+      <div class="tile-body">
+        <div class="tile-title">${esc(p.label)}</div>
+        <div class="tile-sub">${esc(p.detail)}</div>
+      </div></div>`;
   });
-  h += `</div>`;
 
   if(blocking.length){
     h += `<div class="card" style="padding:15px 18px;margin-top:16px;background:#F7EEDC;border-color:#E4CFA3">
@@ -1782,12 +1799,23 @@ async function boot(){
   }catch(e){}
   await loadAll();
   if(!applyHash()){
-    /* Opening the app always lands on Today. It used to reopen wherever you happened to
-       close it, so somebody who last looked at Settings on Tuesday opened the app on
-       Settings on Wednesday morning. Today is the page that knows what changed overnight,
-       and it is the first impression every single day. The saved page is still used for
-       the browser back button and for a reload inside a session. */
-    state.page='today'; state.ctx={};
+    /* Today on the first open of a day, your own place after that. Landing on Today
+       every single time meant a refresh in the middle of building a schedule threw the
+       page away; reopening wherever you closed it meant somebody who last looked at
+       Settings on Tuesday opened on Settings on Wednesday morning. The date is the
+       difference between the two. */
+    let np='today', nc={};
+    try{
+      const seen=localStorage.getItem('sw_lastday');
+      const todayKey=isoDate(new Date());
+      if(seen===todayKey){
+        const n=JSON.parse(localStorage.getItem('sw_nav')||'null');
+        if(n&&n.p){ np=n.p; nc=n.c||{}; }
+      }
+      localStorage.setItem('sw_lastday', todayKey);
+    }catch(e){}
+    if((np==='lesson'||np==='track') && !(nc.tid && state.tracks.find(t=>t.id===nc.tid))){ np='home'; nc={}; }
+    state.page=np; state.ctx=nc;
   }
   render();
   try{ updateBillingBanner(); }catch(e){}
