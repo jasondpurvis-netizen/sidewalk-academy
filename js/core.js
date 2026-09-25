@@ -2,7 +2,7 @@
 /* A stamp so any device can say which version it is actually running. Three times now a
    phone and a laptop on the same address have disagreed about what the app looks like,
    and there was no way to tell them apart except by describing the screen. */
-const BUILD = '2026-09-24-28';
+const BUILD = '2026-09-24-29';
 window.BUILD = BUILD;
 const SUPABASE_URL = "https://wjqcnxnwjqmuzrandgea.supabase.co";
 const SUPABASE_KEY = "sb_publishable_DQZclfAnv_MYQJLGcOdzdw_g4vMCiSC";
@@ -510,7 +510,7 @@ function renderAuth(){
     <label>Email</label><input id="email" type="email" placeholder="you@email.com" autocomplete="email"/>
     ${m==="reset"?``:`<label>Password</label><input id="pass" type="password" placeholder="••••••••" autocomplete="${m==="in"?"current-password":"new-password"}"/>`}
     ${(m==="up"&&state._joinPrefill)?`<label>Join code</label><input id="jc" type="text" value="${esc(state._joinPrefill||'')}" placeholder="Ask your manager" autocomplete="off"/>`:``}
-    <button class="btn pri" id="go">${m==="in"?"Sign in":(m==="reset"?"Send reset link":"Create account")}</button>
+    <button class="btn pri full" id="go">${m==="in"?"Sign in":(m==="reset"?"Send reset link":"Create account")}</button>
     ${m==="in"?`<div style="text-align:center;margin-top:12px"><b id="fp" style="color:var(--brand);cursor:pointer;font-size:14px;font-weight:600">Forgot password?</b></div>`:``}
     <div class="toggle">${m==="in"?"New here? <b id='tg'>Create an account</b>":(m==="reset"?"<b id='tg'>&larr; Back to sign in</b>":"Have an account? <b id='tg'>Sign in</b>")}</div>
   </div></div>`;
@@ -529,7 +529,7 @@ async function sendReset(){
 }
 function renderSetPassword(){
   const s=state.settings||{}; const logo = s.logo_url?`<img src="${s.logo_url}" style="max-width:230px;max-height:76px;width:auto;height:auto;object-fit:contain;margin:0 auto 16px;display:block"/>`:`<div class="logo">${esc((s.academy_name||'A').charAt(0).toUpperCase())}</div>`;
-  root.innerHTML = `<div class="auth"><div class="box">${logo}<h1>Set a new password</h1><p class="sub">Almost there — pick a new password for your account.</p><div id="amsg"></div><label>New password</label><input id="np1" type="password" placeholder="••••••••" autocomplete="new-password"/><label>Confirm new password</label><input id="np2" type="password" placeholder="••••••••" autocomplete="new-password"/><button class="btn pri" id="npgo">Save new password</button></div></div>`;
+  root.innerHTML = `<div class="auth"><div class="box">${logo}<h1>Set a new password</h1><p class="sub">Almost there — pick a new password for your account.</p><div id="amsg"></div><label>New password</label><input id="np1" type="password" placeholder="••••••••" autocomplete="new-password"/><label>Confirm new password</label><input id="np2" type="password" placeholder="••••••••" autocomplete="new-password"/><button class="btn pri full" id="npgo">Save new password</button></div></div>`;
   document.getElementById("npgo").onclick=doSetPassword;
   document.getElementById("np2").onkeydown=e=>{ if(e.key==="Enter") doSetPassword(); };
 }
@@ -560,7 +560,7 @@ window.doSetPassword=async function(){
   }catch(e){ amsg((e&&e.message)||String(e),"err"); restore(); }
 };
 function renderNewRestaurant(){
-  root.innerHTML = `<div class="auth"><div class="box"><div class="logo">🏪</div><h1>Welcome</h1><p class="sub">Are you setting up a restaurant, or joining one that already exists?</p><div id="nrmsg"></div><div style="border:1px solid var(--line2);border-radius:12px;padding:16px;margin-bottom:14px;text-align:left"><div style="font-weight:800;font-size:15.5px">Set up my restaurant</div><div class="muted" style="font-size:12.5px;margin:3px 0 12px;line-height:1.5">For the owner or manager. This creates your restaurant and its academy.</div><label>Restaurant name</label><input id="nrName" type="text" placeholder="e.g. Main Street Diner" autocomplete="organization"/><button class="btn pri" id="nrGo" style="margin-top:8px">Create my restaurant</button></div><div style="text-align:center;font-size:12.5px;color:var(--muted);margin:2px 0 14px;font-weight:800;letter-spacing:.05em">— OR —</div><div style="border:1px solid var(--line2);border-radius:12px;padding:16px;text-align:left"><div style="font-weight:800;font-size:15.5px">Join my team</div><div class="muted" style="font-size:12.5px;margin:3px 0 12px;line-height:1.5">For team members. Enter the join code your manager gave you.</div><label>Join code</label><input id="nrJoin" type="text" placeholder="Ask your manager for it" autocomplete="off"/><button class="btn" id="nrJoinGo" style="margin-top:8px">Join my team</button></div><div class="toggle" style="margin-top:16px"><b id="nrOut">Sign out</b></div></div></div>`;
+  root.innerHTML = `<div class="auth"><div class="box"><div class="logo">🏪</div><h1>Welcome</h1><p class="sub">Are you setting up a restaurant, or joining one that already exists?</p><div id="nrmsg"></div><div style="border:1px solid var(--line2);border-radius:12px;padding:16px;margin-bottom:14px;text-align:left"><div style="font-weight:800;font-size:15.5px">Set up my restaurant</div><div class="muted" style="font-size:12.5px;margin:3px 0 12px;line-height:1.5">For the owner or manager. This creates your restaurant and its academy.</div><label>Restaurant name</label><input id="nrName" type="text" placeholder="e.g. Main Street Diner" autocomplete="organization"/><button class="btn pri full" id="nrGo" style="margin-top:8px">Create my restaurant</button></div><div style="text-align:center;font-size:12.5px;color:var(--muted);margin:2px 0 14px;font-weight:800;letter-spacing:.05em">— OR —</div><div style="border:1px solid var(--line2);border-radius:12px;padding:16px;text-align:left"><div style="font-weight:800;font-size:15.5px">Join my team</div><div class="muted" style="font-size:12.5px;margin:3px 0 12px;line-height:1.5">For team members. Enter the join code your manager gave you.</div><label>Join code</label><input id="nrJoin" type="text" placeholder="Ask your manager for it" autocomplete="off"/><button class="btn" id="nrJoinGo" style="margin-top:8px">Join my team</button></div><div class="toggle" style="margin-top:16px"><b id="nrOut">Sign out</b></div></div></div>`;
   const i=document.getElementById('nrName'); if(i){ i.focus(); i.onkeydown=function(e){ if(e.key==='Enter') createRestaurant(); }; }
   const j=document.getElementById('nrJoin'); if(j){ j.onkeydown=function(e){ if(e.key==='Enter') joinRestaurant(); }; }
   document.getElementById('nrGo').onclick=createRestaurant;
@@ -1475,7 +1475,9 @@ window.csToggleHelp=function(){ const b=document.getElementById('csHelpBody'); i
 window.csToggleDetail=function(){ const b=document.getElementById('csDetail'); if(!b)return; const open=b.style.display==='none'; b.style.display=open?'block':'none'; try{localStorage.setItem('cs_detail_open',open?'1':'0');}catch(e){} const c=document.getElementById('csDetChev'); if(c)c.className='ti ti-chevron-'+(open?'up':'down'); };
 window.csSaveTarget=async function(mode){ const g=id=>{const e=document.getElementById(id);return e?+e.value:null;}; const splhTarget=Math.max(1,g('csTarget')||40); const pctTarget=Math.min(60,Math.max(1,g('csPct')||25)); const tplhTarget=Math.max(1,g('csTplh')||6); const minCov=Math.max(1,g('csMin')||2); const minClose=Math.max(1,g('csMinClose')||3); const avgWage=Math.max(1,g('csWage')||15); const m=['pct','splh','tplh'].includes(mode)?mode:'splh'; const _rk=await window._replaceKind('csconfig',{kind:'csconfig',title:'csconfig',detail:JSON.stringify({splhTarget,pctTarget,tplhTarget,minCov,minClose,avgWage,mode:m}),created_by:state.user.id}); if(!_rk.ok){ alert(window._replaceMsg(_rk)); return; } vCostSmart(document.getElementById('view')); };
 function heroTile(){ return `<svg class="phero-svg" width="100%" height="100%" viewBox="0 0 400 200" preserveAspectRatio="none"><defs><pattern id="swtile" width="40" height="40" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path d="M20 0 L40 20 L20 40 L0 20 Z" fill="none" stroke="#EAF7FA" stroke-width="1.1"/><circle cx="20" cy="20" r="2.2" fill="#EAF7FA"/><path d="M20 6 L20 34 M6 20 L34 20" stroke="#EAF7FA" stroke-width=".7"/></pattern></defs><rect width="400" height="200" fill="url(#swtile)" opacity=".13"/></svg>`; }
-function heroBanner(eyebrow,titleHTML,sub,ctaHTML){ return `<div class="phero">${heroTile()}<div class="phero-in"><div class="phero-eyebrow">${eyebrow}</div><div class="phero-title">${titleHTML}</div>${sub?`<div class="phero-sub">${sub}</div>`:''}${ctaHTML||''}</div></div>`; }
+/* The Academy's hero and Today's band were two teal blocks built weeks apart, so the two
+   pages that open the app did not look like they came from the same product. One band. */
+function heroBanner(eyebrow,titleHTML,sub,ctaHTML,ghost){ return `<div class="pband"><i class="ti ${ghost||'ti-school'} pb-ghost"></i><div class="pb-in"><div class="pb-eyebrow">${eyebrow}</div><div class="pb-title">${titleHTML}</div>${sub?`<div class="pb-sub">${sub}</div>`:''}${ctaHTML||''}</div></div>`; }
 function smartResume(){
   const vt=visibleTracks();
   const started=t=>trackLessons(t.id).some(x=>isDone(x.id));

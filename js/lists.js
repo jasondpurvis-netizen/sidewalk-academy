@@ -141,12 +141,12 @@ async function vToday(v){
   const _bandSub = shifts.length
       ? shifts.length+' on the floor'+(todayEvents.length?' \u00b7 '+todayEvents.length+' on today':'')
       : (todayEvents.length? todayEvents.length+' on today' : 'No shifts published for today');
-  let h=`<div style="position:relative;overflow:hidden;border-radius:14px;padding:26px 28px 24px;margin-bottom:16px;background:linear-gradient(135deg,var(--tealdark) 0%,var(--tealmid) 58%,var(--teallite) 100%);box-shadow:0 14px 34px rgba(20,72,82,.26)">
-    <div style="position:absolute;right:-30px;bottom:-46px;opacity:.10"><i class="ti ti-sun" style="font-size:180px;color:#fff"></i></div>
-    <div style="position:relative">
-      <div style="font-size:12px;letter-spacing:.19em;text-transform:uppercase;color:var(--accent);font-weight:800;margin-bottom:9px">${esc(today.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'}))}</div>
-      <div style="font-size:clamp(23px,3.4vw,31px);font-weight:800;letter-spacing:-.03em;color:#fff;line-height:1.12">${esc((_gH<12?'Good morning':_gH<17?'Good afternoon':'Good evening')+(_gN?', '+_gN:''))}</div>
-      <div style="margin-top:12px;display:inline-flex;align-items:center;gap:9px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.26);border-radius:999px;padding:7px 15px">
+  let h=`<div class="pband">
+    <i class="ti ti-sun pb-ghost"></i>
+    <div class="pb-in">
+      <div class="pb-eyebrow">${esc(today.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'}))}</div>
+      <div class="pb-title">${esc((_gH<12?'Good morning':_gH<17?'Good afternoon':'Good evening')+(_gN?', '+_gN:''))}</div>
+      <div class="pb-chip">
         <i class="ti ti-${_needCount?'alert-circle':'circle-check'}" style="font-size:16px;color:${_needCount?'var(--accent)':'#BFF0D4'}"></i>
         <span style="color:#fff;font-weight:650;font-size:14.5px;letter-spacing:-.01em">${esc(_bandLine)}</span>
         <span style="color:rgba(255,255,255,.78);font-size:13.5px">\u00b7 ${esc(_bandSub)}</span>
