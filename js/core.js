@@ -2,7 +2,7 @@
 /* A stamp so any device can say which version it is actually running. Three times now a
    phone and a laptop on the same address have disagreed about what the app looks like,
    and there was no way to tell them apart except by describing the screen. */
-const BUILD = '2026-09-24-24';
+const BUILD = '2026-09-24-25';
 window.BUILD = BUILD;
 const SUPABASE_URL = "https://wjqcnxnwjqmuzrandgea.supabase.co";
 const SUPABASE_KEY = "sb_publishable_DQZclfAnv_MYQJLGcOdzdw_g4vMCiSC";
@@ -321,6 +321,18 @@ async function loadSettings(){
   let s={};
   if(_isSW || !_hasTenant){ const { data } = await sb.from('settings').select('*').eq('id',1).maybeSingle(); s=data||{}; }
   const data=_isSW? s : null;
+  /* Which restaurants this person belongs to. One is the normal case and the switcher
+     stays hidden; two or more and they get to choose which one they are looking at. */
+  try{ const _mm=await sb.from('memberships').select('tenant_id,role');
+       state.memberships=(_mm&&_mm.data)||[]; }catch(e){ state.memberships=[]; }
+  /* Names for the switcher. A person can only read a restaurant they belong to, so if
+     the second one comes back nameless the dropdown still works -- it just says
+     "Restaurant" until the read policy lets the name through. */
+  window._tenantNames=window._tenantNames||{};
+  if((state.memberships||[]).length>1){
+    try{ const _tt=await sb.from('tenants').select('id,name,academy_name');
+         (_tt.data||[]).forEach(t=>{ window._tenantNames[t.id]=t.academy_name||t.name||'Restaurant'; }); }catch(e){}
+  }
   let _tn=null,_tjc=null,_tan=null,_tbc=null,_tlg=null,_tlj=null,_tof=null; if(state.profile && state.profile.tenant_id){ try{ const _tr=await sb.from('tenants').select('*').maybeSingle(); if(_tr.data){ state.tenant=_tr.data; _tn=_tr.data.name; _tjc=_tr.data.join_code; _tan=_tr.data.academy_name; _tbc=_tr.data.brand_color; _tlg=_tr.data.logo_url; _tlj=_tr.data.law_jurisdiction; _tof=_tr.data.open_floor; } }catch(e){} try{ const _su=await sb.from('subscriptions').select('*').maybeSingle(); if(_su.data) state.sub=_su.data; }catch(e){} } state.settings = Object.assign({}, s, { academy_name: _tan||_tn||(_isSW?s.academy_name:null)||DEFAULT_NAME, brand_color: _tbc||(_isSW?s.brand_color:null)||DEFAULT_BRAND, logo_url: (_tlg!=null&&_tlg!=='')?_tlg:(_isSW?(s.logo_url||(data?DEFAULT_LOGO:'')):''), join_code: _tjc||s.join_code||'', law_jurisdiction: _tlj||s.law_jurisdiction||'AZ', open_floor: _tof||s.open_floor||'05:30' }); try{ const rs=await sb.from('day_items').select('detail').eq('kind','stations').maybeSingle(); const arr=JSON.parse((rs.data&&rs.data.detail)||'[]'); if(Array.isArray(arr)) state.settings.stations=arr; }catch(e){} try{ const rp=await sb.from('day_items').select('detail').eq('kind','perms').maybeSingle(); state.perms=JSON.parse((rp.data&&rp.data.detail)||'{}'); }catch(e){ state.perms={}; } try{ const rg=await sb.from('day_items').select('title,detail').eq('kind','usergrant'); const gm={}; (rg.data||[]).forEach(x=>{ try{ const d=JSON.parse(x.detail||'{}'); if(x.title&&Array.isArray(d.pages)) gm[x.title]=d.pages; }catch(e){} }); state.grants=gm; }catch(e){ state.grants={}; }
   // explicit login-to-roster links (title = profile id, detail = roster name), for names we can't resolve on our own
   try{ const rl=await sb.from('day_items').select('title,detail').eq('kind','acctlink'); const lm={}; (rl.data||[]).forEach(x=>{ if(x.title&&x.detail) lm[x.title]=x.detail; }); window._acctLink=lm; }catch(e){ window._acctLink={}; } applyBrand(state.settings.brand_color); applyAppIdentity(); }
@@ -683,6 +695,19 @@ window.togglePin=function(p){
   renderApp();
 };
 
+/* Switching restaurant changes one column on your own row. The database only accepts
+   it for a restaurant you are actually a member of, so this cannot be used to reach
+   somebody else's data even if the dropdown were tampered with. */
+window.switchRestaurant=async function(tid){
+  if(!tid || !(state.memberships||[]).some(m=>m.tenant_id===tid)) return;
+  const r=await sb.from('profiles').update({active_tenant_id:tid}).eq('id',state.user.id);
+  if(r&&r.error){ alert('Could not switch restaurants \u2014 '+r.error.message); return; }
+  /* everything cached belongs to the restaurant you were just in */
+  ['settings','tenant','profile','tracks','lessons','progress','calCache','_recipes','_recToneMap','_recipeCount','perms','grants','memberships','community','sub']
+    .forEach(k=>{ try{ delete state[k]; }catch(e){} });
+  try{ localStorage.setItem('sw_nav', JSON.stringify({p:'today',c:{}})); }catch(e){}
+  location.reload();
+};
 function renderApp(){
   const isAdmin = state.profile && state.profile.role==="admin";
   const realAdmin = state.previewLIT ? (state._realRole==='admin') : isAdmin;
@@ -732,6 +757,16 @@ function renderApp(){
   root.innerHTML = `<div class="app">
     <aside class="side">
       <div class="brand" onclick="go('whiteboard')" style="cursor:pointer${state.settings&&state.settings.logo_url?';flex-direction:column;align-items:flex-start;gap:9px;padding:20px 18px':''}">${state.settings&&state.settings.logo_url?`<img src="${state.settings.logo_url}" style="max-width:190px;max-height:64px;width:auto;height:auto;object-fit:contain;display:block" alt="logo"/><div><b>${esc((state.settings&&state.settings.academy_name)||'Academy')}</b><span>Training</span></div>`:`<div class="lg">${esc(((state.settings&&state.settings.academy_name)||'A').charAt(0).toUpperCase())}</div><div><b>${esc((state.settings&&state.settings.academy_name)||'Academy')}</b><span>Training</span></div>`}</div>
+      ${(function(){
+        const ms=(state.memberships||[]);
+        if(ms.length<2) return '';
+        const names=(window._tenantNames||{});
+        const active=(state.profile&&(state.profile.active_tenant_id||state.profile.tenant_id))||'';
+        return `<div style="padding:10px 14px 4px"><div class="faint" style="font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;margin-bottom:5px">Restaurant</div>
+          <select onchange="switchRestaurant(this.value)" style="width:100%;padding:8px 10px;border:1px solid var(--line2);border-radius:9px;background:var(--card);color:var(--ink);font-family:inherit;font-size:14px;font-weight:600">
+            ${ms.map(m=>`<option value="${m.tenant_id}"${m.tenant_id===active?' selected':''}>${esc(names[m.tenant_id]||'Restaurant')}</option>`).join('')}
+          </select></div>`;
+      })()}
       <nav class="nav" id="nav"></nav>
       <div class="me"><div style="display:flex;align-items:center;gap:10px;margin-bottom:11px"><div onclick="document.getElementById('avup').click()" title="Change your photo" style="width:42px;height:42px;border-radius:50%;flex-shrink:0;cursor:pointer;overflow:hidden;background:var(--brand-soft);color:var(--brand);display:flex;align-items:center;justify-content:center;font-size:15.5px;font-weight:700;border:2px solid var(--line)">${state.profile&&state.profile.avatar_url?`<img src="${state.profile.avatar_url}" style="width:100%;height:100%;object-fit:cover"/>`:esc(((state.profile&&state.profile.name)||'?').charAt(0).toUpperCase())}</div><div style="min-width:0"><div class="who">${esc(state.profile?state.profile.name:"")}</div></div></div><input type="file" id="avup" accept="image/*" style="display:none" onchange="uploadAvatar(this)"/>${state.previewLIT?`<button class="btn" style="margin-bottom:8px;font-size:14px;gap:6px" onclick="togglePreviewLIT()"><i class="ti ti-eye"></i> Exit preview</button>`:''}<button class="btn" id="out">Sign out</button></div>
     </aside>
