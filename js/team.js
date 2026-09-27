@@ -1789,18 +1789,25 @@ window.startCheckout=async function(interval){ const btn=document.getElementById
 window.openBillingPortal=async function(){ try{ const { data:{ session } }=await sb.auth.getSession(); const r=await fetch(SB_URL+'/functions/v1/billing-portal',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+(session&&session.access_token||'')},body:JSON.stringify({tenant_id:(state.tenant||{}).id})}); const j=await r.json(); if(j&&j.url){ location.href=j.url; return; } throw new Error((j&&j.error)||'Could not open billing'); }catch(e){ alert('Could not open billing: '+e.message); } };
 function renderPaywall(bs){ const admin=(state.profile&&state.profile.role==='admin'); const nm=(state.settings&&state.settings.academy_name)||'your academy'; const brand=(state.settings&&state.settings.brand_color)||DEFAULT_BRAND; const brandNew=bs.status==='needs_checkout'; const expired=bs.status==='trial_expired'; const head=brandNew?'Start your 14-day free trial':(expired?'Your 14-day trial has ended':'Your subscription is paused'); const sub=brandNew?('Add a card to start your free trial of '+esc(nm)+'. You won’t be charged until the 14 days are up — cancel anytime before then.'):(expired?('Thanks for trying '+esc(nm)+'. Add a payment method to keep your team, schedules, and training going.'):'Reactivate to restore full access. Your data is safe.'); const app=document.getElementById('app')||document.body;
   app.innerHTML=`<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:var(--bg)"><div class="card" style="max-width:440px;width:100%;padding:30px 28px;text-align:center"><div style="width:54px;height:54px;border-radius:12px;margin:0 auto 16px;display:flex;align-items:center;justify-content:center;background:${brand};color:#fff;font-size:26px"><i class="ti ti-lock"></i></div><div style="font-weight:800;font-size:18px;margin-bottom:8px">${head}</div><div class="muted" style="font-size:14px;line-height:1.6;margin-bottom:20px">${sub}</div>`+
-    /* One price, everything in it. This offered $149 monthly beside $1,490 annual with a
-       "2 months free" badge -- two numbers, a discount to work out, and a price Jason has
-       since moved on from. A restaurant owner deciding in thirty seconds should see one
-       number and what it buys. No tiers, no seat counts, no add-ons: that is the product. */
-    (admin?`<div class="card" style="padding:18px 20px;margin-bottom:16px;text-align:left;border:1px solid var(--brand-line)">
+    /* One price, two ways to pay it -- not two products. This used to show $149 monthly
+       beside $1,490 annual with a "2 months free" badge and no clue which to pick. The
+       price leads; how you pay it is a smaller decision underneath. Paying for the year
+       costs two months less, which is a sum anybody can do in their head. */
+    (admin?`<div class="card" style="padding:18px 20px;margin-bottom:14px;text-align:left;border:1px solid var(--brand-line)">
       <div style="display:flex;align-items:baseline;gap:8px">
         <div style="font-weight:800;font-size:34px;letter-spacing:-.03em">$199</div>
         <div class="faint" style="font-size:14px;font-weight:600">per month, per location</div>
       </div>
       <div class="muted" style="font-size:13.5px;margin-top:8px;line-height:1.55">Everything is included &mdash; scheduling, training, recipes, checklists, messages, the lot. No plans to choose between, no limit on how many people you add, and nothing costs extra later.</div>
     </div>
-    <button id="bpaybtn" class="btn pri full" onclick="startCheckout('month')">${brandNew?'Start free trial':'Add payment'}</button>`
+    <button id="bpaybtn" class="btn pri full" style="margin-bottom:10px" onclick="startCheckout('month')">${brandNew?'Start free trial':'Add payment'}</button>
+    <div style="display:flex;align-items:center;gap:11px;padding:12px 14px;border:1px solid var(--line2);border-radius:10px;background:var(--bg);text-align:left">
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:700;font-size:14px">Pay for the year &mdash; $1,990</div>
+        <div class="faint" style="font-size:12.5px;margin-top:1px">Two months free. Works out at $165.83 a month.</div>
+      </div>
+      <button class="btn" style="width:auto;flex:none" onclick="startCheckout('year')">Choose yearly</button>
+    </div>`
     :`<div class="muted" style="font-size:14px;line-height:1.6">Ask your restaurant’s owner to reactivate the account.</div>`)+
     `<div style="margin-top:16px"><a href="#" onclick="sb.auth.signOut().then(function(){location.reload();});return false" class="faint" style="font-size:12.5px">Sign out</a></div></div></div>`; }
 window.renderPaywall=renderPaywall;
