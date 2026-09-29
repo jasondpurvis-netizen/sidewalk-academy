@@ -2,7 +2,7 @@
 /* A stamp so any device can say which version it is actually running. Three times now a
    phone and a laptop on the same address have disagreed about what the app looks like,
    and there was no way to tell them apart except by describing the screen. */
-const BUILD = '2026-09-29-3';
+const BUILD = '2026-09-29-4';
 window.BUILD = BUILD;
 const SUPABASE_URL = "https://wjqcnxnwjqmuzrandgea.supabase.co";
 const SUPABASE_KEY = "sb_publishable_DQZclfAnv_MYQJLGcOdzdw_g4vMCiSC";
@@ -1411,7 +1411,7 @@ window.csRenderPreview=function(){
   const todayIso=isoDate(new Date());
   const names=[...new Set(p.draft.filter(d=>d.person_name!=='__OPEN__').map(d=>d.person_name))];
   const roster={}; names.forEach(n=>{ const r=posOf(n); (roster[r]=roster[r]||[]).push(n); });
-  const POS_ORDER=['OJR','Owner','GM','Manager','Supervisor','Trainer','Trainee','Team Member','Unassigned']; const POS_COL={OJR:'#DC2626',Owner:'#7C3AED',Manager:'#2563EB',Supervisor:'#0D9488',Trainer:'#0891B2',Trainee:'#D97706','Team Member':'#64748B',Unassigned:'#94A3B8'};
+  const POS_ORDER=['OJR','Owner','GM','Manager','Asst. Manager','Supervisor','Trainer','Trainee','Team Member','Unassigned']; const POS_COL={OJR:'#DC2626',Owner:'#7C3AED',Manager:'#2563EB','Asst. Manager':'#3B82F6',Supervisor:'#0D9488',Trainer:'#0891B2',Trainee:'#D97706','Team Member':'#64748B',Unassigned:'#94A3B8'};
   const byPD={}; p.draft.forEach(s=>{ (byPD[s.person_name+'|'+s.on_date]=byPD[s.person_name+'|'+s.on_date]||[]).push(s); });
   h+=`<div class="board"><div class="board-grid"><div class="bh bh-team">Team</div>`+p.isoDays.map(iso=>{ const dt=new Date(iso+'T00:00'); return `<div class="bh ${iso===todayIso?'bh-today':''}">${DN[dt.getDay()]}<span>${dt.getDate()}</span></div>`; }).join('');
   Object.keys(roster).sort((a,b)=>{const ia=POS_ORDER.indexOf(a),ib=POS_ORDER.indexOf(b);return (ia<0?99:ia)-(ib<0?99:ib)||a.localeCompare(b);}).forEach(role=>{

@@ -467,7 +467,7 @@ h+=`<div class="board"><div class="board-grid"><div class="bh bh-team">Team</div
     }
   }catch(e){}
   const dayHrs=isoDays.map(()=>0), dayCost=isoDays.map(()=>0);
-  const POS_ORDER=['OJR','Owner','GM','Manager','Supervisor','Trainer','Trainee','Team Member','Unassigned']; const POS_COL={OJR:'#DC2626',Owner:'#7C3AED',Manager:'#2563EB',Supervisor:'#0D9488',Trainer:'#0891B2',Trainee:'#D97706','Team Member':'#64748B',Unassigned:'#94A3B8'};
+  const POS_ORDER=['OJR','Owner','GM','Manager','Asst. Manager','Supervisor','Trainer','Trainee','Team Member','Unassigned']; const POS_COL={OJR:'#DC2626',Owner:'#7C3AED',Manager:'#2563EB','Asst. Manager':'#3B82F6',Supervisor:'#0D9488',Trainer:'#0891B2',Trainee:'#D97706','Team Member':'#64748B',Unassigned:'#94A3B8'};
   Object.keys(roles).sort((a,b)=>{const ia=POS_ORDER.indexOf(a),ib=POS_ORDER.indexOf(b);return (ia<0?99:ia)-(ib<0?99:ib)||a.localeCompare(b);}).forEach(role=>{
     const _bc=POS_COL[role]||'#94A3B8';
     h+=`<div class="band" style="background:${_bc}14;color:${_bc};border-left:4px solid ${_bc}">${esc(role)}</div>`;
