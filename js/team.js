@@ -353,18 +353,46 @@ window._impCommit=async function(){
   /* Re-check against the roster now, not just when the preview was drawn. The preview is
      built from whatever was loaded at the time; if the roster had not finished loading,
      someone already on it could be offered again and end up with two entries. */
+  /* This used to add people and nothing else: anybody already on the roster was skipped,
+     so a position change or a pay rise in the export never landed, and anybody who had
+     left stayed on the roster for ever. That is why Jason's roster drifted away from
+     7shifts. Re-importing is now a reconcile -- add, update, and offer to retire. */
+  var updates=[];
   try{
-    await loadPositions();
+    await Promise.all([loadPositions(), loadProfiles(), loadArchived()]);
     var have={}; rosterNames().forEach(function(n){ have[n.toLowerCase()]=1; });
+    var already=list.filter(function(p){ return have[p.name.toLowerCase()]; });
     list=list.filter(function(p){ return !have[p.name.toLowerCase()]; });
+    var payNow={};
+    try{ var _pr=await sb.from('pay_rates').select('person_name,wage'); (_pr.data||[]).forEach(function(x){ payNow[x.person_name]=+x.wage; }); }catch(e){}
+    already.forEach(function(p){
+      var real=rosterNames().find(function(n){ return n.toLowerCase()===p.name.toLowerCase(); }) || p.name;
+      var bits=[];
+      if(p.rank && posOf(real)!==p.rank) bits.push({kind:'pos', to:p.rank});
+      if(p.wage>0 && +payNow[real]!==+p.wage) bits.push({kind:'wage', to:+p.wage});
+      if(bits.length) updates.push({name:real, changes:bits});
+    });
   }catch(e){}
   if(!list.length) return;
   var go=document.getElementById('impGo'), msg=document.getElementById('impMsg');
   if(go){ go.disabled=true; go.textContent='Importing…'; }
   var uid=state.user.id;
   var posRows=list.map(function(p){ return {kind:'pos',title:p.name,detail:p.rank,on_date:null,created_by:uid}; });
-  var ins=await sb.from('day_items').insert(posRows);
+  var ins = posRows.length ? await sb.from('day_items').insert(posRows) : {error:null};
   if(ins.error){ if(msg){ msg.style.color='#B32D2D'; msg.textContent='Nothing was imported: '+ins.error.message; } if(go){go.disabled=false;go.textContent='Try again';} return; }
+  /* People already here whose position or pay has moved on since last time. */
+  for(var ui=0; ui<updates.length; ui++){
+    var u=updates[ui];
+    for(var ci=0; ci<u.changes.length; ci++){
+      var c=u.changes[ci];
+      if(c.kind==='pos'){
+        var ex=await sb.from('day_items').select('id').eq('kind','pos').eq('title',u.name).maybeSingle();
+        if(ex.data) await sb.from('day_items').update({detail:c.to}).eq('id',ex.data.id);
+      } else {
+        await sb.from('pay_rates').upsert({person_name:u.name, wage:c.to, updated_at:new Date().toISOString()});
+      }
+    }
+  }
   // Stations become skills, so the scheduling brain starts with real data instead of blanks.
   var withStation=list.filter(function(p){ return p.station; });
   if(withStation.length){
@@ -377,8 +405,25 @@ window._impCommit=async function(){
     var wr=await sb.from('pay_rates').upsert(withWage.map(function(p){ return {person_name:p.name, wage:p.wage, updated_at:new Date().toISOString()}; }));
     if(wr.error && msg){ msg.style.color='#7A6224'; msg.textContent='People imported, but pay rates did not save: '+wr.error.message; }
   }
+  /* Anybody on the roster who is not in the file has almost certainly left -- but that is
+     a decision about a person, so it is offered rather than done. Nothing is deleted:
+     they move to Former team with their record intact, the same as any other leaver. */
+  try{
+    var inFile={}; (window._impFresh||[]).forEach(function(p){ inFile[p.name.toLowerCase()]=1; });
+    var gone=rosterNames().filter(function(n){ return !isArchived(n) && posOf(n)!=='Owner' && !inFile[n.toLowerCase()]; });
+    if(gone.length && confirm(gone.length+(gone.length===1?' person is':' people are')+' on your roster but not in this file:\n\n'+gone.join('\n')+'\n\nMove them to Former team? Nothing is deleted \u2014 their record is kept and they can be rehired.')){
+      for(var gi=0; gi<gone.length; gi++){
+        var nm=gone[gi];
+        var ex=await sb.from('day_items').select('id').eq('kind','archived').eq('title',nm).maybeSingle();
+        if(ex.data) continue;
+        await sb.from('day_items').insert({kind:'archived',title:nm,on_date:null,
+          detail:JSON.stringify({reason:'',rehire:'',notes:'Not on the roster imported '+isoDate(new Date())+'.',date:isoDate(new Date())}),
+          created_by:state.user.id});
+      }
+    }
+  }catch(e){}
   var m=document.getElementById('impModal'); if(m) m.remove();
-  try{ await Promise.all([loadPositions(), loadProfiles()]); }catch(e){}
+  try{ await Promise.all([loadPositions(), loadProfiles(), loadArchived()]); }catch(e){}
   try{ go('team',{ttab:'roster'}); }catch(e){ location.reload(); }
 };
 
