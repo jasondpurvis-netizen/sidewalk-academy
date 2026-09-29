@@ -37,6 +37,20 @@ function reactionBar(p){
   const who=Object.keys(by).map(e=>`${e} ${by[e].map(id=>id===mine?'You':(nm[id]||'Someone')).join(', ')}`).join('    ');
   return `<div style="margin-top:11px"><div class="row" style="gap:6px;flex-wrap:wrap">`+bar+`</div>`+(who?`<div class="faint" style="font-size:12.5px;margin-top:6px;line-height:1.5">${esc(who)}</div>`:'')+`</div>`;
 }
+/* Pinning is one row saying "this post matters", not a copy of the post -- so editing the
+   original edits what is pinned, and unpinning loses nothing. */
+window.pinPost=async function(pid){
+  const r=await sb.from('day_items').insert({kind:'pin',title:String(pid),on_date:null,
+    detail:JSON.stringify({by:(state.profile&&state.profile.name)||'',at:new Date().toISOString()}),
+    created_by:state.user.id});
+  if(r&&r.error){ alert('Could not pin that: '+r.error.message); return; }
+  state.community=null; go('community', state.ctx);
+};
+window.unpinPost=async function(pid){
+  const r=await sb.from('day_items').delete().eq('kind','pin').eq('title',String(pid));
+  if(r&&r.error){ alert('Could not unpin that: '+r.error.message); return; }
+  state.community=null; go('community', state.ctx);
+};
 window.react=async function(pid,emoji){ const mine=state.user.id; const arr=state.community.reactions||(state.community.reactions=[]); const idx=arr.findIndex(r=>r.post_id===pid&&r.user_id===mine&&r.emoji===emoji); if(idx>=0){ arr.splice(idx,1); sb.from('reactions').delete().eq('post_id',pid).eq('user_id',mine).eq('emoji',emoji).then(()=>{}); } else { arr.push({post_id:pid,user_id:mine,emoji}); sb.from('reactions').insert({post_id:pid,user_id:mine,emoji}).then(()=>{}); } vCommunity(document.getElementById('view')); };
 window.editPost=function(pid){ const p=(state.community.posts||[]).find(x=>x.id===pid); if(!p)return; const m=document.createElement('div'); m.id='epm'; m.style.cssText='position:fixed;inset:0;background:rgba(16,24,40,.45);z-index:9999;display:flex;align-items:flex-end;justify-content:center'; m.onclick=e=>{if(e.target===m)m.remove();}; m.innerHTML=`<div style="background:var(--card);width:100%;max-width:480px;border-radius:12px 16px 0 0;padding:20px 20px 26px"><div style="font-weight:700;font-size:15.5px;margin-bottom:10px">Edit post <span class="faint" style="font-weight:400;font-size:12.5px">— Enter to save, Shift+Enter for a new line</span></div><textarea id="epbody" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();savePostEdit(${pid});}" style="width:100%;min-height:120px">${esc(p.body||'')}</textarea><div class="row" style="gap:8px;margin-top:14px"><button class="btn" style="width:auto;margin-left:auto" onclick="document.getElementById('epm').remove()">Cancel</button><button class="btn pri" style="width:auto" onclick="savePostEdit(${pid})">Save</button></div></div>`; document.body.appendChild(m); setTimeout(()=>{const t=document.getElementById('epbody'); if(t){t.focus();t.setSelectionRange(t.value.length,t.value.length);}},0); };
 window.savePostEdit=async function(pid){ const body=((document.getElementById('epbody')||{}).value||'').trim(); if(!body)return; const r=await sb.from('posts').update({body}).eq('id',pid); const m=document.getElementById('epm'); if(m)m.remove(); if(r&&r.error){ alert('Could not save: '+r.error.message); return; } const p=(state.community.posts||[]).find(x=>x.id===pid); if(p)p.body=body; vCommunity(document.getElementById('view')); };
