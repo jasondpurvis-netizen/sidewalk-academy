@@ -300,7 +300,7 @@ async function schBoard(v){
     return {total:+d.total||0, peakH:peakH, peakV:peakV};
   });
   const burdenMul=1+((covRules.burdenPct||0)/100);
-  const allHrs=shifts.reduce((a,s)=>a+shiftHours(s),0); const allCost=shifts.reduce((a,s)=>a+shiftHours(s)*(wage[s.person_name]||0),0)*burdenMul; const ppl=new Set(shifts.map(s=>s.person_name).filter(n=>n&&n!=='__OPEN__')).size;
+  const allHrs=shifts.reduce((a,s)=>a+shiftHours(s),0); const allCost=laborCost(shifts, wage, shifts)*burdenMul; const ppl=new Set(shifts.map(s=>s.person_name).filter(n=>n&&n!=='__OPEN__')).size;
   const totSales=isoDays.reduce((a,iso)=>a+(sales[iso]||0),0); const labpctO=(isAdmin&&totSales&&allCost)?Math.round(allCost/totSales*100):null;
   window._sch={shifts:shifts, wage:Object.assign({},wage), isoDays:isoDays.slice(), isAdmin:isAdmin, burden:(covRules.burdenPct||0)};
   const metric=(ic,vv,ll,col,id)=>`<div class="metric"><div class="ml"><i class="ti ${ic}"></i>${ll}</div><div class="mv"${id?` id="${id}"`:''}${col?` style="color:${col}"`:''}>${vv}</div></div>`;
@@ -680,7 +680,7 @@ window.fillShift=async function(id){
 window.assignFill=async function(id,name,override){ if(override && !confirm(name+' is outside their availability. Assign anyway? They should approve the change first.')) return; const patch={person_name:name,role:posOf(name)}; if(override) patch.note='Assigned outside availability — needs '+name+"'s ok"; await sb.from('shifts').update(patch).eq('id',id); const m=document.getElementById('fillm'); if(m)m.remove(); schRefresh(); };
 window._salesCarried=false;
 window._carrySales=async function(isoDays){ window._salesCarried=false; if(window._noSalesEver) return {}; const r=await sb.from('day_sales').select('*').gte('on_date',isoDays[0]).lte('on_date',isoDays[6]); const map={}; (r.data||[]).forEach(d=>map[d.on_date]=Number(d.sales)||0); if((r.data||[]).length) return map; try{ const _any=await sb.from('day_sales').select('on_date',{count:'exact',head:true}); if(!_any.count){ window._noSalesEver=true; return map; } }catch(e){} for(let back=1;back<=12;back++){ const ps=isoDays.map(iso=>{ const d=new Date(iso+'T00:00'); d.setDate(d.getDate()-7*back); return isoDate(d); }); const pr=await sb.from('day_sales').select('*').gte('on_date',ps[0]).lte('on_date',ps[6]); if((pr.data||[]).length){ const bywd={}; (pr.data||[]).forEach(d=>{ const wd=(new Date(d.on_date+'T00:00').getDay()+6)%7; bywd[wd]=Number(d.sales)||0; }); const rows=[]; isoDays.forEach((iso,di)=>{ if(bywd[di]!=null){ map[iso]=bywd[di]; rows.push({on_date:iso,sales:bywd[di]}); } }); if(rows.length){ window._salesCarried=true; try{ await sb.from('day_sales').upsert(rows); }catch(e){} } return map; } } return map; };
-window.refreshLabor=function(){ const sc=window._sch; if(!sc||!sc.isAdmin)return; const bm=1+((sc.burden||0)/100); let cost=0; const sales={}; sc.isoDays.forEach(iso=>{ const el=document.getElementById('sales-'+iso); sales[iso]=el?(Number(el.value)||0):0; }); sc.shifts.forEach(s=>{ if(s.person_name!=='__OPEN__') cost+=shiftHours(s)*((sc.wage[s.person_name])||0)*bm; }); const totSales=sc.isoDays.reduce((a,iso)=>a+(sales[iso]||0),0); const ce=document.getElementById('lbl-cost'); if(ce)ce.textContent=cost?money(cost):'—'; const pe=document.getElementById('lbl-pct'); if(pe){ const pct=(totSales&&cost)?Math.round(cost/totSales*100):null; pe.textContent=pct!=null?pct+'%':'—'; pe.style.color=pct!=null?(pct>30?'var(--amber)':'var(--green)'):''; } };
+window.refreshLabor=function(){ const sc=window._sch; if(!sc||!sc.isAdmin)return; const bm=1+((sc.burden||0)/100); let cost=0; const sales={}; sc.isoDays.forEach(iso=>{ const el=document.getElementById('sales-'+iso); sales[iso]=el?(Number(el.value)||0):0; }); cost = laborCost(sc.shifts.filter(s=>s.person_name!=='__OPEN__'), sc.wage, sc.shifts) * bm; const totSales=sc.isoDays.reduce((a,iso)=>a+(sales[iso]||0),0); const ce=document.getElementById('lbl-cost'); if(ce)ce.textContent=cost?money(cost):'—'; const pe=document.getElementById('lbl-pct'); if(pe){ const pct=(totSales&&cost)?Math.round(cost/totSales*100):null; pe.textContent=pct!=null?pct+'%':'—'; pe.style.color=pct!=null?(pct>30?'var(--amber)':'var(--green)'):''; } };
 /* setWage went with the inline wage box on the labour panel -- nothing rendered it any more,
    but it was still a live function able to upsert a pay rate. Pay has one editor. */
 window._salesTmr={};
@@ -1215,7 +1215,7 @@ async function schOverview(v){
   const shifts=rsh.data||[]; const wage={}; (rpay.data||[]).forEach(p=>wage[p.person_name]=Number(p.wage)||0);
   const sales={}; (rsal.data||[]).forEach(d=>sales[d.on_date]=Number(d.sales)||0);
   const wkHrs=shifts.reduce((a,s)=>a+shiftHours(s),0);
-  const wkCost=shifts.reduce((a,s)=>a+shiftHours(s)*(wage[s.person_name]||0),0);
+  const wkCost=laborCost(shifts, wage, shifts);
   const wkSales=days.reduce((a,iso)=>a+(sales[iso]||0),0);
   const labpct=(wkSales&&wkCost)?Math.round(wkCost/wkSales*100):null;
   const todayShifts=shifts.filter(s=>s.on_date===todayIso).sort((a,b)=>(a.start_time||'').localeCompare(b.start_time||''));
@@ -1507,7 +1507,7 @@ async function schLogbook(v){
   let burden=0; try{ burden=+JSON.parse((rcov.data&&rcov.data.detail)||'{}').burdenPct||0; }catch(e){}
   const wage={}; (rpay.data||[]).forEach(p=>wage[p.person_name]=Number(p.wage)||0);
   const shifts=(rsh.data||[]).filter(s=>s.person_name&&s.person_name!=='__OPEN__');
-  const hrs=shifts.reduce((a,s)=>a+shiftHours(s),0); const cost=shifts.reduce((a,s)=>a+shiftHours(s)*(wage[s.person_name]||0),0)*(1+burden/100);
+  const hrs=shifts.reduce((a,s)=>a+shiftHours(s),0); const cost=laborCost(shifts, wage, shifts)*(1+burden/100);
   const forecast=rsal.data?Number(rsal.data.sales)||0:0; let actual=0; try{ actual=ractRow&&ractRow.data?Number(JSON.parse(ractRow.data.detail||'{}').amount)||0:0; }catch(e){} const useSales=actual||forecast; const pct=(useSales&&cost)?cost/useSales*100:null; const varP=(forecast&&actual)?((actual-forecast)/forecast*100):null;
   let meta={score:0,summary:''}; try{ if(rmeta.data) meta=Object.assign(meta,JSON.parse(rmeta.data.detail||'{}')); }catch(e){}
   window._logScoreVal=meta.score||0;
@@ -1559,7 +1559,7 @@ async function schReports(v){
   const sales={}; days.forEach(iso=>{ sales[iso]=actual[iso]||forecast[iso]||0; });
   const per={}; shifts.forEach(s=>{ const k=s.person_name; const hrs=shiftHours(s); (per[k]=per[k]||{hrs:0,cost:0,dset:new Set()}); per[k].hrs+=hrs; per[k].cost+=hrs*(wage[k]||0); per[k].dset.add(s.on_date); });
   const names=Object.keys(per).sort((a,b)=>per[b].hrs-per[a].hrs);
-  const byDay=days.map(iso=>{ const ds=shifts.filter(s=>s.on_date===iso); const hrs=ds.reduce((a,s)=>a+shiftHours(s),0); const cost=ds.reduce((a,s)=>a+shiftHours(s)*(wage[s.person_name]||0),0)*bMul; const sal=sales[iso]||0; return {iso,hrs,cost,sal,pct:(sal&&cost)?cost/sal*100:null,heads:new Set(ds.map(s=>s.person_name)).size}; });
+  const byDay=days.map(iso=>{ const ds=shifts.filter(s=>s.on_date===iso); const hrs=ds.reduce((a,s)=>a+shiftHours(s),0); const cost=laborCost(ds, wage, shifts)*bMul; const sal=sales[iso]||0; return {iso,hrs,cost,sal,pct:(sal&&cost)?cost/sal*100:null,heads:new Set(ds.map(s=>s.person_name)).size}; });
   const totHrs=names.reduce((a,n)=>a+per[n].hrs,0); const totCost=names.reduce((a,n)=>a+per[n].cost,0)*bMul; const totSales=days.reduce((a,iso)=>a+(sales[iso]||0),0); const labpct=(totSales&&totCost)?(totCost/totSales*100):null; const otW=(lawRules().ot_weekly_hrs)||40;
   const totForecast=days.reduce((a,iso)=>a+(forecast[iso]||0),0); const totActual=days.reduce((a,iso)=>a+(actual[iso]||0),0); const svar=(totForecast&&totActual)?((totActual-totForecast)/totForecast*100):null;
   const maxDC=Math.max(1,...byDay.map(d=>d.cost)); const maxPH=Math.max(1,...names.map(n=>per[n].hrs));
@@ -1615,7 +1615,8 @@ async function vSales(v){
   const kpi=(lbl,val,d,note)=>{ const dc=d==null?'var(--muted)':(d>=0?'#1B7B3F':'#B32D2D'); const arrow=d==null?'':(d>=0?'▲':'▼'); return `<div class="card" style="padding:16px 18px;flex:1;min-width:150px"><div class="faint" style="font-size:15.5px;font-weight:600;text-transform:none;letter-spacing:-.012em">${lbl}</div><div style="font-size:26px;font-weight:800;margin:3px 0">${val==null?'<span style="color:var(--faint)">—</span>':money(val)}</div><div style="font-size:12.5px;color:${dc};font-weight:600">${note||(d==null?'no last-year data':arrow+' '+Math.abs(d).toFixed(1)+'% vs last year')}</div></div>`; };
   const curDays=[]; { let dd=new Date(curWS); while(iso(dd)<=todayIso){ curDays.push(iso(dd)); dd.setDate(dd.getDate()+1); } }
   const lastDays=curDays.map(k=>{ const dd=_d(k); dd.setDate(dd.getDate()-7); return iso(dd); });
-  const _lc=k=>(shiftsByDay[k]||[]).reduce((a,s)=>a+shiftHours(s)*(wage[s.person_name]||0),0)*burdenMul;
+  const _allWk=Object.keys(shiftsByDay||{}).reduce((a,k)=>a.concat(shiftsByDay[k]||[]),[]);
+  const _lc=k=>laborCost(shiftsByDay[k]||[], wage, _allWk)*burdenMul;
   const curSales=curDays.reduce((a,k)=>a+(map[k]||0),0), lastSales=lastDays.reduce((a,k)=>a+(map[k]||0),0);
   const curLabor=curDays.reduce((a,k)=>a+_lc(k),0), lastLabor=lastDays.reduce((a,k)=>a+_lc(k),0);
   const curLPct=(curSales&&curLabor)?(curLabor/curSales*100):null, lastLPct=(lastSales&&lastLabor)?(lastLabor/lastSales*100):null;

@@ -2,7 +2,7 @@
 /* A stamp so any device can say which version it is actually running. Three times now a
    phone and a laptop on the same address have disagreed about what the app looks like,
    and there was no way to tell them apart except by describing the screen. */
-const BUILD = '2026-09-29-1';
+const BUILD = '2026-09-29-2';
 window.BUILD = BUILD;
 const SUPABASE_URL = "https://wjqcnxnwjqmuzrandgea.supabase.co";
 const SUPABASE_KEY = "sb_publishable_DQZclfAnv_MYQJLGcOdzdw_g4vMCiSC";
@@ -920,6 +920,35 @@ function academySibs(current){
   if(rows.length<2) return '';
   return `<div class="sibs">`+rows.map(([p,l])=>
     `<a onclick="go('${p}')"${p===current?' class="on"':''}>${esc(l)}</a>`).join('')+`</div>`;
+}
+/* ---------- What a week of shifts actually costs ----------
+   Six places worked this out as hours x hourly rate, which silently leaves salaried
+   people out of it entirely: Sidewalk's GM is on $55,000 and contributed nothing to the
+   week's labour figure or the labour percentage -- about $1,184 a week missing, and a
+   percentage that read 28% when it was nearer 37%.
+
+   A salaried person costs the same whether they work 30 hours or 50, so their year is
+   divided by 52 and spread across the hours they are actually on that week. Each day and
+   each shift then adds up to the right weekly total, which is what the grid already did
+   per row but the totals never did. */
+function weekHoursByPerson(weekShifts){
+  const h={};
+  (weekShifts||[]).forEach(function(s){ if(!s||!s.person_name) return; h[s.person_name]=(h[s.person_name]||0)+shiftHours(s); });
+  return h;
+}
+function effectiveRate(name, wage, weekHours){
+  const sal=+(((typeof profileOf==='function' && profileOf(name))||{}).salary)||0;
+  if(sal>0) return (weekHours>0) ? (sal/52)/weekHours : 0;
+  return (wage && wage[name]) || 0;
+}
+/* list = the shifts you want costed; weekShifts = the whole week they sit in, so a
+   salaried person's day is the right slice of their week rather than a guess. */
+function laborCost(list, wage, weekShifts){
+  const wh=weekHoursByPerson(weekShifts||list);
+  return (list||[]).reduce(function(a,s){
+    if(!s||!s.person_name) return a;
+    return a + shiftHours(s)*effectiveRate(s.person_name, wage, wh[s.person_name]||0);
+  },0);
 }
 function searchBox(id,placeholder,targetId){
   return `<div style="position:relative;margin:0 0 13px"><i class="ti ti-search" style="position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:15.5px;pointer-events:none"></i><input id="${id}" type="search" autocomplete="off" oninput="filterRows('${id}','${targetId}')" placeholder="${placeholder}" style="width:100%"/></div>`;
