@@ -2,7 +2,7 @@
 /* A stamp so any device can say which version it is actually running. Three times now a
    phone and a laptop on the same address have disagreed about what the app looks like,
    and there was no way to tell them apart except by describing the screen. */
-const BUILD = '2026-09-29-2';
+const BUILD = '2026-09-29-3';
 window.BUILD = BUILD;
 const SUPABASE_URL = "https://wjqcnxnwjqmuzrandgea.supabase.co";
 const SUPABASE_KEY = "sb_publishable_DQZclfAnv_MYQJLGcOdzdw_g4vMCiSC";
@@ -943,12 +943,36 @@ function effectiveRate(name, wage, weekHours){
 }
 /* list = the shifts you want costed; weekShifts = the whole week they sit in, so a
    salaried person's day is the right slice of their week rather than a guess. */
+const OT_AFTER = 40;      // federal weekly threshold; Arizona has no daily rule
+const OT_MULTIPLIER = 1.5;
 function laborCost(list, wage, weekShifts){
   const wh=weekHoursByPerson(weekShifts||list);
+  /* Hours past forty cost half as much again, and nothing here was charging for that --
+     a 45-hour week was billed as 45 straight hours, so the figure Jason staffs against
+     was low by exactly the overtime he was about to owe. Salaried people are left out of
+     it: their cost does not move with hours, which is the whole point of a salary. */
+  const otShare={};
+  Object.keys(wh).forEach(function(n){
+    const sal=+(((typeof profileOf==='function' && profileOf(n))||{}).salary)||0;
+    otShare[n] = (!sal && wh[n]>OT_AFTER) ? (wh[n]-OT_AFTER)/wh[n] : 0;
+  });
   return (list||[]).reduce(function(a,s){
     if(!s||!s.person_name) return a;
-    return a + shiftHours(s)*effectiveRate(s.person_name, wage, wh[s.person_name]||0);
+    const h=shiftHours(s), r=effectiveRate(s.person_name, wage, wh[s.person_name]||0);
+    const ot=otShare[s.person_name]||0;
+    return a + h*r*(1 + ot*(OT_MULTIPLIER-1));
   },0);
+}
+/* Who is heading past forty this week, so it can be said before the week is published
+   rather than discovered on the payroll run. */
+function overtimePeople(weekShifts){
+  const wh=weekHoursByPerson(weekShifts);
+  return Object.keys(wh).filter(function(n){
+    if(n==='__OPEN__') return false;
+    if(+(((typeof profileOf==='function' && profileOf(n))||{}).salary)>0) return false;
+    return wh[n]>OT_AFTER;
+  }).map(function(n){ return {name:n, hours:Math.round(wh[n]*10)/10}; })
+    .sort(function(a,b){ return b.hours-a.hours; });
 }
 function searchBox(id,placeholder,targetId){
   return `<div style="position:relative;margin:0 0 13px"><i class="ti ti-search" style="position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:15.5px;pointer-events:none"></i><input id="${id}" type="search" autocomplete="off" oninput="filterRows('${id}','${targetId}')" placeholder="${placeholder}" style="width:100%"/></div>`;

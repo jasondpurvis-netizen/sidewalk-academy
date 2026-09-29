@@ -361,8 +361,19 @@ async function schBoard(v){
   const _empty = dayVerdict.map((v,i)=>({v,i})).filter(x=>x.v.level==='none');
   const _dn = i => days[i].toLocaleDateString(undefined,{weekday:'long'});
   if(isAdmin){
+    /* Overtime was never mentioned anywhere before the week was published, so the first
+       anybody heard of it was payroll. It belongs beside the other coverage problems --
+       it is a problem with the week, found while there is still time to move a shift. */
+    const _ot = (typeof overtimePeople==='function') ? overtimePeople(shifts) : [];
     const _issues = _bad.concat(_warn);
-    if(!_issues.length && !_empty.length){
+    if(_ot.length){
+      h += `<div style="display:flex;align-items:flex-start;gap:11px;background:var(--soon-soft,#FDF4E1);border:1px solid var(--soon,#B7791F);border-radius:12px;padding:13px 16px;margin-bottom:14px">
+        <i class="ti ti-clock-exclamation" style="font-size:18px;color:var(--soon,#B7791F);flex:none;margin-top:1px"></i>
+        <div><div style="font-weight:800;font-size:14.5px;color:var(--soon,#B7791F)">${_ot.length===1?'One person is over forty hours':_ot.length+' people are over forty hours'}</div>
+        <div style="font-size:13px;color:var(--ink2);margin-top:3px">${_ot.map(o=>esc(o.name)+' &middot; '+o.hours+'h').join(' &nbsp;|&nbsp; ')}</div>
+        <div class="faint" style="font-size:12.5px;margin-top:3px">Everything past forty is charged at time and a half in the figures above.</div></div></div>`;
+    }
+    if(!_issues.length && !_empty.length && !_ot.length){
       h += `<div style="display:flex;align-items:center;gap:11px;background:var(--good-wash,#E1EFE7);border-radius:12px;padding:14px 17px;margin-bottom:14px">
         <i class="ti ti-circle-check" style="font-size:18px;color:#2C6E4B"></i>
         <div><div style="font-weight:800;font-size:15.5px;color:#2C6E4B">This week is covered</div>
