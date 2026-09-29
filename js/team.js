@@ -556,6 +556,12 @@ window._payLoad = async function(){
   const sal={}; people.forEach(function(n){ const pr=(window._profiles||{})[n]||{}; sal[n]=(+pr.salary>0)?+pr.salary:null; });
   window._paySal = sal;
   window._paySal0 = Object.assign({}, sal);
+  /* How somebody is paid is its own fact, not something to infer from whether a number is
+     big enough. Inferring it meant switching a person to salary had to plant a fake value
+     (0.0001) just to make the row change shape -- which then displayed as pennies a year
+     and blocked the save until you noticed. */
+  const typ={}; people.forEach(function(n){ typ[n] = (+sal[n]>0) ? 'salary' : 'hourly'; });
+  window._payType = typ;
 };
 /* The sidebar had its own Pay rates page with a second, worse version of this list -- first
    names only, no minimum-wage check, no idea who was salaried -- writing to the same table.
@@ -589,7 +595,7 @@ window._payRender = function(){
   h+='<div style="display:flex;flex-direction:column;gap:6px;margin-top:14px">';
   people.forEach(function(n){
     const q=JSON.stringify(n).replace(/"/g,'&quot;');
-    const sal=+(window._paySal[n]||0)>0;
+    const sal=(window._payType&&window._payType[n]==='salary');
     const v=cur[n]!=null? cur[n] : '';
     const low = !sal && v!=='' && +v < MINW;
     h+='<div style="display:flex;gap:10px;align-items:center;border:1px solid '+(low?'#E4B8A8':'var(--line2,#d5dde0)')+';background:'+(low?'#F9EDE8':'transparent')+';border-radius:12px;padding:9px 12px">'
@@ -599,11 +605,17 @@ window._payRender = function(){
       +'<span class="muted" style="font-size:12.5px;min-width:82px">'+esc(posOf(n))+'</span>'
       + (sal
           ? '<span style="display:flex;align-items:center;gap:4px"><span class="muted" style="font-size:12.5px">salary $</span>'
-            +'<input type="number" step="500" value="'+esc(String(window._paySal[n]||''))+'" oninput="_paySalSet('+q+',this.value)" onblur="_payRender()" style="width:104px;padding:7px 9px;border:1px solid var(--line2,#d5dde0);border-radius:8px;font-size:14px;background:var(--card,#fff);color:inherit">'
+            +'<input type="number" step="500" value="'+esc(String(window._paySal[n]>0?window._paySal[n]:''))+'" oninput="_paySalSet('+q+',this.value)" onblur="_payRender()" style="width:104px;padding:7px 9px;border:1px solid var(--line2,#d5dde0);border-radius:8px;font-size:14px;background:var(--card,#fff);color:inherit">'
             +'<span class="muted" style="font-size:12.5px">/yr</span></span>'
           : '<span style="display:flex;align-items:center;gap:4px"><span class="muted" style="font-size:14px">$</span>'
             +'<input type="number" step="0.01" value="'+esc(String(v))+'" data-payfor="'+esc(n)+'" oninput="_paySet('+q+',this.value)" style="width:92px;padding:7px 9px;border:1px solid var(--line2,#d5dde0);border-radius:8px;font-size:14px;background:var(--card,#fff);color:inherit"><span class="muted" style="font-size:12.5px">/hr</span></span>')
-      +'<button onclick="_payToggleSal('+q+')" title="'+(sal?'Switch to an hourly rate':'This person is salaried')+'" style="border:1px solid var(--line2,#d5dde0);background:transparent;color:inherit;border-radius:8px;padding:5px 9px;font-size:12.5px;cursor:pointer;flex:none">'+(sal?'Hourly':'Salaried')+'</button>'
+      /* The old control was one button labelled "Salaried" on an hourly person -- it read
+         as a statement of fact, so clicking it to "mark" somebody silently changed how
+         they are paid. Two options, the current one filled in. */
+      +'<span style="display:inline-flex;border:1px solid var(--line2,#d5dde0);border-radius:8px;overflow:hidden;flex:none">'
+      +  '<button onclick="_paySetType('+q+',&quot;hourly&quot;)" style="border:none;padding:5px 10px;font-size:12.5px;cursor:pointer;font-family:inherit;background:'+(sal?'transparent':'var(--brand,#4a9cad)')+';color:'+(sal?'var(--muted)':'#fff')+'">Hourly</button>'
+      +  '<button onclick="_paySetType('+q+',&quot;salary&quot;)" style="border:none;border-left:1px solid var(--line2,#d5dde0);padding:5px 10px;font-size:12.5px;cursor:pointer;font-family:inherit;background:'+(sal?'var(--brand,#4a9cad)':'transparent')+';color:'+(sal?'#fff':'var(--muted)')+'">Salary</button>'
+      +'</span>'
       +'</div>'
       + (low? '<div style="font-size:12.5px;color:#A8401C;margin:-2px 0 2px 12px">Below the $'+MINW.toFixed(2)+' minimum</div>' : '');
   });
@@ -616,14 +628,18 @@ window._payRender = function(){
 };
 window._paySet = function(n,v){ window._payCur[n] = v===''? null : +v; };
 window._paySalSet = function(n,v){ window._paySal[n] = v===''? null : +v; };
-window._payToggleSal = function(n){
-  /* Hourly and salary are the same question answered two ways, so only one can hold a
-     value at a time -- otherwise labour cost has to guess which one you meant. */
-  if(+(window._paySal[n]||0)>0){ window._paySal[n]=null; }
-  else { window._paySal[n]=0.0001; window._payCur[n]=null; }   // placeholder so the row switches; a real figure is required to save
+window._paySetType = function(n, t){
+  if(!window._payType) window._payType={};
+  if(window._payType[n]===t) return;
+  window._payType[n]=t;
+  /* Only one of the two can hold a figure, or labour cost has to guess which you meant.
+     Nothing is invented: an empty box is empty until you fill it. */
+  if(t==='salary'){ window._payCur[n]=null; }
+  else { window._paySal[n]=null; }
   _payRender();
-  setTimeout(function(){ const el=document.querySelector('#payCard input[type=number][step="500"]'); },0);
 };
+window._payToggleSal = function(n){ window._paySetType(n, (window._payType&&window._payType[n]==='salary')?'hourly':'salary'); };
+
 window._payFillBlank = function(){
   const v=+(document.getElementById('payAllVal')||{}).value;
   if(!(v>0)) { alert('Put a rate in the box first.'); return; }
@@ -635,12 +651,15 @@ window._payFillBlank = function(){
 };
 window._paySave = async function(){
   const go=document.getElementById('payGo'), msg=document.getElementById('payMsg');
-  const half=window._payPeople.filter(n=>{ const sv=+(window._paySal[n]||0); return sv>0 && sv<1000; });
-  if(half.length){ if(msg){ msg.style.color='#B32D2D'; msg.textContent='Put a yearly figure in for '+half[0]+', or switch them back to hourly.'; } return; }
+  /* It used to name only the first person blocking the save, so fixing them and pressing
+     Save again produced the same sentence with a different name, several times over. */
+  const T=window._payType||{};
+  const half=window._payPeople.filter(n=>{ if(T[n]!=='salary') return false; const sv=+(window._paySal[n]||0); return !(sv>=1000); });
+  if(half.length){ if(msg){ msg.style.color='#B32D2D'; msg.textContent=(half.length===1?'Put a yearly figure in for ':'Put a yearly figure in for these, or switch them back to hourly: ')+half.join(', ')+(half.length===1?', or switch them back to hourly.':''); } return; }
   if(go){ go.disabled=true; go.textContent='Saving…'; }
   const rows=[], clear=[];
   window._payPeople.forEach(function(n){
-    if(+(window._paySal[n]||0)>0){ clear.push(n); return; }     // salaried: no hourly row at all
+    if(T[n]==='salary'){ clear.push(n); return; }     // salaried: no hourly row at all
     const v=window._payCur[n];
     if(v==null || v==='' || !(+v>0)) { clear.push(n); return; }
     rows.push({person_name:n, wage:+v, updated_at:new Date().toISOString()});
