@@ -62,7 +62,7 @@ window._npmedia=null;
 window.pickMedia=function(inp){ const f=inp.files&&inp.files[0]; if(!f)return; if(f.size>60*1024*1024){ alert('That file is over 60 MB. Please pick a shorter video or a smaller photo.'); inp.value=''; return; } window._npmedia=f; const url=URL.createObjectURL(f); const isVid=f.type.startsWith('video'); const pv=document.getElementById('npprev'); if(pv) pv.innerHTML=(isVid?`<video src="${url}" style="max-width:100%;max-height:240px;border-radius:12px" controls></video>`:`<img src="${url}" style="max-width:100%;max-height:240px;border-radius:12px;display:block"/>`)+`<div class="row" style="margin-top:5px;gap:8px"><span class="faint" style="font-size:12.5px">${esc(f.name)}</span><span style="color:var(--brand);cursor:pointer;font-size:12.5px;font-weight:600" onclick="clearMedia()">Remove</span></div>`; };
 window.clearMedia=function(){ window._npmedia=null; const p=document.getElementById('npprev'); if(p)p.innerHTML=''; const i=document.getElementById('npfile'); if(i)i.value=''; };
 async function uploadMedia(f){ if(!f)return null; const ext=(f.name.split('.').pop()||'bin').toLowerCase(); const path=state.user.id+'/'+Date.now()+'-'+Math.random().toString(36).slice(2,7)+'.'+ext; const { error }=await sb.storage.from('media').upload(path,f,{contentType:f.type||'application/octet-stream',upsert:false}); if(error){ alert('Upload failed: '+error.message); return null; } return sb.storage.from('media').getPublicUrl(path).data.publicUrl; }
-window.postNew=async function(){ const ta=document.getElementById('np'); const body=(ta.value||'').trim(); const f=window._npmedia; if(!body && !f) return; if(!state.user||!state.user.id){ alert('You appear to be signed out — please sign in again, then post.'); return; } const btn=document.getElementById('postbtn'); if(btn){ btn.textContent=f?'Uploading…':'Posting…'; btn.disabled=true; } let media_url=null, media_type=null; if(f){ media_url=await uploadMedia(f); if(!media_url){ if(btn){btn.textContent='Post';btn.disabled=false;} return; } media_type=f.type.startsWith('video')?'video':'image'; } const ch=state.ctx.ch||'announcements'; const _ins={author_id:state.user.id, author_name:(state.profile&&state.profile.name)||'Someone', channel:ch, body, media_url, media_type}; const r=await sb.from('posts').insert(_ins).select('id').maybeSingle(); if(r&&r.error){ alert('Could not post: '+r.error.message); if(btn){btn.textContent='Post';btn.disabled=false;} return; } /* a poll, a must-confirm or an audience are rows about this post, so they need its id */ try{ if(r&&r.data&&r.data.id) await savePostExtras(r.data.id); }catch(e){} try{ await notifyMentions(body); }catch(e){} window._npmedia=null; state.community=null; go('community',{ch}); };
+window.postNew=async function(){ const ta=document.getElementById('np'); const body=(ta.value||'').trim(); const f=window._npmedia; if(!body && !f) return; if(!state.user||!state.user.id){ alert('You appear to be signed out — please sign in again, then post.'); return; } const btn=document.getElementById('postbtn'); if(btn){ btn.textContent=f?'Uploading…':'Posting…'; btn.disabled=true; } let media_url=null, media_type=null; if(f){ media_url=await uploadMedia(f); if(!media_url){ if(btn){btn.textContent='Post';btn.disabled=false;} return; } media_type=f.type.startsWith('video')?'video':(f.type.startsWith('audio')?'audio':'image'); } const ch=state.ctx.ch||'announcements'; const _ins={author_id:state.user.id, author_name:(state.profile&&state.profile.name)||'Someone', channel:ch, body, media_url, media_type}; const r=await sb.from('posts').insert(_ins).select('id').maybeSingle(); if(r&&r.error){ alert('Could not post: '+r.error.message); if(btn){btn.textContent='Post';btn.disabled=false;} return; } /* a poll, a must-confirm or an audience are rows about this post, so they need its id */ try{ if(r&&r.data&&r.data.id) await savePostExtras(r.data.id); }catch(e){} try{ await notifyMentions(body); }catch(e){} window._npmedia=null; state.community=null; go('community',{ch}); };
 // Keeps the community nav badge in sync with window._communityUnread without a full re-render.
 window._updateCommunityBadge=function(){
   const tot=window._communityUnread||0;
@@ -82,7 +82,7 @@ window.markUnreadFrom=async function(pid){
   _updateCommunityBadge();
   const t=document.createElement('div'); t.textContent='Marked unread — it\'ll show on Community until you open it again'; t.style.cssText='position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#1A1A1A;color:#fff;padding:10px 16px;border-radius:10px;font-size:13px;z-index:10050;box-shadow:0 6px 20px rgba(0,0,0,.25)'; document.body.appendChild(t); setTimeout(()=>t.remove(),2600);
 };
-window.commentNew=async function(pid){ const inp=document.getElementById('rc'+pid); const body=(inp.value||'').trim(); if(!body) return; const ch=state.ctx.ch||'announcements'; const r=await sb.from('comments').insert({post_id:pid, author_id:state.user.id, author_name:(state.profile&&state.profile.name)||'Someone', body}); if(r&&r.error){ alert('Could not reply: '+r.error.message); return; } try{ await notifyMentions(body); }catch(e){} state.community=null; go('community',{ch}); };
+window.commentNew=async function(pid){ const inp=document.getElementById('rc'+pid); const body=(inp.value||'').trim(); if(!body) return; const ch=state.ctx.ch||'announcements'; const r=await sb.from('comments').insert({post_id:pid, author_id:state.user.id, author_name:(state.profile&&state.profile.name)||'Someone', body}).select('id').maybeSingle(); if(r&&r.error){ alert('Could not reply: '+r.error.message); return; } try{ const _q=window._quoteFor&&window._quoteFor[pid]; if(_q && r.data && r.data.id){ await sb.from('day_items').insert({kind:'quote',title:String(r.data.id),on_date:null,detail:JSON.stringify({author:_q.author,text:_q.text,cid:_q.cid}),created_by:state.user.id}); } if(window._quoteFor) delete window._quoteFor[pid]; }catch(e){} try{ await notifyMentions(body); }catch(e){} state.community=null; go('community',{ch}); };
 
 async function vFeedback(v){
   const isAdmin = state.profile && state.profile.role==='admin';
@@ -502,11 +502,11 @@ window.rmDel=async function(id){ if(!confirm('Remove this item?'))return; await 
    *about* a post, keyed to that post's id, so editing or deleting the post never leaves a
    half-orphaned copy of it behind -- the same reason pinning was built this way. */
 
-function _cmeta(){ const m=(state.community&&state.community.meta)||{}; return {polls:m.polls||{},votes:m.votes||{},must:m.must||{},readok:m.readok||{},aud:m.aud||{}}; }
+function _cmeta(){ const m=(state.community&&state.community.meta)||{}; return {polls:m.polls||{},votes:m.votes||{},must:m.must||{},readok:m.readok||{},aud:m.aud||{},quotes:m.quotes||{}}; }
 function _cJSON(r){ try{ return typeof r.detail==='string'?JSON.parse(r.detail||'{}'):(r.detail||{}); }catch(e){ return {}; } }
 // Splits one day_items read into the five things a post can carry. Called by vCommunity.
 function splitPostMeta(rows){
-  const meta={polls:{},votes:{},must:{},readok:{},aud:{}};
+  const meta={polls:{},votes:{},must:{},readok:{},aud:{},quotes:{}};
   (rows||[]).forEach(function(r){
     const k=String(r.title||''), d=_cJSON(r);
     if(r.kind==='poll') meta.polls[k]=d;
@@ -514,6 +514,7 @@ function splitPostMeta(rows){
     else if(r.kind==='mustread') meta.must[k]=d;
     else if(r.kind==='readok') (meta.readok[k]=meta.readok[k]||[]).push({user:r.created_by,name:d.name||'',at:d.at||''});
     else if(r.kind==='postaud') meta.aud[k]=d;
+    else if(r.kind==='quote') meta.quotes[k]=d;   // keyed by the reply's id, not the post's
   });
   return meta;
 }
@@ -627,7 +628,7 @@ window.remindConfirm=async function(pid){
   const left=_audPeople(m.aud[key]||null).filter(function(n){ return !done.has(n); });
   if(!left.length) return;
   const post=(state.community.posts||[]).find(function(x){ return String(x.id)===key; })||{};
-  await notify({title:'Please confirm you read this', body:String(post.body||'').slice(0,160), who:left, act:'community', urgent:true});
+  await notify({title:'Please confirm you read this', body:String(post.body||'').slice(0,160), who:left, act:"go('community')", urgent:true});
   alert(typeof isQuiet==='function'&&isQuiet() ? 'Practice mode is on, so nothing was sent.' : 'Reminded '+left.length+' '+(left.length===1?'person':'people')+'.');
 };
 
@@ -705,7 +706,7 @@ async function savePostExtras(pid){
     /* If it has to be confirmed, it has to reach them -- an unread badge is not enough. */
     const _a=window._npAud||{}; const _who=_audPeople(_audEmpty(_a)?null:_a);
     const _ta=document.getElementById('np'); const _b=_ta?String(_ta.value||'').trim().slice(0,160):'';
-    jobs.push(notify({title:'Please read and confirm', body:_b, who:_who, act:'community', urgent:true}));
+    jobs.push(notify({title:'Please read and confirm', body:_b, who:_who, act:"go('community')", urgent:true}));
   }
   if(t.aud){ const a=window._npAud||{}; if(!_audEmpty(a)) jobs.push(sb.from('day_items').insert({kind:'postaud',title:String(pid),on_date:null,detail:JSON.stringify({pos:a.pos||[],skills:a.skills||[],names:a.names||[]}),created_by:state.user.id})); }
   if(jobs.length) await Promise.all(jobs);
@@ -830,5 +831,116 @@ async function notifyMentions(body, where){
   const me=_meRoster(), from=(state.profile&&state.profile.name)||'';
   const who=mentionResolve(body).filter(function(n){ return n!==me && n!==from; });
   if(!who.length) return;
-  await notify({title:(from||'Someone')+' mentioned you', body:String(body||'').slice(0,160), who:who, act:'community'});
+  await notify({title:(from||'Someone')+' mentioned you', body:String(body||'').slice(0,160), who:who, act:"go('community')"});
+}
+
+/* ---------- Voice messages ----------
+   The one feature people name first when they say what they love about WhatsApp, and the
+   one that fits a kitchen best: hands are wet, hands are full, and a closing note that
+   takes four minutes to type takes twenty seconds to say. It rides on the same upload and
+   the same storage as a photo, so nothing new has to be true for it to work. */
+function _recMime(){
+  const c=['audio/webm;codecs=opus','audio/webm','audio/mp4','audio/aac'];
+  for(let i=0;i<c.length;i++){ try{ if(window.MediaRecorder && MediaRecorder.isTypeSupported(c[i])) return c[i]; }catch(e){} }
+  return '';
+}
+function _recSecs(){ return Math.max(0, Math.round((Date.now()-(window._recStart||Date.now()))/1000)); }
+function _mmss(t){ const m=Math.floor(t/60), s=t%60; return m+':'+(s<10?'0':'')+s; }
+function _voiceUI(){
+  const pv=document.getElementById('npprev'); if(!pv) return;
+  pv.innerHTML=`<div class="row" style="gap:10px;align-items:center;border:1px solid #E5B4B4;background:#FDF1F1;border-radius:12px;padding:10px 13px">
+    <span style="width:11px;height:11px;border-radius:50%;background:#C0392B;flex-shrink:0"></span>
+    <span style="font-weight:800;font-size:14px;color:#8A1C1C;font-variant-numeric:tabular-nums">${_mmss(_recSecs())}</span>
+    <span class="faint" style="font-size:12.5px">Recording — up to 3 minutes</span>
+    <button class="btn pri" style="width:auto;margin-left:auto;padding:5px 13px;font-size:13px" onclick="voiceStop()">Stop</button>
+    <button class="btn" style="width:auto;padding:5px 11px;font-size:13px" onclick="voiceCancel()">Cancel</button></div>`;
+}
+function _voicePreview(f, secs){
+  const pv=document.getElementById('npprev'); if(!pv) return;
+  const url=URL.createObjectURL(f);
+  pv.innerHTML=`<div style="border:1px solid var(--line2);border-radius:12px;padding:10px 13px">
+    <div class="row" style="gap:9px;align-items:center;margin-bottom:7px">
+      <i class="ti ti-microphone" style="color:var(--brand);font-size:16px"></i>
+      <span style="font-weight:700;font-size:13.5px">Voice message${secs?' · '+_mmss(secs):''}</span>
+      <span style="color:var(--brand);cursor:pointer;font-size:12.5px;font-weight:700;margin-left:auto" onclick="clearMedia()">Remove</span></div>
+    <audio controls src="${url}" style="width:100%"></audio></div>`;
+}
+window.voiceStart=async function(){
+  if(window._rec){ return; }
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder){
+    alert('This browser cannot record audio. You can still attach a photo or a video.'); return;
+  }
+  let stream;
+  try{ stream=await navigator.mediaDevices.getUserMedia({audio:true}); }
+  catch(e){ alert('We could not reach the microphone. Allow this site to use it, then try again.'); return; }
+  const mime=_recMime();
+  let mr;
+  try{ mr=new MediaRecorder(stream, mime?{mimeType:mime}:undefined); }
+  catch(e){ try{ stream.getTracks().forEach(function(t){t.stop();}); }catch(e2){} alert('This browser cannot record audio. You can still attach a photo or a video.'); return; }
+  window._recChunks=[];
+  mr.ondataavailable=function(e){ if(e.data && e.data.size) window._recChunks.push(e.data); };
+  mr.onstop=function(){
+    try{ stream.getTracks().forEach(function(t){ t.stop(); }); }catch(e){}
+    clearInterval(window._recTimer); clearTimeout(window._recMax);
+    const secs=_recSecs(); const cancelled=window._recCancel; window._recCancel=false; window._rec=null;
+    if(cancelled){ clearMedia(); return; }
+    const type=mr.mimeType||mime||'audio/webm';
+    const ext=(type.indexOf('mp4')>=0||type.indexOf('aac')>=0)?'m4a':'webm';
+    const blob=new Blob(window._recChunks||[], {type:type});
+    if(!blob.size){ clearMedia(); alert('Nothing was recorded. Try once more.'); return; }
+    const f=new File([blob], 'voice-'+Date.now()+'.'+ext, {type:type});
+    window._npmedia=f; _voicePreview(f, secs);
+  };
+  try{ mr.start(); }catch(e){ try{ stream.getTracks().forEach(function(t){t.stop();}); }catch(e2){} alert('Recording would not start.'); return; }
+  window._rec=mr; window._recStart=Date.now(); window._recCancel=false;
+  _voiceUI();
+  window._recTimer=setInterval(_voiceUI, 250);
+  window._recMax=setTimeout(function(){ if(window._rec) window.voiceStop(); }, 180000);
+};
+window.voiceStop=function(){ const mr=window._rec; if(!mr) return; try{ mr.stop(); }catch(e){ window._rec=null; clearInterval(window._recTimer); } };
+window.voiceCancel=function(){ const mr=window._rec; if(!mr){ clearMedia(); return; } window._recCancel=true; try{ mr.stop(); }catch(e){ window._rec=null; clearInterval(window._recTimer); clearMedia(); } };
+// A voice note is played, not looked at.
+function mediaBlock(p, small){
+  if(!p.media_url) return '';
+  if(p.media_type==='audio') return `<div style="margin-top:11px;border:1px solid var(--line2);border-radius:12px;padding:10px 13px;display:flex;align-items:center;gap:10px">
+    <i class="ti ti-microphone" style="color:var(--brand);font-size:17px;flex-shrink:0"></i>
+    <audio controls preload="none" src="${p.media_url}" style="flex:1;min-width:0"></audio></div>`;
+  if(p.media_type==='video') return `<video src="${p.media_url}" controls playsinline style="width:100%;max-height:${small?240:420}px;margin-top:11px;border-radius:12px;background:#000"></video>`;
+  return `<img src="${p.media_url}" loading="lazy" style="width:100%;margin-top:11px;border-radius:12px;display:block"/>`;
+}
+
+/* ---------- Quote a message when you answer it ----------
+   The half of threading people actually like: the answer carries the question with it, in
+   the same room, so nobody has to open a separate place to find out what "yes" meant.
+   Threads themselves are the part Slack's own testing found people did not understand. */
+window._quoteFor={};
+function _quoteText(t){ t=String(t||'').replace(/\s+/g,' ').trim(); return t.length>150?t.slice(0,150)+'…':t; }
+window.quotePost=function(pid){
+  const p=(state.community.posts||[]).find(function(x){ return x.id===pid; }); if(!p) return;
+  window._quoteFor[pid]={author:p.author_name||'', text:_quoteText(p.body)||(p.media_type==='audio'?'Voice message':'Attachment'), cid:null};
+  _renderQuoteBar(pid);
+};
+window.quoteComment=function(pid,cid){
+  const c=(state.community.comments||[]).find(function(x){ return x.id===cid; }); if(!c) return;
+  window._quoteFor[pid]={author:c.author_name||'', text:_quoteText(c.body), cid:cid};
+  _renderQuoteBar(pid);
+};
+window.quoteClear=function(pid){ delete window._quoteFor[pid]; _renderQuoteBar(pid); };
+function _renderQuoteBar(pid){
+  const bar=document.getElementById('qb'+pid); if(!bar) return;
+  const q=window._quoteFor[pid];
+  if(!q){ bar.innerHTML=''; bar.style.display='none'; return; }
+  bar.style.display='block';
+  bar.innerHTML=`<div style="display:flex;gap:9px;align-items:flex-start;border-left:3px solid var(--brand);background:var(--brand-soft);border-radius:0 8px 8px 0;padding:7px 11px;margin-bottom:7px">
+    <div style="flex:1;min-width:0">
+      <div style="font-weight:700;font-size:12.5px;color:var(--brand)">Replying to ${esc(q.author||'this message')}</div>
+      <div class="muted" style="font-size:13px;line-height:1.45;overflow:hidden">${esc(q.text)}</div></div>
+    <button onclick="quoteClear(${pid})" title="Don't quote it" style="border:none;background:none;color:var(--muted);cursor:pointer;font-size:16px;line-height:1">×</button></div>`;
+  const inp=document.getElementById('rc'+pid); if(inp) inp.focus();
+}
+function quotedBlock(cid){
+  const q=(_cmeta().quotes||{})[String(cid)]; if(!q) return '';
+  return `<div style="border-left:3px solid var(--line2);padding:2px 0 2px 9px;margin:0 0 4px">
+    <div style="font-size:12px;font-weight:700;color:var(--muted)">${esc(q.author||'')}</div>
+    <div class="faint" style="font-size:12.5px;line-height:1.4">${esc(q.text||'')}</div></div>`;
 }
