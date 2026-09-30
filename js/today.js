@@ -3,7 +3,11 @@ function isoDate(d){ const x=new Date(d); return x.getFullYear()+'-'+String(x.ge
 function weekStart(d){ const x=new Date(d); const off=(x.getDay()+6)%7; x.setDate(x.getDate()-off); x.setHours(0,0,0,0); return x; }
 function fmtDay(d){ return new Date(d).toLocaleDateString(undefined,{weekday:'short',month:'numeric',day:'numeric'}); }
 function parseClock(t){ if(!t)return null; t=String(t).trim().toLowerCase(); let ap=null; if(/am|a$/.test(t))ap='a'; if(/pm|p$/.test(t))ap='p'; t=t.replace(/[ap]m?$/,'').trim(); let parts=t.split(':'); let hh=parseInt(parts[0]); let mm=parseInt(parts[1]||'0'); if(isNaN(hh))return null; if(ap==='p'&&hh<12)hh+=12; if(ap==='a'&&hh===12)hh=0; return hh+(mm||0)/60; }
-function shiftHours(s){ const a=parseClock(s.start_time),b=parseClock(s.end_time); if(a==null||b==null)return 0; let d=b-a; if(d<0)d+=24; return d; }
+/* Paid hours, which is not the same as the length of the shift. An eight-hour shift with
+   a half-hour unpaid break is seven and a half paid hours, and every labour figure in the
+   app -- weekly cost, percentage of sales, the forty-hour overtime line -- runs off this
+   one function. Shifts with no break recorded are unchanged. */
+function shiftHours(s){ const a=parseClock(s.start_time),b=parseClock(s.end_time); if(a==null||b==null)return 0; let d=b-a; if(d<0)d+=24; const br=(+((s&&s.break_min)||0))/60; return Math.max(0, d-br); }
 function fmtClock(t){ const v=parseClock(t); if(v==null)return esc(t||''); let hh=Math.floor(v),mm=Math.round((v-hh)*60); const ap=hh>=12?'p':'a'; let h12=hh%12||12; return h12+(mm?':'+String(mm).padStart(2,'0'):'')+ap; }
 function money(n){ return '$'+(Math.round(n*100)/100).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}); }
 async function vSchedule(v){

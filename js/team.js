@@ -594,6 +594,11 @@ window._payLoad = async function(){
   const r = await sb.from('pay_rates').select('person_name,wage');
   const cur = {}; (r.data||[]).forEach(x=>cur[x.person_name]=+x.wage);
   window._payCur = cur;
+  /* Rates on file for people who are not on the roster. Twenty-three rows for sixteen
+     people is not a bug in itself -- a departed person's rate is what makes their past
+     shifts cost anything, so deleting it silently rewrites last year's labour. They are
+     listed separately, and removing one says what it costs. */
+  window._payOff = Object.keys(cur).filter(function(n){ return people.indexOf(n)<0; }).sort();
   window._payPeople = people;
   /* Salary used to be a box on the profile while the hourly rate was here, so setting
      somebody's pay meant knowing which of the two screens applied to them. It is one
@@ -669,7 +674,27 @@ window._payRender = function(){
     +'<button onclick="_paySave()" id="payGo" style="background:var(--brand,#4a9cad);color:#fff;border:none;border-radius:8px;padding:11px 20px;font-weight:700;cursor:pointer">Save pay rates</button>'
     + (inline?'':'<button onclick="var m=document.getElementById(\'payModal\');if(m)m.remove()" style="background:transparent;border:1px solid var(--line2,#d5dde0);border-radius:8px;padding:11px 16px;cursor:pointer;color:inherit">Cancel</button>')
     +'<span id="payMsg" class="muted" style="font-size:12.5px"></span></div>';
+  /* These were invisible: the page showed sixteen people while the table held twenty-three
+     rates, so nobody could tell the difference between a rate that is live and one left
+     over from somebody who quit. */
+  const off=window._payOff||[];
+  if(off.length){
+    h+='<div style="margin-top:26px;border-top:1px solid var(--line);padding-top:16px">'
+      +'<div style="font-weight:800;font-size:14px">No longer on the roster <span class="faint" style="font-weight:600">\u00b7 '+off.length+'</span></div>'
+      +'<div class="muted" style="font-size:12.5px;line-height:1.55;margin:4px 0 11px">These rates are not paid to anyone. They are what makes each person\u2019s <b>past</b> shifts cost what they cost, so removing one rewrites the labour figures for the weeks they worked. Remove a row only when it was never a real person \u2014 a duplicate, or a name typed twice.</div>'
+      + off.map(function(n){ return '<div class="row" style="gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line)">'
+          +'<div style="flex:1;min-width:0;font-size:14px">'+esc(n)+'</div>'
+          +'<span class="faint" style="font-size:13px;font-variant-numeric:tabular-nums">$'+(+window._payCur[n]||0).toFixed(2)+'/hr</span>'
+          +'<button onclick="payDropRate('+JSON.stringify(n).replace(/"/g,'&quot;')+')" style="border:1px solid var(--line2);background:var(--card);border-radius:8px;padding:4px 10px;font-size:12.5px;cursor:pointer;color:var(--muted);font-family:inherit">Remove</button></div>'; }).join('')
+      +'</div>';
+  }
   c.innerHTML=h;
+};
+window.payDropRate=async function(name){
+  if(!confirm('Remove the pay rate on file for '+name+'?\n\nAny past shift of theirs will cost $0 from now on, so the labour figures for those weeks will change. Do this only for a duplicate or a name typed twice.')) return;
+  const r=await sb.from('pay_rates').delete().eq('person_name',name);
+  if(r&&r.error){ alert('That did not save: '+r.error.message); return; }
+  await _payLoad(); _payRender();
 };
 window._paySet = function(n,v){ window._payCur[n] = v===''? null : +v; };
 window._paySalSet = function(n,v){ window._paySal[n] = v===''? null : +v; };
