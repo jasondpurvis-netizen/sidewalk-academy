@@ -1229,6 +1229,7 @@ window.notify=async function(opts){
         body: String(opts.body||'').slice(0,400),
         act: opts.act||'',
         who: Array.isArray(opts.who)? opts.who : (opts.who? [opts.who] : null),  // null = everyone
+        urgent: !!opts.urgent,
         from: (state.profile&&state.profile.name)||'',
         at: new Date().toISOString()
       }),
@@ -1242,12 +1243,24 @@ window.loadNotifs=async function(){
   const since=isoDate(new Date(Date.now()-14*864e5));
   const r=await sb.from('day_items').select('id,title,detail,on_date').eq('kind','notif').gte('on_date',since).order('id',{ascending:false}).limit(40);
   let seen={}; try{ seen=JSON.parse(localStorage.getItem('notif_seen')||'{}'); }catch(e){}
-  const out=[];
+  let out=[];
   (r.data||[]).forEach(function(x){
     let d={}; try{ d=JSON.parse(x.detail||'{}'); }catch(e){}
     if(d.who && d.who.length && d.who.indexOf(me)<0) return;   // addressed to specific people
-    out.push({id:x.id, title:x.title, body:d.body||'', act:d.act||'', at:d.at||x.on_date, unread:!seen[x.id]});
+    out.push({id:x.id, title:x.title, body:d.body||'', act:d.act||'', at:d.at||x.on_date, urgent:!!d.urgent, unread:!seen[x.id]});
   });
+  /* Quiet hours: held, never dropped. While you are inside your own window, anything that
+     arrived during it waits; the moment the window ends it is all there. Something a leader
+     marked urgent goes through -- a held "please confirm you read this" defeats the point
+     of asking. */
+  try{
+    if(!window._profiles && typeof loadProfiles==='function'){ await loadProfiles(); }
+    const q=(typeof myQuiet==='function')?myQuiet(me):{on:false};
+    if(typeof _inQuietNow==='function' && _inQuietNow(q)){
+      const since=_quietSince(q);
+      out=out.filter(function(n){ return n.urgent || !since || new Date(n.at||0) < since; });
+    }
+  }catch(e){}
   window._notifs=out; return out;
 };
 window.markNotifsSeen=function(){

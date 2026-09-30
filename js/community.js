@@ -62,7 +62,7 @@ window._npmedia=null;
 window.pickMedia=function(inp){ const f=inp.files&&inp.files[0]; if(!f)return; if(f.size>60*1024*1024){ alert('That file is over 60 MB. Please pick a shorter video or a smaller photo.'); inp.value=''; return; } window._npmedia=f; const url=URL.createObjectURL(f); const isVid=f.type.startsWith('video'); const pv=document.getElementById('npprev'); if(pv) pv.innerHTML=(isVid?`<video src="${url}" style="max-width:100%;max-height:240px;border-radius:12px" controls></video>`:`<img src="${url}" style="max-width:100%;max-height:240px;border-radius:12px;display:block"/>`)+`<div class="row" style="margin-top:5px;gap:8px"><span class="faint" style="font-size:12.5px">${esc(f.name)}</span><span style="color:var(--brand);cursor:pointer;font-size:12.5px;font-weight:600" onclick="clearMedia()">Remove</span></div>`; };
 window.clearMedia=function(){ window._npmedia=null; const p=document.getElementById('npprev'); if(p)p.innerHTML=''; const i=document.getElementById('npfile'); if(i)i.value=''; };
 async function uploadMedia(f){ if(!f)return null; const ext=(f.name.split('.').pop()||'bin').toLowerCase(); const path=state.user.id+'/'+Date.now()+'-'+Math.random().toString(36).slice(2,7)+'.'+ext; const { error }=await sb.storage.from('media').upload(path,f,{contentType:f.type||'application/octet-stream',upsert:false}); if(error){ alert('Upload failed: '+error.message); return null; } return sb.storage.from('media').getPublicUrl(path).data.publicUrl; }
-window.postNew=async function(){ const ta=document.getElementById('np'); const body=(ta.value||'').trim(); const f=window._npmedia; const _rec=((document.getElementById('npkudos')||{}).value||'').trim(); if(!body && !f && !_rec) return; if(!state.user||!state.user.id){ alert('You appear to be signed out — please sign in again, then post.'); return; } const btn=document.getElementById('postbtn'); if(btn){ btn.textContent=f?'Uploading…':'Posting…'; btn.disabled=true; } let media_url=null, media_type=null; if(f){ media_url=await uploadMedia(f); if(!media_url){ if(btn){btn.textContent='Post';btn.disabled=false;} return; } media_type=f.type.startsWith('video')?'video':'image'; } const ch=state.ctx.ch||'announcements'; const _ins={author_id:state.user.id, author_name:(state.profile&&state.profile.name)||'Someone', channel:ch, body, media_url, media_type}; if(_rec)_ins.recognized_name=_rec; const r=await sb.from('posts').insert(_ins); if(r&&r.error){ alert('Could not post: '+r.error.message); if(btn){btn.textContent='Post';btn.disabled=false;} return; } window._npmedia=null; state.community=null; go('community',{ch}); };
+window.postNew=async function(){ const ta=document.getElementById('np'); const body=(ta.value||'').trim(); const f=window._npmedia; const _rec=((document.getElementById('npkudos')||{}).value||'').trim(); if(!body && !f && !_rec) return; if(!state.user||!state.user.id){ alert('You appear to be signed out — please sign in again, then post.'); return; } const btn=document.getElementById('postbtn'); if(btn){ btn.textContent=f?'Uploading…':'Posting…'; btn.disabled=true; } let media_url=null, media_type=null; if(f){ media_url=await uploadMedia(f); if(!media_url){ if(btn){btn.textContent='Post';btn.disabled=false;} return; } media_type=f.type.startsWith('video')?'video':'image'; } const ch=state.ctx.ch||'announcements'; const _ins={author_id:state.user.id, author_name:(state.profile&&state.profile.name)||'Someone', channel:ch, body, media_url, media_type}; if(_rec)_ins.recognized_name=_rec; const r=await sb.from('posts').insert(_ins).select('id').maybeSingle(); if(r&&r.error){ alert('Could not post: '+r.error.message); if(btn){btn.textContent='Post';btn.disabled=false;} return; } /* a poll, a must-confirm or an audience are rows about this post, so they need its id */ try{ if(r&&r.data&&r.data.id) await savePostExtras(r.data.id); }catch(e){} window._npmedia=null; state.community=null; go('community',{ch}); };
 // Keeps the community nav badge in sync with window._communityUnread without a full re-render.
 window._updateCommunityBadge=function(){
   const tot=window._communityUnread||0;
@@ -492,3 +492,263 @@ window.rmReopen=async function(id){
 window.rmDel=async function(id){ if(!confirm('Remove this item?'))return; await sb.from('day_items').delete().eq('id',id); if(state.page==='rm') vRM(document.getElementById('view')); else if(typeof refreshView==='function') refreshView(); else render(); };
 
 /* ---------- Lists: owner-made running lists (supply run, Amazon, recovery, anything) ---------- */
+/* ---------- Messaging: polls, must-confirm, who it reaches, quiet hours ----------
+   Four things the apps restaurants already use get wrong -- and the four complaints that
+   come up most when people talk about why their team stopped reading the group chat:
+   nobody can tell who actually read the important one; an announcement goes to seventeen
+   people when it concerns four; "who can cover Friday" turns into forty replies nobody
+   can tally; and the phone buzzes at 11pm on somebody's day off.
+   None of it needs a new table. A poll, a confirmation and an audience are small rows
+   *about* a post, keyed to that post's id, so editing or deleting the post never leaves a
+   half-orphaned copy of it behind -- the same reason pinning was built this way. */
+
+function _cmeta(){ const m=(state.community&&state.community.meta)||{}; return {polls:m.polls||{},votes:m.votes||{},must:m.must||{},readok:m.readok||{},aud:m.aud||{}}; }
+function _cJSON(r){ try{ return typeof r.detail==='string'?JSON.parse(r.detail||'{}'):(r.detail||{}); }catch(e){ return {}; } }
+// Splits one day_items read into the five things a post can carry. Called by vCommunity.
+function splitPostMeta(rows){
+  const meta={polls:{},votes:{},must:{},readok:{},aud:{}};
+  (rows||[]).forEach(function(r){
+    const k=String(r.title||''), d=_cJSON(r);
+    if(r.kind==='poll') meta.polls[k]=d;
+    else if(r.kind==='pollvote') (meta.votes[k]=meta.votes[k]||[]).push({user:r.created_by,opt:+d.opt||0,name:d.name||''});
+    else if(r.kind==='mustread') meta.must[k]=d;
+    else if(r.kind==='readok') (meta.readok[k]=meta.readok[k]||[]).push({user:r.created_by,name:d.name||'',at:d.at||''});
+    else if(r.kind==='postaud') meta.aud[k]=d;
+  });
+  return meta;
+}
+
+/* ---- who a post reaches ---- */
+function _meRoster(){ return (typeof myRosterName==='function'&&myRosterName())||((state.profile&&state.profile.name)||''); }
+function _audEmpty(a){ return !a || (!(a.pos||[]).length && !(a.skills||[]).length && !(a.names||[]).length); }
+function _audMe(a){
+  if(_audEmpty(a)) return true;
+  const me=_meRoster(); if(!me) return true;
+  if((a.names||[]).indexOf(me)>=0) return true;
+  if((a.pos||[]).indexOf(typeof posOf==='function'?posOf(me):'')>=0) return true;
+  const mine=((typeof profileOf==='function'?profileOf(me):{}).roles)||[];
+  return (a.skills||[]).some(function(s){ return mine.indexOf(s)>=0; });
+}
+// Everyone the post is addressed to, by roster name. Empty audience = the whole roster.
+function _audPeople(a){
+  const all=(typeof rosterNames==='function')?rosterNames():[];
+  if(_audEmpty(a)) return all;
+  return all.filter(function(n){
+    if((a.names||[]).indexOf(n)>=0) return true;
+    if((a.pos||[]).indexOf(posOf(n))>=0) return true;
+    const r=((profileOf(n)||{}).roles)||[];
+    return (a.skills||[]).some(function(s){ return r.indexOf(s)>=0; });
+  });
+}
+function _audLabel(a){ if(_audEmpty(a)) return ''; return [].concat(a.pos||[],a.skills||[],a.names||[]).join(' · '); }
+
+/* ---- polls ---- */
+function pollBlock(p){
+  const m=_cmeta(), key=String(p.id), def=m.polls[key];
+  if(!def||!(def.opts||[]).length) return '';
+  const votes=m.votes[key]||[], total=votes.length;
+  const mineIdx=(function(){ const v=votes.find(function(x){ return x.user===state.user.id; }); return v?v.opt:-1; })();
+  const rows=def.opts.map(function(o,i){
+    const who=votes.filter(function(v){ return v.opt===i; });
+    const pct=total?Math.round(who.length*100/total):0;
+    const on=mineIdx===i;
+    return `<button onclick="pollVote(${p.id},${i})" style="display:block;width:100%;text-align:left;position:relative;overflow:hidden;border:1px solid ${on?'var(--brand)':'var(--line2)'};background:var(--card);border-radius:10px;padding:9px 12px;margin-bottom:6px;cursor:pointer;font-family:inherit">
+      <span style="position:absolute;inset:0 auto 0 0;width:${pct}%;background:${on?'var(--brand-soft)':'var(--line)'};transition:width .25s ease"></span>
+      <span style="position:relative;display:flex;align-items:center;gap:8px">
+        <i class="ti ti-${on?'circle-check-filled':'circle'}" style="color:${on?'var(--brand)':'var(--faint)'};font-size:16px;flex-shrink:0"></i>
+        <span style="flex:1;min-width:0;font-size:14px;font-weight:${on?'700':'600'};color:var(--ink)">${esc(o)}</span>
+        <span style="font-size:12.5px;font-weight:800;color:var(--muted);flex-shrink:0">${who.length}</span>
+      </span>
+      ${who.length?`<span style="position:relative;display:block;font-size:12px;color:var(--muted);margin:3px 0 0 24px">${esc(who.map(function(v){ return v.user===state.user.id?'You':(v.name||'Someone'); }).join(', '))}</span>`:''}
+    </button>`;
+  }).join('');
+  return `<div style="margin-top:11px;border:1px solid var(--line);border-radius:12px;padding:12px 13px">
+    <div style="display:flex;align-items:center;gap:7px;margin-bottom:9px">
+      <i class="ti ti-chart-bar" style="color:var(--brand);font-size:15px"></i>
+      <span style="font-weight:800;font-size:11.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--brand)">Pick one</span>
+      <span class="faint" style="font-size:12px;margin-left:auto">${total} answer${total===1?'':'s'}</span>
+    </div>${rows}
+    ${mineIdx>=0?`<div class="faint" style="font-size:12px;margin-top:2px">Tap a different one to change your answer.</div>`:''}
+  </div>`;
+}
+window.pollVote=async function(pid,i){
+  await sb.from('day_items').delete().eq('kind','pollvote').eq('title',String(pid)).eq('created_by',state.user.id);
+  const r=await sb.from('day_items').insert({kind:'pollvote',title:String(pid),on_date:null,
+    detail:JSON.stringify({opt:i,name:_meRoster()||((state.profile||{}).name||'')}),created_by:state.user.id});
+  if(r&&r.error){ alert('Your answer did not save: '+r.error.message); return; }
+  state.community=null; go('community',state.ctx);
+};
+
+/* ---- must confirm ----
+   The gap Jason named: you can post the one that matters and have no idea who has seen it.
+   A read receipt on its own is noise -- this is a deliberate tap, on the post, by the
+   people it is addressed to, and the leader sees exactly who is left. */
+function confirmBlock(p,isLeader){
+  const m=_cmeta(), key=String(p.id);
+  if(!m.must[key]) return '';
+  const done=m.readok[key]||[], aud=m.aud[key]||null, need=_audPeople(aud);
+  const doneNames=new Set(done.map(function(d){ return d.name; }));
+  const mine=done.find(function(d){ return d.user===state.user.id; });
+  const left=need.filter(function(n){ return !doneNames.has(n); });
+  let h=`<div style="margin-top:11px;border-radius:12px;overflow:hidden;border:1px solid ${mine?'#BFE3C6':'#F0D98A'}">`;
+  if(mine){
+    h+=`<div style="display:flex;align-items:center;gap:8px;padding:10px 13px;background:#EDF8EF;color:#1E6B37">
+      <i class="ti ti-circle-check-filled" style="font-size:17px"></i>
+      <span style="font-size:14px;font-weight:700">You confirmed this${mine.at?' · '+esc(timeAgo(mine.at)):''}</span></div>`;
+  } else {
+    h+=`<div style="padding:11px 13px;background:#FFF7E0">
+      <div style="display:flex;align-items:center;gap:8px;color:#8A5A00;margin-bottom:8px">
+        <i class="ti ti-alert-circle" style="font-size:17px"></i>
+        <span style="font-size:14px;font-weight:700">Read this, then confirm</span></div>
+      <button class="btn pri" style="width:auto" onclick="confirmRead(${p.id})">Got it</button></div>`;
+  }
+  if(isLeader){
+    h+=`<div style="padding:10px 13px;border-top:1px solid var(--line);background:var(--card)">
+      <div style="font-size:13px;font-weight:700">${done.length} of ${need.length} confirmed</div>`;
+    if(left.length) h+=`<div class="muted" style="font-size:13px;margin-top:4px;line-height:1.5">Still waiting on ${esc(left.join(', '))}</div>
+      <button class="btn" style="width:auto;margin-top:8px;padding:4px 11px;font-size:12.5px" onclick="remindConfirm(${p.id})"><i class="ti ti-bell"></i> Remind the ${left.length}</button>`;
+    else h+=`<div class="muted" style="font-size:13px;margin-top:4px">Everyone has confirmed.</div>`;
+    h+=`</div>`;
+  }
+  return h+`</div>`;
+}
+window.confirmRead=async function(pid){
+  const r=await sb.from('day_items').insert({kind:'readok',title:String(pid),on_date:null,
+    detail:JSON.stringify({name:_meRoster()||((state.profile||{}).name||''),at:new Date().toISOString()}),created_by:state.user.id});
+  if(r&&r.error){ alert('That did not save: '+r.error.message); return; }
+  state.community=null; go('community',state.ctx);
+};
+window.remindConfirm=async function(pid){
+  const m=_cmeta(), key=String(pid);
+  const done=new Set((m.readok[key]||[]).map(function(d){ return d.name; }));
+  const left=_audPeople(m.aud[key]||null).filter(function(n){ return !done.has(n); });
+  if(!left.length) return;
+  const post=(state.community.posts||[]).find(function(x){ return String(x.id)===key; })||{};
+  await notify({title:'Please confirm you read this', body:String(post.body||'').slice(0,160), who:left, act:'community', urgent:true});
+  alert(typeof isQuiet==='function'&&isQuiet() ? 'Practice mode is on, so nothing was sent.' : 'Reminded '+left.length+' '+(left.length===1?'person':'people')+'.');
+};
+
+/* ---- the composer's extra tools ---- */
+window._npTools=null;
+function composerTools(isLeader){
+  window._npTools={poll:false,must:false,aud:false};
+  window._npAud={pos:[],skills:[],names:[]};
+  window._npOpts=2;
+  const chip=function(k,icon,label){ return `<button id="npc_${k}" onclick="npTool('${k}')" style="display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line2);background:var(--card);color:var(--muted);border-radius:999px;padding:6px 12px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit"><i class="ti ${icon}" style="font-size:14px"></i>${label}</button>`; };
+  return `<div class="row" style="margin-top:9px;gap:7px;flex-wrap:wrap">`
+    + chip('poll','ti-chart-bar','Ask a question')
+    + (isLeader?chip('must','ti-circle-check','Must confirm'):'')
+    + (isLeader?chip('aud','ti-users','Who it reaches'):'')
+    + `</div><div id="npPanels"></div>`;
+}
+window.npTool=function(k){
+  const t=window._npTools||(window._npTools={}); t[k]=!t[k];
+  ['poll','must','aud'].forEach(function(x){
+    const b=document.getElementById('npc_'+x); if(!b) return;
+    const on=!!t[x];
+    b.style.borderColor=on?'var(--brand)':'var(--line2)';
+    b.style.background=on?'var(--brand-soft)':'var(--card)';
+    b.style.color=on?'var(--brand)':'var(--muted)';
+  });
+  npPanels();
+};
+function _rosterPositions(){ const s=[]; ((typeof rosterNames==='function')?rosterNames():[]).forEach(function(n){ const p=posOf(n); if(p&&p!=='Unassigned'&&s.indexOf(p)<0) s.push(p); }); return s.sort(); }
+function _rosterSkills(){ const s=[]; ((typeof rosterNames==='function')?rosterNames():[]).forEach(function(n){ (((profileOf(n)||{}).roles)||[]).forEach(function(r){ if(r&&s.indexOf(r)<0) s.push(r); }); }); return s.sort(); }
+function npPanels(){
+  const box=document.getElementById('npPanels'); if(!box) return;
+  const t=window._npTools||{}; let h='';
+  if(t.poll){
+    let opts=''; for(let i=0;i<(window._npOpts||2);i++) opts+=`<input id="npo${i}" placeholder="Choice ${i+1}" style="width:100%;margin-bottom:6px"/>`;
+    h+=`<div style="margin-top:9px;border:1px solid var(--brand-line);background:var(--brand-soft);border-radius:12px;padding:12px 13px">
+      <div style="font-weight:700;font-size:13px;margin-bottom:8px">Choices — people tap one, and you see who picked what</div>${opts}
+      ${(window._npOpts||2)<6?`<button class="btn" style="width:auto;padding:4px 11px;font-size:12.5px" onclick="npPollAdd()">Add a choice</button>`:''}</div>`;
+  }
+  if(t.must){
+    h+=`<div style="margin-top:9px;border:1px solid #F0D98A;background:#FFF7E0;border-radius:12px;padding:11px 13px;font-size:13px;line-height:1.55;color:#8A5A00">
+      Everyone this reaches has to tap <b>Got it</b>. You'll see who hasn't, and you can remind just them.</div>`;
+  }
+  if(t.aud){
+    const a=window._npAud||{pos:[],skills:[],names:[]};
+    const pill=function(grp,v){ const on=(a[grp]||[]).indexOf(v)>=0; return `<button onclick="npAud('${grp}','${String(v).replace(/'/g,"\\'")}')" style="border:1px solid ${on?'var(--brand)':'var(--line2)'};background:${on?'var(--brand-soft)':'var(--card)'};color:${on?'var(--brand)':'var(--ink)'};border-radius:999px;padding:5px 11px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit">${esc(v)}</button>`; };
+    const pos=_rosterPositions(), sk=_rosterSkills();
+    const n=_audPeople(_audEmpty(a)?null:a).length;
+    h+=`<div style="margin-top:9px;border:1px solid var(--line2);border-radius:12px;padding:12px 13px">
+      <div style="font-weight:700;font-size:13px;margin-bottom:7px">Who it reaches <span class="faint" style="font-weight:600">— ${n} ${n===1?'person':'people'}</span></div>
+      ${pos.length?`<div class="faint" style="font-size:11.5px;letter-spacing:.07em;text-transform:uppercase;font-weight:800;margin-bottom:6px">Position</div><div class="row" style="gap:6px;flex-wrap:wrap;margin-bottom:10px">${pos.map(function(p){return pill('pos',p);}).join('')}</div>`:''}
+      ${sk.length?`<div class="faint" style="font-size:11.5px;letter-spacing:.07em;text-transform:uppercase;font-weight:800;margin-bottom:6px">Trained on</div><div class="row" style="gap:6px;flex-wrap:wrap">${sk.map(function(s){return pill('skills',s);}).join('')}</div>`:''}
+      <div class="faint" style="font-size:12px;margin-top:9px">Pick nothing and it reaches the whole team. Leaders always see every post.</div></div>`;
+  }
+  box.innerHTML=h;
+}
+window.npPollAdd=function(){ const keep=[]; for(let i=0;i<(window._npOpts||2);i++){ const e=document.getElementById('npo'+i); keep.push(e?e.value:''); } window._npOpts=Math.min(6,(window._npOpts||2)+1); npPanels(); keep.forEach(function(v,i){ const e=document.getElementById('npo'+i); if(e)e.value=v; }); };
+window.npAud=function(grp,v){ const a=window._npAud||(window._npAud={pos:[],skills:[],names:[]}); const arr=a[grp]||(a[grp]=[]); const i=arr.indexOf(v); if(i>=0)arr.splice(i,1); else arr.push(v); npPanels(); };
+// Writes whatever the composer's tools were set to, for a post that now has an id.
+async function savePostExtras(pid){
+  const t=window._npTools||{}; const jobs=[];
+  if(t.poll){
+    const opts=[]; for(let i=0;i<(window._npOpts||2);i++){ const e=document.getElementById('npo'+i); const v=e?(e.value||'').trim():''; if(v)opts.push(v.slice(0,80)); }
+    if(opts.length>=2) jobs.push(sb.from('day_items').insert({kind:'poll',title:String(pid),on_date:null,detail:JSON.stringify({opts}),created_by:state.user.id}));
+  }
+  if(t.must){
+    jobs.push(sb.from('day_items').insert({kind:'mustread',title:String(pid),on_date:null,detail:JSON.stringify({by:_meRoster(),at:new Date().toISOString()}),created_by:state.user.id}));
+    /* If it has to be confirmed, it has to reach them -- an unread badge is not enough. */
+    const _a=window._npAud||{}; const _who=_audPeople(_audEmpty(_a)?null:_a);
+    const _ta=document.getElementById('np'); const _b=_ta?String(_ta.value||'').trim().slice(0,160):'';
+    jobs.push(notify({title:'Please read and confirm', body:_b, who:_who, act:'community', urgent:true}));
+  }
+  if(t.aud){ const a=window._npAud||{}; if(!_audEmpty(a)) jobs.push(sb.from('day_items').insert({kind:'postaud',title:String(pid),on_date:null,detail:JSON.stringify({pos:a.pos||[],skills:a.skills||[],names:a.names||[]}),created_by:state.user.id})); }
+  if(jobs.length) await Promise.all(jobs);
+}
+
+/* ---- quiet hours ----
+   Practice mode silences the whole restaurant while Jason rehearses. This is the other
+   half: one person saying "not overnight". Held, never dropped -- anything that arrives
+   inside the window appears the moment the window ends, and a leader chasing a
+   confirmation goes through regardless. */
+window.myQuiet=function(name){
+  const pr=(typeof profileOf==='function')?(profileOf(name||_meRoster())||{}):{};
+  return {on:!!pr.qhOn, from:pr.qhFrom||'22:00', to:pr.qhTo||'07:00'};
+};
+function _hm(s){ const m=String(s||'').match(/^(\d{1,2}):(\d{2})/); return m?(+m[1])*60+(+m[2]):null; }
+window._inQuietNow=function(q,now){
+  if(!q||!q.on) return false;
+  const f=_hm(q.from), t=_hm(q.to); if(f==null||t==null) return false;
+  const d=now||new Date(), n=d.getHours()*60+d.getMinutes();
+  return (f<=t) ? (n>=f && n<t) : (n>=f || n<t);
+};
+// The start of the stretch of quiet we are inside right now — anything newer than this waits.
+window._quietSince=function(q,now){
+  const d=now||new Date(), f=_hm(q.from); if(f==null) return null;
+  const s=new Date(d); s.setHours(Math.floor(f/60), f%60, 0, 0);
+  if(s>d) s.setDate(s.getDate()-1);
+  return s;
+};
+window.quietHours=function(){
+  const q=window.myQuiet();
+  let m=document.getElementById('qhm');
+  if(!m){ m=document.createElement('div'); m.id='qhm'; m.style.cssText='position:fixed;inset:0;background:rgba(16,24,40,.5);z-index:9999;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:22px'; m.onclick=function(e){ if(e.target===m) m.remove(); }; document.body.appendChild(m); }
+  m.innerHTML=`<div style="background:var(--card);width:100%;max-width:420px;border-radius:12px;padding:20px">
+    <div class="row" style="align-items:center;margin-bottom:6px"><b style="font-size:16px">Quiet hours</b>
+      <button class="btn" style="width:auto;margin-left:auto;padding:4px 10px" onclick="document.getElementById('qhm').remove()">Close</button></div>
+    <div class="muted" style="font-size:13.5px;line-height:1.55;margin-bottom:13px">Your phone stays quiet between these times. Nothing is lost — anything sent while you're quiet shows up the moment the window ends. A leader asking you to confirm something still gets through.</div>
+    <label style="display:flex;align-items:center;gap:9px;cursor:pointer;margin-bottom:12px;font-size:14px;font-weight:600">
+      <input type="checkbox" id="qhOn" ${q.on?'checked':''}/> Hold messages overnight</label>
+    <div class="row" style="gap:10px">
+      <div style="flex:1"><div class="faint" style="font-size:12px;margin-bottom:4px">From</div><input type="time" id="qhFrom" value="${esc(q.from)}" style="width:100%"/></div>
+      <div style="flex:1"><div class="faint" style="font-size:12px;margin-bottom:4px">Until</div><input type="time" id="qhTo" value="${esc(q.to)}" style="width:100%"/></div>
+    </div>
+    <button class="btn pri" style="width:auto;margin-top:14px" onclick="saveQuietHours()">Save</button></div>`;
+};
+window.saveQuietHours=async function(){
+  const me=_meRoster();
+  if(!me){ alert('We could not tell which roster name is yours, so this has nowhere to save.'); return; }
+  const on=!!(document.getElementById('qhOn')||{}).checked;
+  const from=((document.getElementById('qhFrom')||{}).value)||'22:00';
+  const to=((document.getElementById('qhTo')||{}).value)||'07:00';
+  if(!window._profiles) await loadProfiles();
+  const d=window._profiles[me]||(window._profiles[me]={});
+  d.qhOn=on; d.qhFrom=from; d.qhTo=to;
+  _saveProfileNow(me);
+  const el=document.getElementById('qhm'); if(el) el.remove();
+  const b=document.getElementById('qhBtn'); if(b) b.innerHTML=`<i class="ti ti-moon" style="font-size:14px"></i> ${on?esc(from)+'–'+esc(to):'Quiet hours'}`;
+};
