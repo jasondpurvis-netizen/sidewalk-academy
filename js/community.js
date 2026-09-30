@@ -62,7 +62,7 @@ window._npmedia=null;
 window.pickMedia=function(inp){ const f=inp.files&&inp.files[0]; if(!f)return; if(f.size>60*1024*1024){ alert('That file is over 60 MB. Please pick a shorter video or a smaller photo.'); inp.value=''; return; } window._npmedia=f; const url=URL.createObjectURL(f); const isVid=f.type.startsWith('video'); const pv=document.getElementById('npprev'); if(pv) pv.innerHTML=(isVid?`<video src="${url}" style="max-width:100%;max-height:240px;border-radius:12px" controls></video>`:`<img src="${url}" style="max-width:100%;max-height:240px;border-radius:12px;display:block"/>`)+`<div class="row" style="margin-top:5px;gap:8px"><span class="faint" style="font-size:12.5px">${esc(f.name)}</span><span style="color:var(--brand);cursor:pointer;font-size:12.5px;font-weight:600" onclick="clearMedia()">Remove</span></div>`; };
 window.clearMedia=function(){ window._npmedia=null; const p=document.getElementById('npprev'); if(p)p.innerHTML=''; const i=document.getElementById('npfile'); if(i)i.value=''; };
 async function uploadMedia(f){ if(!f)return null; const ext=(f.name.split('.').pop()||'bin').toLowerCase(); const path=state.user.id+'/'+Date.now()+'-'+Math.random().toString(36).slice(2,7)+'.'+ext; const { error }=await sb.storage.from('media').upload(path,f,{contentType:f.type||'application/octet-stream',upsert:false}); if(error){ alert('Upload failed: '+error.message); return null; } return sb.storage.from('media').getPublicUrl(path).data.publicUrl; }
-window.postNew=async function(){ const ta=document.getElementById('np'); const body=(ta.value||'').trim(); const f=window._npmedia; const _rec=((document.getElementById('npkudos')||{}).value||'').trim(); if(!body && !f && !_rec) return; if(!state.user||!state.user.id){ alert('You appear to be signed out — please sign in again, then post.'); return; } const btn=document.getElementById('postbtn'); if(btn){ btn.textContent=f?'Uploading…':'Posting…'; btn.disabled=true; } let media_url=null, media_type=null; if(f){ media_url=await uploadMedia(f); if(!media_url){ if(btn){btn.textContent='Post';btn.disabled=false;} return; } media_type=f.type.startsWith('video')?'video':'image'; } const ch=state.ctx.ch||'announcements'; const _ins={author_id:state.user.id, author_name:(state.profile&&state.profile.name)||'Someone', channel:ch, body, media_url, media_type}; if(_rec)_ins.recognized_name=_rec; const r=await sb.from('posts').insert(_ins).select('id').maybeSingle(); if(r&&r.error){ alert('Could not post: '+r.error.message); if(btn){btn.textContent='Post';btn.disabled=false;} return; } /* a poll, a must-confirm or an audience are rows about this post, so they need its id */ try{ if(r&&r.data&&r.data.id) await savePostExtras(r.data.id); }catch(e){} window._npmedia=null; state.community=null; go('community',{ch}); };
+window.postNew=async function(){ const ta=document.getElementById('np'); const body=(ta.value||'').trim(); const f=window._npmedia; if(!body && !f) return; if(!state.user||!state.user.id){ alert('You appear to be signed out — please sign in again, then post.'); return; } const btn=document.getElementById('postbtn'); if(btn){ btn.textContent=f?'Uploading…':'Posting…'; btn.disabled=true; } let media_url=null, media_type=null; if(f){ media_url=await uploadMedia(f); if(!media_url){ if(btn){btn.textContent='Post';btn.disabled=false;} return; } media_type=f.type.startsWith('video')?'video':'image'; } const ch=state.ctx.ch||'announcements'; const _ins={author_id:state.user.id, author_name:(state.profile&&state.profile.name)||'Someone', channel:ch, body, media_url, media_type}; const r=await sb.from('posts').insert(_ins).select('id').maybeSingle(); if(r&&r.error){ alert('Could not post: '+r.error.message); if(btn){btn.textContent='Post';btn.disabled=false;} return; } /* a poll, a must-confirm or an audience are rows about this post, so they need its id */ try{ if(r&&r.data&&r.data.id) await savePostExtras(r.data.id); }catch(e){} try{ await notifyMentions(body); }catch(e){} window._npmedia=null; state.community=null; go('community',{ch}); };
 // Keeps the community nav badge in sync with window._communityUnread without a full re-render.
 window._updateCommunityBadge=function(){
   const tot=window._communityUnread||0;
@@ -82,7 +82,7 @@ window.markUnreadFrom=async function(pid){
   _updateCommunityBadge();
   const t=document.createElement('div'); t.textContent='Marked unread — it\'ll show on Community until you open it again'; t.style.cssText='position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#1A1A1A;color:#fff;padding:10px 16px;border-radius:10px;font-size:13px;z-index:10050;box-shadow:0 6px 20px rgba(0,0,0,.25)'; document.body.appendChild(t); setTimeout(()=>t.remove(),2600);
 };
-window.commentNew=async function(pid){ const inp=document.getElementById('rc'+pid); const body=(inp.value||'').trim(); if(!body) return; const ch=state.ctx.ch||'announcements'; const r=await sb.from('comments').insert({post_id:pid, author_id:state.user.id, author_name:(state.profile&&state.profile.name)||'Someone', body}); if(r&&r.error){ alert('Could not reply: '+r.error.message); return; } state.community=null; go('community',{ch}); };
+window.commentNew=async function(pid){ const inp=document.getElementById('rc'+pid); const body=(inp.value||'').trim(); if(!body) return; const ch=state.ctx.ch||'announcements'; const r=await sb.from('comments').insert({post_id:pid, author_id:state.user.id, author_name:(state.profile&&state.profile.name)||'Someone', body}); if(r&&r.error){ alert('Could not reply: '+r.error.message); return; } try{ await notifyMentions(body); }catch(e){} state.community=null; go('community',{ch}); };
 
 async function vFeedback(v){
   const isAdmin = state.profile && state.profile.role==='admin';
@@ -763,3 +763,72 @@ window.saveQuietHours=async function(){
   const el=document.getElementById('qhm'); if(el) el.remove();
   const b=document.getElementById('qhBtn'); if(b) b.innerHTML=`<i class="ti ti-moon" style="font-size:14px"></i> ${on?esc(from)+'–'+esc(to):'Quiet hours'}`;
 };
+
+/* ---------- @ someone ----------
+   Recognizing a teammate was a dropdown under the message box: a second, separate way to
+   say a thing you were already about to type. Two places to do one job is exactly what
+   Jason keeps catching. Typing @ is what everyone already does in every other app, so it
+   is now the only way -- and it does more than the dropdown did, because it also reaches
+   the person, not just decorates the post. */
+function mentionNames(){
+  return Object.keys(window._posMap||{}).filter(function(n){ return n && !isArchived(n); });
+}
+function _mentionTokens(){
+  const all=mentionNames();
+  const first={}; all.forEach(function(n){ const f=String(n).split(/\s+/)[0]; (first[f]=first[f]||[]).push(n); });
+  const toks=all.slice();
+  Object.keys(first).forEach(function(f){ if(first[f].length===1 && toks.indexOf(f)<0) toks.push(f); }); // a first name only counts when it belongs to one person
+  return {toks:toks.sort(function(a,b){ return b.length-a.length; }), first:first};
+}
+// Who a message actually names, resolved back to full roster names.
+function mentionResolve(body){
+  const b=String(body||''); const t=_mentionTokens(); const out=[];
+  t.toks.forEach(function(tok){
+    if(!new RegExp('@'+escapeRe(tok)+'(?![A-Za-z])').test(b)) return;
+    const full=(t.first[tok]&&t.first[tok].length===1)?t.first[tok][0]:tok;
+    if(out.indexOf(full)<0) out.push(full);
+  });
+  return out;
+}
+/* One pass, longest name first -- replacing name by name would find "@Riley" again inside
+   the "@Riley Mannix" it had just written. */
+function linkifyBody(s){
+  let h=esc(s||'');
+  const t=_mentionTokens();
+  if(t.toks.length){
+    const re=new RegExp('@('+t.toks.map(escapeRe).join('|')+')(?![A-Za-z])','g');
+    h=h.replace(re, function(m,n){ return '<span style="color:var(--brand);font-weight:700;background:var(--brand-soft);border-radius:5px;padding:0 3px">@'+n+'</span>'; });
+  }
+  return h.replace(/(^|\s)(#[A-Za-z0-9_]{1,30})/g, function(m,pre,tag){ return pre+'<span style="color:var(--brand);cursor:pointer;font-weight:600" onclick="filterTag(\''+tag.toLowerCase().replace(/'/g,'')+'\')">'+tag+'</span>'; });
+}
+window.npKey=function(){
+  const ta=document.getElementById('np'), box=document.getElementById('npMention');
+  if(!ta||!box) return;
+  const before=ta.value.slice(0, ta.selectionStart||0);
+  const m=before.match(/@([A-Za-z]*)$/);
+  if(!m){ box.style.display='none'; box.innerHTML=''; return; }
+  const q=(m[1]||'').toLowerCase();
+  const hits=mentionNames().filter(function(n){
+    if(!q) return true;
+    return String(n).toLowerCase().split(/\s+/).some(function(w){ return w.indexOf(q)===0; });
+  }).slice(0,6);
+  if(!hits.length){ box.style.display='none'; box.innerHTML=''; return; }
+  box.style.display='block';
+  box.innerHTML=hits.map(function(n){ return `<button type="button" onclick="npPick('${String(n).replace(/'/g,"\\'")}')" style="display:block;width:100%;text-align:left;border:none;background:none;padding:7px 11px;font-size:14px;font-family:inherit;cursor:pointer;color:var(--ink)">${esc(n)} <span class="faint" style="font-size:12px">${esc(posOf(n))}</span></button>`; }).join('');
+};
+window.npPick=function(n){
+  const ta=document.getElementById('np'), box=document.getElementById('npMention');
+  if(!ta) return;
+  const pos=ta.selectionStart||0, after=ta.value.slice(pos);
+  const before=ta.value.slice(0,pos).replace(/@([A-Za-z]*)$/, '@'+n+' ');
+  ta.value=before+after;
+  if(box){ box.style.display='none'; box.innerHTML=''; }
+  ta.focus(); try{ ta.setSelectionRange(before.length, before.length); }catch(e){}
+};
+// Tells the people a message names. Never yourself.
+async function notifyMentions(body, where){
+  const me=_meRoster(), from=(state.profile&&state.profile.name)||'';
+  const who=mentionResolve(body).filter(function(n){ return n!==me && n!==from; });
+  if(!who.length) return;
+  await notify({title:(from||'Someone')+' mentioned you', body:String(body||'').slice(0,160), who:who, act:'community'});
+}
