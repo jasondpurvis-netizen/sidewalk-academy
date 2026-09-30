@@ -590,8 +590,11 @@ function confirmBlock(p,isLeader){
   const doneNames=new Set(done.map(function(d){ return d.name; }));
   const mine=done.find(function(d){ return d.user===state.user.id; });
   const left=need.filter(function(n){ return !doneNames.has(n); });
-  let h=`<div style="margin-top:11px;border-radius:12px;overflow:hidden;border:1px solid ${mine?'#BFE3C6':'#F0D98A'}">`;
-  if(mine){
+  const forMe=_audMe(aud) && need.indexOf(_meRoster())>=0;   // the owner is not on the roster, and a bar message is not his to confirm
+  if(!forMe && !mine && !isLeader) return '';
+  let h=`<div style="margin-top:11px;border-radius:12px;overflow:hidden;border:1px solid ${mine?'#BFE3C6':(forMe?'#F0D98A':'var(--line)')}">`;
+  if(!forMe && !mine){ /* nothing to confirm -- a leader just sees the tally below */ }
+  else if(mine){
     h+=`<div style="display:flex;align-items:center;gap:8px;padding:10px 13px;background:#EDF8EF;color:#1E6B37">
       <i class="ti ti-circle-check-filled" style="font-size:17px"></i>
       <span style="font-size:14px;font-weight:700">You confirmed this${mine.at?' · '+esc(timeAgo(mine.at)):''}</span></div>`;
@@ -633,7 +636,7 @@ window._npTools=null;
 function composerTools(isLeader){
   window._npTools={poll:false,must:false,aud:false};
   window._npAud={pos:[],skills:[],names:[]};
-  window._npOpts=2;
+  window._npOpts=2; window._npOptVals=[];
   const chip=function(k,icon,label){ return `<button id="npc_${k}" onclick="npTool('${k}')" style="display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line2);background:var(--card);color:var(--muted);border-radius:999px;padding:6px 12px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit"><i class="ti ${icon}" style="font-size:14px"></i>${label}</button>`; };
   return `<div class="row" style="margin-top:9px;gap:7px;flex-wrap:wrap">`
     + chip('poll','ti-chart-bar','Ask a question')
@@ -654,11 +657,19 @@ window.npTool=function(k){
 };
 function _rosterPositions(){ const s=[]; ((typeof rosterNames==='function')?rosterNames():[]).forEach(function(n){ const p=posOf(n); if(p&&p!=='Unassigned'&&s.indexOf(p)<0) s.push(p); }); return s.sort(); }
 function _rosterSkills(){ const s=[]; ((typeof rosterNames==='function')?rosterNames():[]).forEach(function(n){ (((profileOf(n)||{}).roles)||[]).forEach(function(r){ if(r&&s.indexOf(r)<0) s.push(r); }); }); return s.sort(); }
+// Anything already typed into the choices survives a re-render -- picking an audience
+// after writing the choices used to wipe them, silently, and the poll never got saved.
+function _npGrabOpts(){
+  const v=window._npOptVals||[];
+  for(let i=0;i<(window._npOpts||2);i++){ const e=document.getElementById('npo'+i); if(e) v[i]=e.value; }
+  window._npOptVals=v;
+}
 function npPanels(){
   const box=document.getElementById('npPanels'); if(!box) return;
+  _npGrabOpts();
   const t=window._npTools||{}; let h='';
   if(t.poll){
-    let opts=''; for(let i=0;i<(window._npOpts||2);i++) opts+=`<input id="npo${i}" placeholder="Choice ${i+1}" style="width:100%;margin-bottom:6px"/>`;
+    let opts=''; for(let i=0;i<(window._npOpts||2);i++) opts+=`<input id="npo${i}" value="${esc((window._npOptVals||[])[i]||'')}" placeholder="Choice ${i+1}" style="width:100%;margin-bottom:6px"/>`;
     h+=`<div style="margin-top:9px;border:1px solid var(--brand-line);background:var(--brand-soft);border-radius:12px;padding:12px 13px">
       <div style="font-weight:700;font-size:13px;margin-bottom:8px">Choices — people tap one, and you see who picked what</div>${opts}
       ${(window._npOpts||2)<6?`<button class="btn" style="width:auto;padding:4px 11px;font-size:12.5px" onclick="npPollAdd()">Add a choice</button>`:''}</div>`;
@@ -680,7 +691,7 @@ function npPanels(){
   }
   box.innerHTML=h;
 }
-window.npPollAdd=function(){ const keep=[]; for(let i=0;i<(window._npOpts||2);i++){ const e=document.getElementById('npo'+i); keep.push(e?e.value:''); } window._npOpts=Math.min(6,(window._npOpts||2)+1); npPanels(); keep.forEach(function(v,i){ const e=document.getElementById('npo'+i); if(e)e.value=v; }); };
+window.npPollAdd=function(){ _npGrabOpts(); window._npOpts=Math.min(6,(window._npOpts||2)+1); npPanels(); };
 window.npAud=function(grp,v){ const a=window._npAud||(window._npAud={pos:[],skills:[],names:[]}); const arr=a[grp]||(a[grp]=[]); const i=arr.indexOf(v); if(i>=0)arr.splice(i,1); else arr.push(v); npPanels(); };
 // Writes whatever the composer's tools were set to, for a post that now has an id.
 async function savePostExtras(pid){
