@@ -944,3 +944,4 @@ function quotedBlock(cid){
     <div style="font-size:12px;font-weight:700;color:var(--muted)">${esc(q.author||'')}</div>
     <div class="faint" style="font-size:12.5px;line-height:1.4">${esc(q.text||'')}</div></div>`;
 }
+window.chanMore=function(){ window._chanMore=!window._chanMore; vCommunity(document.getElementById('view')); };
