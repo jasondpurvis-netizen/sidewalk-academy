@@ -2,7 +2,7 @@
 /* A stamp so any device can say which version it is actually running. Three times now a
    phone and a laptop on the same address have disagreed about what the app looks like,
    and there was no way to tell them apart except by describing the screen. */
-const BUILD = '2026-09-29-11';
+const BUILD = '2026-09-29-12';
 window.BUILD = BUILD;
 const SUPABASE_URL = "https://wjqcnxnwjqmuzrandgea.supabase.co";
 const SUPABASE_KEY = "sb_publishable_DQZclfAnv_MYQJLGcOdzdw_g4vMCiSC";
@@ -721,9 +721,15 @@ const PERM_LABELS=(function(){ const m=Object.assign({},PERM_LABELS_EXTRA);
    list into a group of their own, so pinning four of six destinations left a sidebar
    showing two things and looking broken. A pin now adds a shortcut at the top and
    changes nothing else. */
+/* A page that is already a door in the sidebar cannot be pinned to the sidebar -- doing it
+   put a second "Messages" above the first one, which is the duplicate-listing problem in
+   miniature. Pinning is for the pages that are NOT doors: Recipes, Pay, Catering and the
+   rest that came off the nav when it went from twenty-two to eleven. Anything saved before
+   this that names a door is ignored rather than migrated. */
+function _inNav(p){ return NAV_ALL.some(function(g){ return g[1].some(function(r){ return r[0]===p; }); }); }
 function myPins(){
   try{ const a=JSON.parse(localStorage.getItem('sw_pins')||'[]');
-       return Array.isArray(a)?a.filter(p=>PAGE_LABEL[p]&&canSee(p)):[]; }catch(e){ return []; }
+       return Array.isArray(a)?a.filter(p=>PAGE_LABEL[p]&&canSee(p)&&!_inNav(p)):[]; }catch(e){ return []; }
 }
 function isPinned(p){ return myPins().indexOf(p)>=0; }
 window.togglePin=function(p){
@@ -1015,9 +1021,12 @@ function setTitle(t,s){
   if(PAGE_LABEL[state.page]) t=PAGE_LABEL[state.page];
   if(PAGE_HERO[state.page]){ ph.innerHTML=heroBanner(PAGE_HERO[state.page], esc(t||''), s?esc(s):'', ''); }
   else {
-    const _canPin=!!PAGE_LABEL[state.page];
+    /* It was a bare bookmark icon whose only explanation was a tooltip, and a tooltip
+       needs a mouse -- on a phone there is no way to find out what it does. It says what
+       it does now, and says it back to you once it is done. */
+    const _canPin=!!PAGE_LABEL[state.page] && !_inNav(state.page);
     const _on=_canPin&&isPinned(state.page);
-    const _pin=_canPin?`<button class="iconbtn" onclick="togglePin('${state.page}')" title="${_on?'Remove from the sidebar':'Pin to the sidebar'}" aria-label="${_on?'Remove from the sidebar':'Pin to the sidebar'}" style="margin-left:auto;flex:none;color:${_on?'var(--brand)':'var(--muted)'}"><i class="ti ti-${_on?'bookmark-filled':'bookmark'}"></i></button>`:'';
+    const _pin=_canPin?`<button onclick="togglePin('${state.page}')" aria-label="${_on?'Remove from the sidebar':'Add to the sidebar'}" style="margin-left:auto;flex:none;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;border:1px solid ${_on?'var(--brand)':'var(--line2)'};background:${_on?'var(--brand-soft)':'var(--card)'};color:${_on?'var(--brand)':'var(--muted)'};border-radius:999px;padding:7px 13px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit"><i class="ti ti-${_on?'bookmark-filled':'bookmark'}" style="font-size:15px"></i>${_on?'In your sidebar':'Add to sidebar'}</button>`:'';
     ph.innerHTML=`<div class="top" style="display:flex;align-items:center;gap:13px"><span class="topicon"><i class="ti ${HEROICON[state.page]||'ti-point'}"></i></span><div style="min-width:0;flex:1"><h1 id="ttl">${esc(t||'')}</h1><div class="sub" id="tsub">${esc(s||'')}</div></div>${_pin}</div>`;
   }
 }
