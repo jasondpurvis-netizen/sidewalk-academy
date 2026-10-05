@@ -12,7 +12,7 @@ function fmtClock(t){ const v=parseClock(t); if(v==null)return esc(t||''); let h
 function money(n){ return '$'+(Math.round(n*100)/100).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}); }
 async function vSchedule(v){
   const isAdmin=state.profile&&state.profile.role==='admin';
-  const stab=state.ctx.stab||'schedule';
+  let stab=state.ctx.stab||'schedule';   // reassigned below when an old availability/timeoff link arrives
   setTitle('Operations','Scheduling, team & the daily log — one place');
   const _w=document.querySelector('.wrap'); if(_w) _w.style.maxWidth='1180px';
   /* Reports is not in the tab bar. Every figure on it -- hours, labour cost, labour

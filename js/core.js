@@ -2,7 +2,7 @@
 /* A stamp so any device can say which version it is actually running. Three times now a
    phone and a laptop on the same address have disagreed about what the app looks like,
    and there was no way to tell them apart except by describing the screen. */
-const BUILD = '2026-09-30-1';
+const BUILD = '2026-10-05-1';
 window.BUILD = BUILD;
 const SUPABASE_URL = "https://wjqcnxnwjqmuzrandgea.supabase.co";
 const SUPABASE_KEY = "sb_publishable_DQZclfAnv_MYQJLGcOdzdw_g4vMCiSC";
@@ -879,10 +879,18 @@ function renderApp(){
   const _failed = function(err){
     const v2=document.getElementById('view'); if(!v2) return;
     const why=(err&&(err.message||err.error_description))||'';
+    /* A fault in the page's own code was being reported as "could not fetch its data",
+       which sent the search in the wrong direction -- an availability page that threw a
+       TypeError looked like a database problem for as long as anyone believed the message.
+       Say which of the two it is. */
+    const _code=!!(err && (err instanceof TypeError || err instanceof ReferenceError || err instanceof SyntaxError));
+    const _lead=_code
+      ? 'Nothing has been lost \u2014 this is a fault in the app, not in your data. Reloading may get you past it; tell Jason if it keeps happening.'
+      : 'Nothing has been lost \u2014 the page could not fetch its data.';
     v2.innerHTML='<div class="card" style="padding:26px 24px;max-width:520px">'
       +'<div style="font-size:18px;font-weight:600;letter-spacing:-.02em;margin-bottom:6px">This didn\u2019t load</div>'
       +'<div class="faint" style="font-size:15px;line-height:1.55;margin-bottom:16px">'
-      +'Nothing has been lost \u2014 the page could not fetch its data.'
+      +_lead
       +(why?' <span style="opacity:.8">('+esc(why)+')</span>':'')+'</div>'
       +'<button class="btn pri" style="width:auto" onclick="render()">Try again</button></div>';
     try{ console.error('view failed:', state.page, err); }catch(e){}
