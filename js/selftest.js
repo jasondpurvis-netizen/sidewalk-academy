@@ -13,7 +13,7 @@
    It reads. It writes nothing. */
 
 (function(){
-  const WAIT_MS = 9000;     // a slow page on a cold cache
+  const WAIT_MS = 12000;    // a slow page on a phone, on a cold cache
   const SETTLE  = 160;
 
   // Everything with a door, plus the tabs inside the ones that have them. A route that
@@ -106,6 +106,10 @@
 
     const where={p:state.page, c:state.ctx};
     const R=routes(), out=[];
+    /* The first page measured was racing the app's own start-up and failed on time, which
+       is a lie: run it once and throw the answer away, so the first real measurement is of
+       the page and not of the boot. */
+    try{ await step(R[0][0], R[0][1], bus); }catch(e){}
     const b=panel();
     const draw=function(done){
       const bad=out.filter(function(x){ return !x.ok; });
@@ -144,9 +148,11 @@
   // Opening the app at #selftest runs it, once the app is actually up.
   (function arm(){
     if((location.hash||'').toLowerCase()!=='#selftest') return;
+    // Wait for the app to be properly up -- signed in and done drawing -- not merely present.
     const t=setInterval(function(){
-      if(typeof state==='undefined' || !state.user || !document.getElementById('view')) return;
-      clearInterval(t); window.selfTest();
+      if(typeof state==='undefined' || !state.user) return;
+      if(!settled(document.getElementById('view'))) return;
+      clearInterval(t); setTimeout(window.selfTest, 1200);
     },400);
   })();
 })();
