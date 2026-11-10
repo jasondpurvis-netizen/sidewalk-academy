@@ -17,7 +17,7 @@ echo "--- $NEW appears ---"
 printf "  index.html %s times\n" "$(grep -c "$NEW" index.html)"
 printf "  manifest   %s times\n" "$(grep -c "$NEW" manifest.webmanifest)"
 grep -n "const BUILD" js/core.js
-for f in core academy community lists today schedule team; do
+for f in core academy community lists today schedule team selftest; do
   /System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc -e "new Function(read(\"js/$f.js\"));" || { echo "SYNTAX FAIL: $f"; exit 1; }
 done
 echo "all files parse"
