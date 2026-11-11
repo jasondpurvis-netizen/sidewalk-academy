@@ -54,12 +54,17 @@
     return n;
   }
 
+  /* "Has it finished?" used to mean "is there no spinner anywhere on the page". That is
+     the wrong question: plenty of pages draw their content and leave a small spinner in a
+     corner for a count that is still on its way. The Brain does, and the check called it
+     broken twice for it -- while the page itself was on screen and usable in under two
+     seconds. The right question is whether the page drew anything real. */
   function settled(v){
     if(!v) return false;
-    const h=v.innerHTML||'';
-    if(!h.trim()) return false;
-    if(h.indexOf('class="waiting"')>=0) return false;
-    if(/>\s*Loading…\s*</.test(h)) return false;
+    if(!(v.innerHTML||'').trim()) return false;
+    const t=(v.innerText||'').trim();
+    if(!t) return false;                 // the bare spinner has no words in it
+    if(/^Loading…?$/.test(t)) return false;
     return true;
   }
 
