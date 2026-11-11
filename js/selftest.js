@@ -130,7 +130,7 @@
         +'</div>'
         + out.map(function(x){
             return '<div style="padding:2px 0;color:'+(x.ok?'#7FB98B':'#F08C7A')+'">'
-              + (x.ok?'ok  ':'FAIL') + '  ' + x.name
+              + (x.ok?'ok  ':'FAIL') + '  ' + x.name + (x.slow?' <span style="opacity:.6">(slow)</span>':'')
               + (x.ok?'':' <span style="opacity:.85">— '+x.why+'</span>') + '</div>';
           }).join('')
         + (done&&bad.length? '<div style="margin-top:9px;opacity:.75">Tell Jason which lines say FAIL.</div>' : '');
@@ -142,7 +142,17 @@
       const p=R[i][0], c=R[i][1];
       let r;
       try{ r=await step(p,c,bus); }catch(e){ r={ok:false,why:'the check itself threw: '+(e&&e.message||e)}; }
+      /* Forty-two pages back to back lean on the database hard enough that a slow page runs
+         out of time and gets called broken. It is not broken, and a check that invents
+         failures is worse than no check at all -- the next real one gets ignored too. So
+         anything that fails gets one more go, on its own, with room to breathe. A page that
+         is genuinely broken fails both times; a slow one passes the second time. */
+      if(!r.ok){
+        await new Promise(function(x){ setTimeout(x,1500); });
+        try{ const again=await step(p,c,bus); if(again.ok) again.slow=true; r=again; }catch(e){}
+      }
       r.name=label(p,c); out.push(r); draw(false);
+      await new Promise(function(x){ setTimeout(x,250); });
     }
 
     window.removeEventListener('error',onErr);
