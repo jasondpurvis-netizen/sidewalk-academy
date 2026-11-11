@@ -1704,6 +1704,13 @@ async function vSettings(v){
     <code style="font-size:14px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:4px 9px">${esc(window.BUILD||'unknown')}</code>
     <span class="faint" style="font-size:13px;flex:1;min-width:150px">If two devices disagree about what the app looks like, this tells us which one is behind.</span>
   </div>
+  <!-- Saved to a home screen there is no address bar, so a check you reach by typing in a
+       web address is a check Jason cannot run on the phone he actually uses. It needs a button. -->
+  <div class="card" style="padding:22px;max-width:480px;margin-top:16px">
+    <div style="font-size:15.5px;font-weight:600;letter-spacing:-.012em;margin-bottom:4px">Check every page</div>
+    <div class="faint" style="font-size:14px;margin-bottom:14px;line-height:1.5">Opens every page in the app, one after another, and tells you if any of them is broken. Takes about a minute. It only looks &mdash; nothing is changed, and nobody is told.</div>
+    <button class="btn pri" style="width:auto" id="stBtn" onclick="runSelfCheck()">Check every page</button>
+  </div>
   <div class="card" style="padding:22px;max-width:480px;margin-top:16px">
     <div style="font-size:15.5px;font-weight:600;letter-spacing:-.012em;margin-bottom:4px">On your phone's home screen</div>
     <div class="faint" style="font-size:14px;margin-bottom:14px;line-height:1.5">Saved to a home screen this opens like an app, with your name and logo on the icon &mdash; not a browser tab.</div>
@@ -2006,14 +2013,31 @@ window.addEventListener('hashchange',()=>{ if(state.user && applyHash()) render(
 /* The self-check is not part of the app. It loads only when the address ends in
    #selftest, so a normal visit never fetches it and no member of staff meets it. */
 (function(){
-  function loadSelfTest(){
-    if(window._stLoaded || (location.hash||'').toLowerCase()!=='#selftest') return;
+  function fetchSelfTest(){
+    if(window._stLoaded) return Promise.resolve();
     window._stLoaded=true;
-    const s=document.createElement('script'); s.src='js/selftest.js?v='+(window.BUILD||'');
-    document.head.appendChild(s);
+    return new Promise(function(res,rej){
+      const s=document.createElement('script');
+      s.src='js/selftest.js?v='+(window.BUILD||'');
+      s.onload=res; s.onerror=function(){ window._stLoaded=false; rej(new Error('could not load the checker')); };
+      document.head.appendChild(s);
+    });
   }
-  loadSelfTest();
-  window.addEventListener('hashchange', loadSelfTest);
+  // The button in Settings. This is how it is actually run -- on a phone there is no
+  // address bar to type anything into.
+  window.runSelfCheck=async function(){
+    const b=document.getElementById('stBtn');
+    if(b){ b.disabled=true; b.textContent='Checking\u2026'; }
+    try{ await fetchSelfTest(); await window.selfTest(); }
+    catch(e){ alert('The check could not start: '+(e&&e.message||e)); }
+    // The run walks away from Settings and back, so the button on screen now is a new one.
+    const b2=document.getElementById('stBtn');
+    if(b2){ b2.disabled=false; b2.textContent='Check every page'; }
+  };
+  // Still works from a web address, for a laptop.
+  function armHash(){ if((location.hash||'').toLowerCase()==='#selftest') fetchSelfTest(); }
+  armHash();
+  window.addEventListener('hashchange', armHash);
 })();
 window.shareLesson=function(tid,lid){ const url=location.origin+location.pathname+'#lesson/'+encodeURIComponent(tid)+'/'+encodeURIComponent(lid); try{ navigator.clipboard&&navigator.clipboard.writeText(url); }catch(e){} const b=document.getElementById('sharebtn'); if(b){ b.textContent='Link copied ✓'; setTimeout(()=>{ b.innerHTML='<i class="ti ti-share"></i> Share'; },2000); } };
 window.printLesson=function(lid){ let L=null,T=null; state.tracks.forEach(t=>(state.lessons[t.id]||[]).forEach(l=>{ if(l.id===lid){L=l;T=t;} })); if(!L)return; const name=(state.settings&&state.settings.academy_name)||'Academy'; const brand=(state.settings&&state.settings.brand_color)||'#4A9CAD'; const body=L.body&&L.body.trim()?richBody(L.body):('<p>'+esc(L.subtitle||'')+'</p>'); const w=window.open('','_blank'); if(!w)return; w.document.write(`<!doctype html><html><head><meta charset=utf-8><title>${esc(L.title)}</title><style>@page{margin:.7in}body{font-family:Helvetica,Arial,sans-serif;color:#1a1a1a;max-width:720px;margin:0 auto;line-height:1.65}h1{font-size:24px;margin:0 0 6px}.ey{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:${brand};font-weight:700}.hd{border-bottom:3px solid ${brand};padding-bottom:8px;margin-bottom:18px}blockquote{border-left:3px solid ${brand};margin:0 0 14px;padding:8px 16px;background:#f3f8f9;font-style:italic}.pbar{position:fixed;top:10px;right:10px}.pbar button{padding:8px 16px;border:1px solid ${brand};background:${brand};color:#fff;border-radius:6px;cursor:pointer}@media print{.pbar{display:none}}</style></head><body><div class=pbar><button onclick="window.print()">Print</button></div><div class=hd><div class=ey>${esc(name)} · ${esc(T.name)}</div></div><h1>${esc(L.title)}</h1>${L.subtitle?'<p style="font-style:italic;color:#666">'+esc(L.subtitle)+'</p>':''}${body}</body></html>`); w.document.close(); setTimeout(()=>{try{w.focus();w.print();}catch(e){}},400); };

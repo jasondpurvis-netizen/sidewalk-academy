@@ -42,7 +42,17 @@
     return R;
   }
 
-  function label(p,c){ const k=Object.keys(c||{}); return p + (k.length? ' · '+k.map(function(x){return c[x];}).join('/') : ''); }
+  // Say the page's real name, the one on its own screen -- "Schedule - When people can
+  // work", not "schedule/whenwork". Whoever reads this is deciding whether to worry.
+  const TAB={schedule:'the week',team:"who's working",whenwork:'when people can work',availability:'when people can work',timeoff:'time off',pool:'shift swaps',reports:'reports'};
+  function label(p,c){
+    let n; try{ n=(typeof PAGE_LABEL!=='undefined' && PAGE_LABEL[p]) || p; }catch(e){ n=p; }
+    c=c||{};
+    if(c.stab) return n+' \u2014 '+(TAB[c.stab]||c.stab);
+    if(c.lid) return n+' \u2014 a lesson';
+    if(c.tid) return n+' \u2014 '+c.tid;
+    return n;
+  }
 
   function settled(v){
     if(!v) return false;
